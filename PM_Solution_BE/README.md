@@ -21,6 +21,7 @@ OpenAPI
 - JSON: `http://localhost:8080/v3/api-docs`
 
 Endpoints
+- GET `/api/projects` → list local projects (id, gitlabProjectId, name) for FE select
 - POST `/api/sync/projects`
   - Body (optional): `{ "projectIds": [123, 456] }`
   - Upserts projects and their 1:1 repositories (root_repo=true).
@@ -38,7 +39,12 @@ Endpoints
 
 - POST `/api/sync/projects/{projectId}/issues/{iid}/notes?since=ISO8601`
   - Same as above but for a single issue.
-  - Response: `{ "fetched": n, "inserted": n, "updated": 0, "skipped": n, "pages": n }`
+  - Response: `{ "fetched": n, "inserted": n, "updated": 0, "skipped": n, "pages": n, "durationMs": n }`
+
+- POST `/api/sync/projects/{projectId}/all?full={true|false}&since=ISO8601`
+  - MVP aggregates Issues → Notes; returns 200 even with per-step errors
+  - Response example:
+    `{ "projects": {"status":"SKIPPED"}, "issues": {"status":"OK", "fetched": 10, ...}, "notes": {"status":"ERROR", "error": {"code":"RATE_LIMITED", ...}}, "durationMs": 3200 }`
 
 Database
 - Flyway migrations: `src/main/resources/db/migration`
@@ -51,6 +57,11 @@ Error semantics
 - 503: rate limited after retries
 - 502: upstream GitLab failure (5xx)
 
+Standard error contract
+```
+{ "error": { "code": "...", "message": "...", "details": "...", "httpStatus": 503, "requestId": "abc-123" } }
+```
+
 Logging
 - Start/end of each sync with parameters, pages processed, and counters.
 - 429/5xx logs include GitLab `X-Request-Id` when available.
@@ -60,4 +71,3 @@ Notes
 - In MVP `assignee_username` uses first assignee only.
 - `report` dedupe key (MVP): `(project_id, iid, username, spent_at, time_spent_seconds)`.
 - Run `POST /api/sync/projects` before issues/notes so the local project exists.
-

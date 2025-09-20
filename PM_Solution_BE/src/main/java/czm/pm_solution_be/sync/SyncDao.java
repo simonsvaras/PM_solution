@@ -45,6 +45,12 @@ public class SyncDao {
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 
+    public record ProjectRow(Long id, Long gitlabProjectId, String name) {}
+    public List<ProjectRow> listProjects() {
+        return jdbc.query("SELECT id, gitlab_project_id, name FROM project ORDER BY name",
+                (rs, rn) -> new ProjectRow(rs.getLong("id"), (Long)rs.getObject("gitlab_project_id"), rs.getString("name")));
+    }
+
     // Repository (1:1 mapping to project as root repo)
     public UpsertResult<Long> upsertRepository(long projectId, long gitlabRepoId, String name, String nameWithNamespace,
                                  Long namespaceId, String namespaceName, boolean rootRepo) {
