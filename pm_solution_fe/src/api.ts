@@ -1,4 +1,5 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+// Default to same-origin (nginx proxies /api -> backend in docker)
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export type SyncSummary = {
   fetched: number;
@@ -80,4 +81,3 @@ export async function syncAll(projectId: number, full: boolean, since?: string):
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<AllResult>(res);
 }
-

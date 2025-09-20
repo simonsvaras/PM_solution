@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: PM_Solution_BE/Dockerfile
+    image: pm-solution-backend:latest
+    container_name: pm-solution-backend
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      GITLAB_API: ${GITLAB_API:-https://gitlab.fel.cvut.cz/api/v4}
+      GITLAB_TOKEN: ${GITLAB_TOKEN}
+      GITLAB_TIMEOUT_MS: ${GITLAB_TIMEOUT_MS:-10000}
+      GITLAB_RETRY_MAX: ${GITLAB_RETRY_MAX:-3}
+      GITLAB_RETRY_BACKOFF_MS: ${GITLAB_RETRY_BACKOFF_MS:-500}
+      GITLAB_PER_PAGE: ${GITLAB_PER_PAGE:-100}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: pm_solution_fe/Dockerfile
+      args:
+        # empty for same-origin; nginx proxies /api to backend
+        VITE_API_BASE_URL: ""
+    image: pm-solution-frontend:latest
+    container_name: pm-solution-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:

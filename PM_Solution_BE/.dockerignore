@@ -1,0 +1,10 @@
+build/
+.gradle/
+**/*.iml
+.idea/
+out/
+bin/
+Dockerfile
+docker-compose.yml
+**/.DS_Store
+

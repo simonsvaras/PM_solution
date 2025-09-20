@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vite/
+Dockerfile
+docker/
+.env.local
+.env.*
+**/.DS_Store
+
