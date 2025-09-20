@@ -43,8 +43,8 @@ public class IssueSyncService {
         SyncSummary summary = new SyncSummary();
         Integer page = 1;
         while (true) {
-            GitLabClient.PageResult<GitLabIssue> res = gitlab.listIssuesPage(gitlabProjectId, page, updatedAfter);
-            List<GitLabIssue> issues = res.data;
+            GitLabClient.PageResult<GitLabIssue> pageRes = gitlab.listIssuesPage(gitlabProjectId, page, updatedAfter);
+            List<GitLabIssue> issues = pageRes.data;
             if (issues.isEmpty() && (page == null || page == 1)) break;
             summary.addFetched(issues.size()).addPage();
 
@@ -54,7 +54,7 @@ public class IssueSyncService {
                     String assigneeUsername = (is.assignees != null && !is.assignees.isEmpty()) ? is.assignees.get(0).username : null;
                     Long assigneeId = (is.assignees != null && !is.assignees.isEmpty()) ? is.assignees.get(0).id : null;
                     String[] labels = is.labels == null ? null : is.labels.toArray(new String[0]);
-                    var res = dao.upsertIssue(
+                    var upsert = dao.upsertIssue(
                             projectId,
                             repositoryId,
                             is.id,
@@ -70,12 +70,12 @@ public class IssueSyncService {
                             is.dueDate,
                             is.updatedAt
                     );
-                    if (res.inserted) summary.addInserted(1); else summary.addUpdated(1);
+                    if (upsert.inserted) summary.addInserted(1); else summary.addUpdated(1);
                 }
             });
 
-            if (res.nextPage == null || res.nextPage.isEmpty()) break;
-            page = Integer.parseInt(res.nextPage);
+            if (pageRes.nextPage == null || pageRes.nextPage.isEmpty()) break;
+            page = Integer.parseInt(pageRes.nextPage);
         }
         // update cursor only if not full and no exception
         if (!full) {

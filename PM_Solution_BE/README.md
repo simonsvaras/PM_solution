@@ -17,8 +17,8 @@ Run
 - App: `./gradlew bootRun` (Windows: `gradlew.bat bootRun`)
 
 OpenAPI
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
-- JSON: `http://localhost:8080/v3/api-docs`
+- Swagger UI: `http://localhost:8081/swagger-ui.html`
+- JSON: `http://localhost:8081/v3/api-docs`
 
 Endpoints
 - GET `/api/projects` → list local projects (id, gitlabProjectId, name) for FE select

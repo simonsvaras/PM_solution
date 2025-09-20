@@ -18,10 +18,9 @@ Quick start
 
 Services
 - Postgres: localhost:5432 (db=issueviz, user=issueviz, pass=issueviz)
-- Backend (Spring Boot): localhost:8080
+ - Backend (Spring Boot): localhost:8081
 - Frontend (Nginx): localhost:5173
 
 Notes
-- Frontend proxies `/api/*` to backend inside the compose network, so no CORS is needed in Docker.
+- Frontend proxies `/api/*` to backend inside the compose network (to port 8081), so no CORS is needed in Docker.
 - For local dev outside Docker, frontend uses `VITE_API_BASE_URL` from `pm_solution_fe/.env` (defaults to same-origin if unset).
-

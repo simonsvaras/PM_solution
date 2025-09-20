@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   backend:
     build:
@@ -17,8 +15,9 @@ services:
       GITLAB_RETRY_MAX: ${GITLAB_RETRY_MAX:-3}
       GITLAB_RETRY_BACKOFF_MS: ${GITLAB_RETRY_BACKOFF_MS:-500}
       GITLAB_PER_PAGE: ${GITLAB_PER_PAGE:-100}
+      SERVER_PORT: 8081
     ports:
-      - "8080:8080"
+      - "8081:8081"
 
   frontend:
     build:
@@ -33,5 +32,3 @@ services:
       - backend
     ports:
       - "5173:80"
-
-volumes:

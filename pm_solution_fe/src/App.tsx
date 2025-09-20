@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import { API_BASE, AllResult, ErrorResponse, ProjectDTO, StepAggregate, SyncSummary, getProjects, syncAll, syncIssues, syncNotes, syncProjects } from './api';
+import { API_BASE, getProjects, syncAll, syncIssues, syncNotes, syncProjects } from './api';
+import type { AllResult, ErrorResponse, ProjectDTO, SyncSummary } from './api';
 
 type ActionKind = 'PROJECTS' | 'ISSUES' | 'NOTES' | 'ALL';
 
@@ -14,7 +15,7 @@ function App() {
   const [result, setResult] = useState<SyncSummary | AllResult | null>(null);
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
-  const lastAction = useRef<() => Promise<void>>();
+  const lastAction = useRef<null | (() => Promise<void>)>(null);
 
   useEffect(() => {
     (async () => {
