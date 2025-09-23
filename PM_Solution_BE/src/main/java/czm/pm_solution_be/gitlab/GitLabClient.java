@@ -109,6 +109,15 @@ public class GitLabClient {
         return getPage("/projects", q, new ParameterizedTypeReference<List<GitLabProject>>(){});
     }
 
+    public PageResult<GitLabProject> listGroupProjectsPage(long groupId, Integer page) {
+        MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
+        q.add("per_page", String.valueOf(props.getPerPage()));
+        q.add("include_subgroups", "true");
+        if (page != null) q.add("page", String.valueOf(page));
+        String path = "/groups/" + groupId + "/projects";
+        return getPage(path, q, new ParameterizedTypeReference<List<GitLabProject>>(){});
+    }
+
     public GitLabProject getProject(long projectId) {
         URI uri = UriComponentsBuilder.fromHttpUrl(props.getApi())
                 .path("/projects/{id}")

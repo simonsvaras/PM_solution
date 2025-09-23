@@ -30,6 +30,7 @@ management:
 gitlab:
   api: ${GITLAB_API:https://gitlab.fel.cvut.cz/api/v4}
   token: ${GITLAB_TOKEN:}
+  groupId: ${GITLAB_GROUP_ID:}
   timeoutMs: ${GITLAB_TIMEOUT_MS:10000}
   retryMax: ${GITLAB_RETRY_MAX:3}
   retryBackoffMs: ${GITLAB_RETRY_BACKOFF_MS:500}

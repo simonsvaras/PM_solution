@@ -1,6 +1,7 @@
 package czm.pm_solution_be.sync;
 
 import czm.pm_solution_be.gitlab.GitLabClient;
+import czm.pm_solution_be.config.GitLabProperties;
 import czm.pm_solution_be.gitlab.dto.GitLabProject;
 import czm.pm_solution_be.sync.dto.SyncSummary;
 import org.slf4j.Logger;
@@ -17,12 +18,14 @@ public class ProjectSyncService {
     private static final Logger log = LoggerFactory.getLogger(ProjectSyncService.class);
     private final GitLabClient gitlab;
     private final SyncDao dao;
+    private final GitLabProperties props;
     private final TransactionTemplate txTemplate;
 
-    public ProjectSyncService(GitLabClient gitlab, SyncDao dao, PlatformTransactionManager tm) {
+    public ProjectSyncService(GitLabClient gitlab, SyncDao dao, PlatformTransactionManager tm, GitLabProperties props) {
         this.gitlab = gitlab;
         this.dao = dao;
         this.txTemplate = new TransactionTemplate(tm);
+        this.props = props;
     }
 
     public SyncSummary syncAllProjects(List<Long> onlyIds) {
@@ -46,7 +49,12 @@ public class ProjectSyncService {
 
         Integer page = 1;
         while (true) {
-            GitLabClient.PageResult<GitLabProject> pageRes = gitlab.listProjectsPage(page, null);
+            GitLabClient.PageResult<GitLabProject> pageRes;
+            if (props.getGroupId() != null) {
+                pageRes = gitlab.listGroupProjectsPage(props.getGroupId(), page);
+            } else {
+                pageRes = gitlab.listProjectsPage(page, null);
+            }
             List<GitLabProject> projects = pageRes.data;
             if (projects.isEmpty() && (page == null || page == 1)) break;
             summary.addFetched(projects.size()).addPage();

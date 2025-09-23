@@ -10,6 +10,8 @@ public class GitLabProperties {
     private String api;
     /** Private token for GitLab (header PRIVATE-TOKEN) */
     private String token;
+    /** Optional parent Group ID – if set, project sync is limited to this group (and subgroups). */
+    private Long groupId;
     /** Request timeout ms */
     private int timeoutMs = 10_000;
     /** Max retries on 429/5xx */
@@ -23,6 +25,8 @@ public class GitLabProperties {
     public void setApi(String api) { this.api = api; }
     public String getToken() { return token; }
     public void setToken(String token) { this.token = token; }
+    public Long getGroupId() { return groupId; }
+    public void setGroupId(Long groupId) { this.groupId = groupId; }
     public int getTimeoutMs() { return timeoutMs; }
     public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
     public int getRetryMax() { return retryMax; }
@@ -32,4 +36,3 @@ public class GitLabProperties {
     public int getPerPage() { return perPage; }
     public void setPerPage(int perPage) { this.perPage = perPage; }
 }
-
