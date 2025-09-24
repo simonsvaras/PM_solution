@@ -1,6 +1,7 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import { API_BASE, getProjects, syncAll, syncIssues, syncNotes, syncProjects } from './api';
+import Navbar, { type Module } from './components/Navbar';
+import { API_BASE, getProjects, syncAll, syncIssues, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, ProjectDTO, SyncSummary } from './api';
 
 type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL';
@@ -36,6 +37,7 @@ function App() {
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
   const [selected, setSelected] = useState<number | undefined>();
   const [full, setFull] = useState(false);
+  const [since, setSince] = useState<string>('');
 
   const [running, setRunning] = useState<ActionKind | null>(null);
   const [result, setResult] = useState<SyncSummary | AllResult | null>(null);
@@ -90,23 +92,23 @@ function App() {
     setRunning(action);
     setError(null);
     setResult(null);
-    console.info('Spoustim synchronizaci', { action, selected, full });
+    console.info('Spouštím synchronizaci', { action, selected, full });
     const t0 = performance.now();
     try {
       await fn();
       const dt = Math.round(performance.now() - t0);
-      showToast('success', 'Synchronizace dokoncena.');
-      console.info('Synchronizace dokoncena.', { action, durationMs: dt });
+      showToast('success', 'Synchronizace dokončena.');
+      console.info('Synchronizace dokončena.', { action, durationMs: dt });
     } catch (e) {
       const err = e as ErrorResponse;
       setError(err);
       const dt = Math.round(performance.now() - t0);
       const code = err?.error?.code || 'UNKNOWN';
-      if (code === 'RATE_LIMITED') showToast('warning', 'GitLab nas docasne omezil. Pockejte minutu a zkuste to znovu.');
-      else if (['GITLAB_UNAVAILABLE', 'TIMEOUT'].includes(code)) showToast('error', 'GitLab je ted nedostupny. Zkuste to prosim znovu.');
-      else if (['BAD_REQUEST', 'VALIDATION'].includes(code)) showToast('error', 'Neplatny vstup. Zkontrolujte vybrany projekt a parametry.');
+      if (code === 'RATE_LIMITED') showToast('warning', 'GitLab nás dočasně omezil. Počkejte minutu a zkuste to znovu.');
+      else if (['GITLAB_UNAVAILABLE', 'TIMEOUT'].includes(code)) showToast('error', 'GitLab je teď nedostupný. Zkuste to prosím znovu.');
+      else if (['BAD_REQUEST', 'VALIDATION'].includes(code)) showToast('error', 'Neplatný vstup. Zkontrolujte vybraný projekt a parametry.');
       else if (code === 'NOT_FOUND') showToast('error', 'Projekt nebo issue nebylo nalezeno.');
-      else showToast('error', 'Synchronizaci se nepodarilo dokoncit. Zkuste to prosim znovu nebo kontaktujte spravce.');
+      else showToast('error', 'Synchronizaci se nepodařilo dokončit. Zkuste to prosím znovu nebo kontaktujte správce.');
       console.warn('Synchronizace selhala', { action, durationMs: dt, error: err });
     } finally {
       setRunning(null);
@@ -121,6 +123,7 @@ function App() {
     });
     lastAction.current = doRepositories;
   }
+
   async function doIssues() {
     if (!selected) { showToast('error', 'Vyberte projekt.'); return; }
     await run('ISSUES', async () => {
@@ -133,7 +136,7 @@ function App() {
   async function doAll() {
     if (!selected) { showToast('error', 'Vyberte projekt.'); return; }
     await run('ALL', async () => {
-      const res = await syncAll(selected, full);
+      const res = await syncAll(selected, full, since || undefined);
       setResult(res);
     });
     lastAction.current = doAll;
@@ -142,15 +145,7 @@ function App() {
   const inlineStatus = running ? (
     <div className="inline-status">
       <span className="spinner" />
-      {running === 'ALL' ? (
-        <span>
-          Spouštím synchronizaci… {`Krok ${result ? 2 : 1}/2: ${result ? 'Notes…' : 'Issues…'}`}
-        </span>
-      ) : (
-        <span>Spouštím synchronizaci…</span>
-      )}
-    <div>
-      <span className="spinner" />{' '}<span>Spoustim synchronizaci</span>
+      <span>Spouštím synchronizaci…</span>
     </div>
   ) : null;
 
@@ -164,16 +159,10 @@ function App() {
       </div>
     ) : (
       <div className="card-summary">
-        <b>Souhrn (ALL)</b><br />
-        Issues: {((result as AllResult).issues.status)}{(result as AllResult).issues.status === 'OK' ? ` (fetched ${(result as AllResult).issues.fetched}, pages ${(result as AllResult).issues.pages}, ${ (result as AllResult).issues.durationMs } ms)` : ''}<br />
-        Celkem: {(result as AllResult).durationMs} ms
         <b>Souhrn (ALL)</b>
         <p>
           Issues: {(result as AllResult).issues.status}
           {(result as AllResult).issues.status === 'OK' ? ` (fetched ${(result as AllResult).issues.fetched}, pages ${(result as AllResult).issues.pages}, ${(result as AllResult).issues.durationMs} ms)` : ''}
-          <br />
-          Notes: {(result as AllResult).notes.status}
-          {(result as AllResult).notes.status === 'OK' ? ` (fetched ${(result as AllResult).notes.fetched}, pages ${(result as AllResult).notes.pages}, ${(result as AllResult).notes.durationMs} ms)` : ''}
           <br />
           Celkem: {(result as AllResult).durationMs} ms
         </p>
@@ -182,11 +171,6 @@ function App() {
   ) : null;
 
   const errCard = error ? (
-    <div className="card-summary">
-      <b className="error">Chyba</b><br />
-      {error.error.message}<br />
-      <small>kod: {error.error.code}{error.error.requestId ? ` â€˘ reqId: ${error.error.requestId}` : ''}</small>
-      <div style={{ marginTop: 8 }}>
     <div className="card-summary card-summary--error">
       <b className="error">Chyba</b>
       <p>
@@ -201,23 +185,6 @@ function App() {
   ) : null;
 
   return (
-    <div>
-      <h2>On-Demand Synchronizace</h2>
-      <div className="toolbar">
-        <label>
-          Projekt:&nbsp;
-          <select value={selected ?? ''} onChange={e => setSelected(Number(e.target.value))}>
-            {projects.map(p => (
-              <option key={p.gitlabProjectId} value={p.gitlabProjectId}>
-                {p.name} ({p.gitlabProjectId})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <input type="checkbox" checked={full} onChange={e => setFull(e.target.checked)} /> Full issues sync
-        </label>
-      </div>
     <div className="app-shell">
       <Navbar
         modules={modules}
@@ -266,15 +233,9 @@ function App() {
                   </label>
                 </div>
 
-      <div className="actions">
-        <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>Sync Repositories</button>
-        <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
-        <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
-      </div>
                 <div className="actions">
-                  <button onClick={doProjects} disabled={running === 'PROJECTS' || running === 'ALL'}>Sync Projects</button>
+                  <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>Sync Repositories</button>
                   <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
-                  <button onClick={doNotes} disabled={running === 'NOTES' || running === 'ALL'}>Sync Notes</button>
                   <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
                 </div>
 
@@ -315,3 +276,4 @@ function App() {
 }
 
 export default App;
+
