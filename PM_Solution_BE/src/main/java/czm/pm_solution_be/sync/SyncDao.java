@@ -1,13 +1,8 @@
 package czm.pm_solution_be.sync;
 
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCreator;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.Statement;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -20,11 +15,13 @@ public class SyncDao {
         this.jdbc = jdbc;
     }
 
-    // Project
     public static class UpsertResult<T> {
         public final T id;
         public final boolean inserted;
-        public UpsertResult(T id, boolean inserted) { this.id = id; this.inserted = inserted; }
+        public UpsertResult(T id, boolean inserted) {
+            this.id = id;
+            this.inserted = inserted;
+        }
     }
 
     public UpsertResult<Long> upsertProject(long gitlabProjectId, String name) {
@@ -32,12 +29,11 @@ public class SyncDao {
         if (updated > 0) {
             Long id = jdbc.queryForObject("SELECT id FROM project WHERE gitlab_project_id = ?", Long.class, gitlabProjectId);
             return new UpsertResult<>(id, false);
-        } else {
-            Long id = jdbc.queryForObject(
-                    "INSERT INTO project (gitlab_project_id, name) VALUES (?, ?) RETURNING id",
-                    Long.class, gitlabProjectId, name);
-            return new UpsertResult<>(id, true);
         }
+        Long id = jdbc.queryForObject(
+                "INSERT INTO project (gitlab_project_id, name) VALUES (?, ?) RETURNING id",
+                Long.class, gitlabProjectId, name);
+        return new UpsertResult<>(id, true);
     }
 
     public Optional<Long> findProjectIdByGitLabId(long gitlabProjectId) {
@@ -48,41 +44,48 @@ public class SyncDao {
     public record ProjectRow(Long id, Long gitlabProjectId, String name) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, gitlab_project_id, name FROM project ORDER BY name",
-                (rs, rn) -> new ProjectRow(rs.getLong("id"), (Long)rs.getObject("gitlab_project_id"), rs.getString("name")));
+                (rs, rn) -> new ProjectRow(rs.getLong("id"), (Long) rs.getObject("gitlab_project_id"), rs.getString("name")));
     }
 
-    // Repository (1:1 mapping to project as root repo)
-    public UpsertResult<Long> upsertRepository(long projectId, long gitlabRepoId, String name, String nameWithNamespace,
-                                 Long namespaceId, String namespaceName, boolean rootRepo) {
-        int updated = jdbc.update("UPDATE repository SET project_id=?, name=?, name_with_namespace=?, namespace_id=?, namespace_name=?, root_repo=? WHERE gitlab_repo_id=?",
-                projectId, name, nameWithNamespace, namespaceId, namespaceName, rootRepo, gitlabRepoId);
+    public UpsertResult<Long> upsertRepository(long gitlabRepoId, String name, String nameWithNamespace,
+                                               Long namespaceId, String namespaceName, boolean rootRepo) {
+        int updated = jdbc.update("UPDATE repository SET name=?, name_with_namespace=?, namespace_id=?, namespace_name=?, root_repo=? WHERE gitlab_repo_id=?",
+                name, nameWithNamespace, namespaceId, namespaceName, rootRepo, gitlabRepoId);
         if (updated > 0) {
             Long id = jdbc.queryForObject("SELECT id FROM repository WHERE gitlab_repo_id = ?", Long.class, gitlabRepoId);
             return new UpsertResult<>(id, false);
-        } else {
-            Long id = jdbc.queryForObject(
-                    "INSERT INTO repository (project_id, gitlab_repo_id, name, name_with_namespace, namespace_id, namespace_name, root_repo) VALUES (?,?,?,?,?,?,?) RETURNING id",
-                    Long.class, projectId, gitlabRepoId, name, nameWithNamespace, namespaceId, namespaceName, rootRepo);
-            return new UpsertResult<>(id, true);
         }
+        Long id = jdbc.queryForObject(
+                "INSERT INTO repository (gitlab_repo_id, name, name_with_namespace, namespace_id, namespace_name, root_repo) VALUES (?,?,?,?,?,?) RETURNING id",
+                Long.class, gitlabRepoId, name, nameWithNamespace, namespaceId, namespaceName, rootRepo);
+        return new UpsertResult<>(id, true);
     }
 
-    // Issues
+    public Optional<Long> findRepositoryIdByGitLabRepoId(long gitlabRepoId) {
+        List<Long> ids = jdbc.query("SELECT id FROM repository WHERE gitlab_repo_id = ?",
+                (rs, rn) -> rs.getLong(1), gitlabRepoId);
+        return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
+    }
+
+    public void linkProjectRepository(long projectId, long repositoryId) {
+        jdbc.update("INSERT INTO projects_to_repositorie (project_id, repository_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                projectId, repositoryId);
+    }
+
     public UpsertResult<Void> upsertIssue(long projectId,
-                           Long repositoryId,
-                           long gitlabIssueId,
-                           long iid,
-                           String title,
-                           String state,
-                           Long assigneeId,
-                           String assigneeUsername,
-                           String authorName,
-                           String[] labels,
-                           Integer timeEstimateSeconds,
-                           Integer totalTimeSpentSeconds,
-                           String dueDate,
-                           OffsetDateTime updatedAt) {
-        // Update first
+                                          Long repositoryId,
+                                          long gitlabIssueId,
+                                          long iid,
+                                          String title,
+                                          String state,
+                                          Long assigneeId,
+                                          String assigneeUsername,
+                                          String authorName,
+                                          String[] labels,
+                                          Integer timeEstimateSeconds,
+                                          Integer totalTimeSpentSeconds,
+                                          String dueDate,
+                                          OffsetDateTime updatedAt) {
         int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, due_date=?::date, updated_at=? WHERE project_id=? AND iid=?",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
@@ -101,7 +104,6 @@ public class SyncDao {
                 });
         if (updated > 0) return new UpsertResult<>(null, false);
 
-        // Insert
         jdbc.update("INSERT INTO issue (project_id, repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, due_date, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?::date,?)",
                 (ps) -> {
                     ps.setLong(1, projectId);
@@ -126,14 +128,6 @@ public class SyncDao {
         return jdbc.query("SELECT iid FROM issue WHERE project_id = ? ORDER BY iid", (rs, rn) -> rs.getLong(1), projectId);
     }
 
-    // Reports
-    public boolean insertReportIfNotExists(long projectId, long iid, OffsetDateTime spentAt, int timeSpentSeconds, String username) {
-        String sql = "INSERT INTO report (project_id, iid, spent_at, time_spent_seconds, username) VALUES (?,?,?,?,?) ON CONFLICT ON CONSTRAINT ux_report_nodup_mvp DO NOTHING";
-        int updated = jdbc.update(sql, projectId, iid, spentAt, timeSpentSeconds, username);
-        return updated > 0;
-    }
-
-    // Cursors
     public Optional<OffsetDateTime> getCursor(long projectId, String scope) {
         List<OffsetDateTime> rows = jdbc.query("SELECT last_run_at FROM sync_cursor WHERE project_id = ? AND scope = ?",
                 (rs, rn) -> rs.getObject(1, OffsetDateTime.class), projectId, scope);
@@ -143,5 +137,9 @@ public class SyncDao {
     public void upsertCursor(long projectId, String scope, OffsetDateTime lastRunAt) {
         String sql = "INSERT INTO sync_cursor (project_id, scope, last_run_at) VALUES (?,?,?) ON CONFLICT (project_id, scope) DO UPDATE SET last_run_at = EXCLUDED.last_run_at";
         jdbc.update(sql, projectId, scope, lastRunAt);
+    }
+
+        public void updateProjectName(long id, String name) {
+        jdbc.update("UPDATE project SET name = ? WHERE id = ?", name, id);
     }
 }

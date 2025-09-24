@@ -1,4 +1,4 @@
-// Default to same-origin (nginx proxies /api -> backend in docker)
+﻿// Default to same-origin (nginx proxies /api -> backend in docker)
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export type SyncSummary = {
@@ -32,9 +32,7 @@ export type StepAggregate = {
 };
 
 export type AllResult = {
-  projects: StepAggregate;
   issues: StepAggregate;
-  notes: StepAggregate;
   durationMs: number;
 };
 
@@ -43,7 +41,7 @@ export type ProjectDTO = { id: number; gitlabProjectId: number; name: string };
 async function parseJson<T>(res: Response): Promise<T> {
   const text = await res.text();
   try { return JSON.parse(text) as T; } catch {
-    throw { error: { code: "INVALID_JSON", message: "Neplatná odpověď serveru.", details: text, httpStatus: res.status } } as ErrorResponse;
+    throw { error: { code: "INVALID_JSON", message: "NeplatnĂˇ odpovÄ›ÄŹ serveru.", details: text, httpStatus: res.status } } as ErrorResponse;
   }
 }
 
@@ -53,22 +51,15 @@ export async function getProjects(): Promise<ProjectDTO[]> {
   return parseJson<ProjectDTO[]>(res);
 }
 
-export async function syncProjects(): Promise<SyncSummary> {
-  const res = await fetch(`${API_BASE}/api/sync/projects`, { method: "POST" });
+export async function syncRepositories(): Promise<SyncSummary> {
+  const res = await fetch(`${API_BASE}/api/sync/repositories`, { method: "POST" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<SyncSummary>(res);
 }
+
 
 export async function syncIssues(projectId: number, full: boolean): Promise<SyncSummary> {
   const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/issues?full=${full}`, { method: "POST" });
-  if (!res.ok) throw await parseJson<ErrorResponse>(res);
-  return parseJson<SyncSummary>(res);
-}
-
-export async function syncNotes(projectId: number, since?: string): Promise<SyncSummary> {
-  const qs = new URLSearchParams();
-  if (since) qs.set("since", since);
-  const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/notes${qs.toString() ? `?${qs.toString()}` : ""}`, { method: "POST" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<SyncSummary>(res);
 }

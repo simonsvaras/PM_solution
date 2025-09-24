@@ -2,7 +2,6 @@ package czm.pm_solution_be.gitlab;
 
 import czm.pm_solution_be.config.GitLabProperties;
 import czm.pm_solution_be.gitlab.dto.GitLabIssue;
-import czm.pm_solution_be.gitlab.dto.GitLabNote;
 import czm.pm_solution_be.gitlab.dto.GitLabProject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +19,6 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class GitLabClient {
@@ -99,29 +97,21 @@ public class GitLabClient {
         try { Thread.sleep(ms); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
     }
 
-    public PageResult<GitLabProject> listProjectsPage(Integer page, List<Long> onlyIds) {
+    public PageResult<GitLabIssue> listIssuesPage(long projectId, Integer page, OffsetDateTime updatedAfter) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
+        q.add("state", "all");
         q.add("per_page", String.valueOf(props.getPerPage()));
         if (page != null) q.add("page", String.valueOf(page));
-        if (onlyIds != null && !onlyIds.isEmpty()) {
-            // GitLab API does not filter by multiple IDs on /projects; fallback to fetching details per ID in service
-        }
-        return getPage("/projects", q, new ParameterizedTypeReference<List<GitLabProject>>(){});
-    }
+        if (updatedAfter != null) q.add("updated_after", updatedAfter.toString());
 
-    public PageResult<GitLabProject> listGroupProjectsPage(long groupId, Integer page) {
-        MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("per_page", String.valueOf(props.getPerPage()));
-        q.add("include_subgroups", "true");
-        if (page != null) q.add("page", String.valueOf(page));
-        String path = "/groups/" + groupId + "/projects";
-        return getPage(path, q, new ParameterizedTypeReference<List<GitLabProject>>(){});
+        String path = "/projects/" + projectId + "/issues";
+        return getPage(path, q, new ParameterizedTypeReference<List<GitLabIssue>>(){});
     }
 
     public GitLabProject getProject(long projectId) {
         URI uri = UriComponentsBuilder.fromHttpUrl(props.getApi())
                 .path("/projects/{id}")
-                .buildAndExpand(Map.of("id", projectId))
+                .buildAndExpand(java.util.Map.of("id", projectId))
                 .toUri();
         int attempt = 0;
         while (true) {
@@ -143,23 +133,12 @@ public class GitLabClient {
         }
     }
 
-    public PageResult<GitLabIssue> listIssuesPage(long projectId, Integer page, OffsetDateTime updatedAfter) {
+    public PageResult<GitLabProject> listGroupProjectsPage(long groupId, Integer page) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("state", "all");
         q.add("per_page", String.valueOf(props.getPerPage()));
+        q.add("include_subgroups", "true");
         if (page != null) q.add("page", String.valueOf(page));
-        if (updatedAfter != null) q.add("updated_after", updatedAfter.toString());
-
-        String path = "/projects/" + projectId + "/issues";
-        return getPage(path, q, new ParameterizedTypeReference<List<GitLabIssue>>(){});
-    }
-
-    public PageResult<GitLabNote> listIssueNotesPage(long projectId, long issueIid, Integer page) {
-        MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
-        q.add("system", "true");
-        q.add("per_page", String.valueOf(props.getPerPage()));
-        if (page != null) q.add("page", String.valueOf(page));
-        String path = "/projects/" + projectId + "/issues/" + issueIid + "/notes";
-        return getPage(path, q, new ParameterizedTypeReference<List<GitLabNote>>(){});
+        String path = "/groups/" + groupId + "/projects";
+        return getPage(path, q, new ParameterizedTypeReference<List<GitLabProject>>(){});
     }
 }

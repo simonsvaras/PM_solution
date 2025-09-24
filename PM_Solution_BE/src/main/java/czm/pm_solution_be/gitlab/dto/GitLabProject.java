@@ -9,16 +9,11 @@ public class GitLabProject {
     public String name;
     @JsonProperty("path_with_namespace")
     public String pathWithNamespace;
+    public Namespace namespace;
 
-    // Optional nested namespace info when using project detail
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Namespace {
-        public long id;
+        public Long id;
         public String name;
-        @JsonProperty("full_path")
-        public String fullPath;
     }
-
-    public Namespace namespace;
 }
-

@@ -11,7 +11,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class IssueSyncService {
@@ -27,12 +26,13 @@ public class IssueSyncService {
     }
 
     public SyncSummary syncProjectIssues(long gitlabProjectId, boolean full) {
-        // Ensure project is present locally
         var maybeProjectId = dao.findProjectIdByGitLabId(gitlabProjectId);
         if (maybeProjectId.isEmpty()) {
             throw new IllegalArgumentException("Project not found locally: " + gitlabProjectId);
         }
         long projectId = maybeProjectId.get();
+
+        Long repositoryId = dao.findRepositoryIdByGitLabRepoId(gitlabProjectId).orElse(null);
 
         log.info("Starting issues sync project={} full={}", gitlabProjectId, full);
         OffsetDateTime updatedAfter = null;
@@ -48,7 +48,7 @@ public class IssueSyncService {
             if (issues.isEmpty() && (page == null || page == 1)) break;
             summary.addFetched(issues.size()).addPage();
 
-            Long repositoryId = null; // optional; 1 project = 1 repo mapping already created in project sync
+            Long repoIdSnapshot = repositoryId;
             txTemplate.executeWithoutResult(status -> {
                 for (GitLabIssue is : issues) {
                     String assigneeUsername = (is.assignees != null && !is.assignees.isEmpty()) ? is.assignees.get(0).username : null;
@@ -56,7 +56,7 @@ public class IssueSyncService {
                     String[] labels = is.labels == null ? null : is.labels.toArray(new String[0]);
                     var upsert = dao.upsertIssue(
                             projectId,
-                            repositoryId,
+                            repoIdSnapshot,
                             is.id,
                             is.iid,
                             is.title,
@@ -77,7 +77,6 @@ public class IssueSyncService {
             if (pageRes.nextPage == null || pageRes.nextPage.isEmpty()) break;
             page = Integer.parseInt(pageRes.nextPage);
         }
-        // update cursor only if not full and no exception
         if (!full) {
             dao.upsertCursor(projectId, "issues", OffsetDateTime.now());
         }
