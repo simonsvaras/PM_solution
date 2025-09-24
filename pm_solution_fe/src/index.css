@@ -6,7 +6,7 @@
   --color-accent-strong: #1e3a8a;
   --color-text-primary: #1f2933;
   --color-text-muted: #6b7280;
-  --navbar-width: clamp(84px, 5vw, 112px);
+  --navbar-width: clamp(96px, 10vw, 192px);
 
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
