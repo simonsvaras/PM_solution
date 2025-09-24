@@ -72,21 +72,20 @@ public class SyncDao {
                 projectId, repositoryId);
     }
 
-    public UpsertResult<Void> upsertIssue(long projectId,
-                                          Long repositoryId,
-                                          long gitlabIssueId,
-                                          long iid,
-                                          String title,
-                                          String state,
-                                          Long assigneeId,
-                                          String assigneeUsername,
-                                          String authorName,
-                                          String[] labels,
-                                          Integer timeEstimateSeconds,
-                                          Integer totalTimeSpentSeconds,
-                                          String dueDate,
-                                          OffsetDateTime updatedAt) {
-        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, due_date=?::date, updated_at=? WHERE project_id=? AND iid=?",
+    public UpsertResult<Void> upsertIssueByRepo(Long repositoryId,
+                                                long gitlabIssueId,
+                                                long iid,
+                                                String title,
+                                                String state,
+                                                Long assigneeId,
+                                                String assigneeUsername,
+                                                String authorName,
+                                                String[] labels,
+                                                Integer timeEstimateSeconds,
+                                                Integer totalTimeSpentSeconds,
+                                                String dueDate,
+                                                OffsetDateTime updatedAt) {
+        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, due_date=?::date, updated_at=? WHERE gitlab_issue_id=?",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setString(2, title);
@@ -99,44 +98,43 @@ public class SyncDao {
                     if (totalTimeSpentSeconds == null) ps.setNull(9, java.sql.Types.INTEGER); else ps.setInt(9, totalTimeSpentSeconds);
                     ps.setString(10, dueDate);
                     if (updatedAt == null) ps.setNull(11, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(11, updatedAt);
-                    ps.setLong(12, projectId);
-                    ps.setLong(13, iid);
+                    ps.setLong(12, gitlabIssueId);
                 });
         if (updated > 0) return new UpsertResult<>(null, false);
 
-        jdbc.update("INSERT INTO issue (project_id, repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, due_date, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?::date,?)",
+        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, due_date, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?::date,?)",
                 (ps) -> {
-                    ps.setLong(1, projectId);
-                    if (repositoryId == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, repositoryId);
-                    ps.setLong(3, gitlabIssueId);
-                    ps.setLong(4, iid);
-                    ps.setString(5, title);
-                    ps.setString(6, state);
-                    if (assigneeId == null) ps.setNull(7, java.sql.Types.BIGINT); else ps.setLong(7, assigneeId);
-                    ps.setString(8, assigneeUsername);
-                    ps.setString(9, authorName);
-                    ps.setArray(10, labels == null ? null : ps.getConnection().createArrayOf("text", labels));
-                    if (timeEstimateSeconds == null) ps.setNull(11, java.sql.Types.INTEGER); else ps.setInt(11, timeEstimateSeconds);
-                    if (totalTimeSpentSeconds == null) ps.setNull(12, java.sql.Types.INTEGER); else ps.setInt(12, totalTimeSpentSeconds);
-                    ps.setString(13, dueDate);
-                    if (updatedAt == null) ps.setNull(14, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(14, updatedAt);
+                    if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
+                    ps.setLong(2, gitlabIssueId);
+                    ps.setLong(3, iid);
+                    ps.setString(4, title);
+                    ps.setString(5, state);
+                    if (assigneeId == null) ps.setNull(6, java.sql.Types.BIGINT); else ps.setLong(6, assigneeId);
+                    ps.setString(7, assigneeUsername);
+                    ps.setString(8, authorName);
+                    ps.setArray(9, labels == null ? null : ps.getConnection().createArrayOf("text", labels));
+                    if (timeEstimateSeconds == null) ps.setNull(10, java.sql.Types.INTEGER); else ps.setInt(10, timeEstimateSeconds);
+                    if (totalTimeSpentSeconds == null) ps.setNull(11, java.sql.Types.INTEGER); else ps.setInt(11, totalTimeSpentSeconds);
+                    ps.setString(12, dueDate);
+                    if (updatedAt == null) ps.setNull(13, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(13, updatedAt);
                 });
         return new UpsertResult<>(null, true);
     }
 
-    public List<Long> findIssueIidsForProject(long projectId) {
-        return jdbc.query("SELECT iid FROM issue WHERE project_id = ? ORDER BY iid", (rs, rn) -> rs.getLong(1), projectId);
+    public List<Long> listAllGitLabRepositoryIds() {
+        return jdbc.query("SELECT gitlab_repo_id FROM repository WHERE gitlab_repo_id IS NOT NULL ORDER BY gitlab_repo_id",
+                (rs, rn) -> rs.getLong(1));
     }
 
-    public Optional<OffsetDateTime> getCursor(long projectId, String scope) {
-        List<OffsetDateTime> rows = jdbc.query("SELECT last_run_at FROM sync_cursor WHERE project_id = ? AND scope = ?",
-                (rs, rn) -> rs.getObject(1, OffsetDateTime.class), projectId, scope);
+    public Optional<OffsetDateTime> getRepoCursor(long repositoryId, String scope) {
+        List<OffsetDateTime> rows = jdbc.query("SELECT last_run_at FROM sync_cursor_repo WHERE repository_id = ? AND scope = ?",
+                (rs, rn) -> rs.getObject(1, OffsetDateTime.class), repositoryId, scope);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
-    public void upsertCursor(long projectId, String scope, OffsetDateTime lastRunAt) {
-        String sql = "INSERT INTO sync_cursor (project_id, scope, last_run_at) VALUES (?,?,?) ON CONFLICT (project_id, scope) DO UPDATE SET last_run_at = EXCLUDED.last_run_at";
-        jdbc.update(sql, projectId, scope, lastRunAt);
+    public void upsertRepoCursor(long repositoryId, String scope, OffsetDateTime lastRunAt) {
+        String sql = "INSERT INTO sync_cursor_repo (repository_id, scope, last_run_at) VALUES (?,?,?) ON CONFLICT (repository_id, scope) DO UPDATE SET last_run_at = EXCLUDED.last_run_at";
+        jdbc.update(sql, repositoryId, scope, lastRunAt);
     }
 
         public void updateProjectName(long id, String name) {

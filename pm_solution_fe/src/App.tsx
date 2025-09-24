@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import Navbar, { type Module } from './components/Navbar';
-import { API_BASE, getProjects, syncAll, syncIssues, syncRepositories } from './api';
-import type { AllResult, ErrorResponse, ProjectDTO, SyncSummary } from './api';
+import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
+import type { AllResult, ErrorResponse, SyncSummary } from './api';
 
 type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL';
 
@@ -34,8 +34,6 @@ const modules: Module[] = [
 ];
 
 function App() {
-  const [projects, setProjects] = useState<ProjectDTO[]>([]);
-  const [selected, setSelected] = useState<number | undefined>();
   const [full, setFull] = useState(false);
   const [since, setSince] = useState<string>('');
 
@@ -44,21 +42,12 @@ function App() {
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const lastAction = useRef<null | (() => Promise<void>)>(null);
+  const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(modules[0].key);
   const [activeSubmoduleKey, setActiveSubmoduleKey] = useState<string>(modules[0].submodules[0].key);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const list = await getProjects();
-        setProjects(list);
-        if (list.length > 0) setSelected(list[0].gitlabProjectId);
-      } catch (e) {
-        console.info('Failed to load projects', e);
-      }
-    })();
-  }, []);
+  useEffect(() => { /* no-op */ }, []);
 
   const canRun = useMemo(() => running === null, [running]);
 
@@ -92,7 +81,8 @@ function App() {
     setRunning(action);
     setError(null);
     setResult(null);
-    console.info('Spouštím synchronizaci', { action, selected, full });
+    setProgress(null);
+    console.info('Spouštím synchronizaci', { action, full });
     const t0 = performance.now();
     try {
       await fn();
@@ -106,7 +96,7 @@ function App() {
       const code = err?.error?.code || 'UNKNOWN';
       if (code === 'RATE_LIMITED') showToast('warning', 'GitLab nás dočasně omezil. Počkejte minutu a zkuste to znovu.');
       else if (['GITLAB_UNAVAILABLE', 'TIMEOUT'].includes(code)) showToast('error', 'GitLab je teď nedostupný. Zkuste to prosím znovu.');
-      else if (['BAD_REQUEST', 'VALIDATION'].includes(code)) showToast('error', 'Neplatný vstup. Zkontrolujte vybraný projekt a parametry.');
+      else if (['BAD_REQUEST', 'VALIDATION'].includes(code)) showToast('error', 'Neplatný vstup. Zkontrolujte parametry.');
       else if (code === 'NOT_FOUND') showToast('error', 'Projekt nebo issue nebylo nalezeno.');
       else showToast('error', 'Synchronizaci se nepodařilo dokončit. Zkuste to prosím znovu nebo kontaktujte správce.');
       console.warn('Synchronizace selhala', { action, durationMs: dt, error: err });
@@ -119,24 +109,21 @@ function App() {
     await run('REPOSITORIES', async () => {
       const res = await syncRepositories();
       setResult(res);
-      try { setProjects(await getProjects()); } catch {}
     });
     lastAction.current = doRepositories;
   }
 
   async function doIssues() {
-    if (!selected) { showToast('error', 'Vyberte projekt.'); return; }
     await run('ISSUES', async () => {
-      const res = await syncIssues(selected, full);
+      const res = await syncIssuesAll(full, (p, t) => setProgress({ processed: p, total: t }));
       setResult(res);
     });
     lastAction.current = doIssues;
   }
 
   async function doAll() {
-    if (!selected) { showToast('error', 'Vyberte projekt.'); return; }
     await run('ALL', async () => {
-      const res = await syncAll(selected, full, since || undefined);
+      const res = await syncAllGlobal(full, since || undefined);
       setResult(res);
     });
     lastAction.current = doAll;
@@ -145,7 +132,12 @@ function App() {
   const inlineStatus = running ? (
     <div className="inline-status">
       <span className="spinner" />
-      <span>Spouštím synchronizaci…</span>
+      <span>
+        Spouštím synchronizaci…
+        {running === 'ISSUES' && progress && progress.total > 0 ? (
+          <> Repozitáře: {progress.processed}/{progress.total}</>
+        ) : null}
+      </span>
     </div>
   ) : null;
 
@@ -208,16 +200,6 @@ function App() {
             <section className="panel">
               <div className="panel__body">
                 <div className="toolbar">
-                  <label>
-                    <span>Projekt</span>
-                    <select value={selected ?? ''} onChange={e => setSelected(Number(e.target.value))}>
-                      {projects.map(p => (
-                        <option key={p.gitlabProjectId} value={p.gitlabProjectId}>
-                          {p.name} ({p.gitlabProjectId})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                   <label className="checkbox">
                     <input type="checkbox" checked={full} onChange={e => setFull(e.target.checked)} />
                     <span>Full issues sync</span>
@@ -276,4 +258,3 @@ function App() {
 }
 
 export default App;
-

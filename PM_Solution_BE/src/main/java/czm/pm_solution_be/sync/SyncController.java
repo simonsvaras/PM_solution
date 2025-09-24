@@ -119,6 +119,44 @@ public class SyncController {
         return ar;
     }
 
+    // New global Issues sync (no project selection)
+    @PostMapping("/issues")
+    public SyncSummary syncIssuesAll(@RequestParam(defaultValue = "false") boolean full) {
+        long start = System.currentTimeMillis();
+        SyncSummary s = issueSyncService.syncAllIssues(full);
+        s.durationMs = System.currentTimeMillis() - start;
+        return s;
+    }
+
+    // Aggregated ALL for global run (currently only issues)
+    @PostMapping("/all")
+    public AllResult syncAllGlobal(@RequestParam(defaultValue = "false") boolean full,
+                                   @RequestParam(required = false)
+                                   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since) {
+        long allStart = System.currentTimeMillis();
+        AllResult ar = new AllResult();
+
+        StepAggregate issues = new StepAggregate();
+        long st = System.currentTimeMillis();
+        try {
+            SyncSummary s = issueSyncService.syncAllIssues(full);
+            issues.status = "OK";
+            issues.fetched = s.fetched;
+            issues.inserted = s.inserted;
+            issues.updated = s.updated;
+            issues.skipped = s.skipped;
+            issues.pages = s.pages;
+            issues.durationMs = System.currentTimeMillis() - st;
+        } catch (Exception ex) {
+            issues.status = "ERROR";
+            issues.error = ErrorResponse.fromException(ex).error;
+            issues.durationMs = System.currentTimeMillis() - st;
+        }
+        ar.issues = issues;
+        ar.durationMs = System.currentTimeMillis() - allStart;
+        return ar;
+    }
+
     public static class ErrorResponse {
         public ErrorBody error;
         public static class ErrorBody {

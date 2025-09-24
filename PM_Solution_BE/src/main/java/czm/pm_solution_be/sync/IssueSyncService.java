@@ -17,27 +17,32 @@ public class IssueSyncService {
     private static final Logger log = LoggerFactory.getLogger(IssueSyncService.class);
     private final GitLabClient gitlab;
     private final SyncDao dao;
+    private final RepositorySyncService repoSyncService;
     private final TransactionTemplate txTemplate;
 
-    public IssueSyncService(GitLabClient gitlab, SyncDao dao, PlatformTransactionManager tm) {
+    public IssueSyncService(GitLabClient gitlab, SyncDao dao, PlatformTransactionManager tm, RepositorySyncService repoSyncService) {
         this.gitlab = gitlab;
         this.dao = dao;
+        this.repoSyncService = repoSyncService;
         this.txTemplate = new TransactionTemplate(tm);
     }
 
     public SyncSummary syncProjectIssues(long gitlabProjectId, boolean full) {
-        var maybeProjectId = dao.findProjectIdByGitLabId(gitlabProjectId);
-        if (maybeProjectId.isEmpty()) {
-            throw new IllegalArgumentException("Project not found locally: " + gitlabProjectId);
-        }
-        long projectId = maybeProjectId.get();
-
+        // Ensure repository exists locally
         Long repositoryId = dao.findRepositoryIdByGitLabRepoId(gitlabProjectId).orElse(null);
+        if (repositoryId == null) {
+            // Try to create it from GitLab
+            repoSyncService.syncProjectRepositories(gitlabProjectId);
+            repositoryId = dao.findRepositoryIdByGitLabRepoId(gitlabProjectId).orElse(null);
+        }
+        if (repositoryId == null) {
+            throw new IllegalArgumentException("Repository not found locally: " + gitlabProjectId);
+        }
 
-        log.info("Starting issues sync project={} full={}", gitlabProjectId, full);
+        log.info("Starting issues sync repo={} full={}", gitlabProjectId, full);
         OffsetDateTime updatedAfter = null;
         if (!full) {
-            updatedAfter = dao.getCursor(projectId, "issues").orElse(null);
+            updatedAfter = dao.getRepoCursor(repositoryId, "issues").orElse(null);
         }
 
         SyncSummary summary = new SyncSummary();
@@ -54,8 +59,7 @@ public class IssueSyncService {
                     String assigneeUsername = (is.assignees != null && !is.assignees.isEmpty()) ? is.assignees.get(0).username : null;
                     Long assigneeId = (is.assignees != null && !is.assignees.isEmpty()) ? is.assignees.get(0).id : null;
                     String[] labels = is.labels == null ? null : is.labels.toArray(new String[0]);
-                    var upsert = dao.upsertIssue(
-                            projectId,
+                    var upsert = dao.upsertIssueByRepo(
                             repoIdSnapshot,
                             is.id,
                             is.iid,
@@ -78,9 +82,40 @@ public class IssueSyncService {
             page = Integer.parseInt(pageRes.nextPage);
         }
         if (!full) {
-            dao.upsertCursor(projectId, "issues", OffsetDateTime.now());
+            dao.upsertRepoCursor(repositoryId, "issues", OffsetDateTime.now());
         }
-        log.info("Issues sync done: project={} fetched={} pages={}", gitlabProjectId, summary.fetched, summary.pages);
+        log.info("Issues sync done: repo={} fetched={} pages={}", gitlabProjectId, summary.fetched, summary.pages);
         return summary;
+    }
+
+    public interface ProgressListener {
+        void onStart(int totalRepos);
+        void onRepoDone(int processedRepos, long gitlabRepoId, SyncSummary repoSummary);
+    }
+
+    public SyncSummary syncAllIssues(boolean full) {
+        return syncAllIssues(full, null);
+    }
+
+    public SyncSummary syncAllIssues(boolean full, ProgressListener progress) {
+        // Refresh repositories from the configured CZM group
+        repoSyncService.syncAllRepositories();
+
+        var repoIds = dao.listAllGitLabRepositoryIds();
+        if (progress != null) progress.onStart(repoIds.size());
+
+        SyncSummary total = new SyncSummary();
+        int processed = 0;
+        for (Long gitlabRepoId : repoIds) {
+            SyncSummary s = syncProjectIssues(gitlabRepoId, full);
+            total.addFetched(s.fetched);
+            total.addInserted(s.inserted);
+            total.addUpdated(s.updated);
+            total.addSkipped(s.skipped);
+            total.pages += s.pages;
+            processed++;
+            if (progress != null) progress.onRepoDone(processed, gitlabRepoId, s);
+        }
+        return total;
     }
 }
