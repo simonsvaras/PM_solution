@@ -1,68 +1,112 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --color-background: #f3f5f9;
+  --color-surface: #ffffff;
+  --color-border: #e3e8f4;
+  --color-accent-soft: #dbeafe;
+  --color-accent-strong: #1e3a8a;
+  --color-text-primary: #1f2933;
+  --color-text-muted: #6b7280;
+  --navbar-width: clamp(96px, 10vw, 192px);
+
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: var(--color-text-primary);
+  background-color: var(--color-background);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
   min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-text-primary);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+a {
+  color: var(--color-accent-strong);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 button {
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+  padding: 0.65em 1.6em;
+  font-size: 0.95rem;
+  font-weight: 600;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--color-accent-strong);
+  color: #fff;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: background-color 200ms ease, box-shadow 200ms ease, transform 160ms ease;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+button:hover:not(:disabled),
+button:focus-visible:not(:disabled) {
+  background-color: #2445a0;
+  box-shadow: 0 12px 22px rgba(30, 58, 138, 0.25);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+input:not([type='checkbox']),
+select {
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  padding: 0.55em 0.85em;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--color-text-primary);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+input:not([type='checkbox']):focus,
+select:focus {
+  border-color: rgba(30, 58, 138, 0.5);
+  box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.1);
+  outline: none;
+}
+
+select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-accent-strong) 50%),
+    linear-gradient(135deg, var(--color-accent-strong) 50%, transparent 50%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05));
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 13px) calc(50% - 3px),
+    calc(100% - 2.5rem) 0.45rem;
+  background-size:
+    6px 6px,
+    6px 6px,
+    1px 1.7rem;
+  background-repeat: no-repeat;
+}
+
+small {
+  color: var(--color-text-muted);
 }
