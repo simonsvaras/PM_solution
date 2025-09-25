@@ -1,0 +1,43 @@
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.projectCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.projectCard__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.projectCard__meta {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.projectCard__actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.projectCard__actions button {
+  flex: 1 1 auto;
+}
+
+.btn--danger {
+  background: #b91c1c;
+  color: #fff;
+  border: 1px solid #7f1d1d;
+}

@@ -1,11 +1,14 @@
 package czm.pm_solution_be.sync;
 
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class SyncDao {
@@ -22,6 +25,12 @@ public class SyncDao {
             this.id = id;
             this.inserted = inserted;
         }
+    }
+
+    public Long createProjectByName(String name) {
+        return jdbc.queryForObject(
+                "INSERT INTO project (name) VALUES (?) RETURNING id",
+                Long.class, name);
     }
 
     public UpsertResult<Long> upsertProject(long gitlabProjectId, String name) {
@@ -47,6 +56,10 @@ public class SyncDao {
                 (rs, rn) -> new ProjectRow(rs.getLong("id"), (Long) rs.getObject("gitlab_project_id"), rs.getString("name")));
     }
 
+    public int deleteProject(long id) {
+        return jdbc.update("DELETE FROM project WHERE id = ?", id);
+    }
+
     public UpsertResult<Long> upsertRepository(long gitlabRepoId, String name, String nameWithNamespace,
                                                Long namespaceId, String namespaceName, boolean rootRepo) {
         int updated = jdbc.update("UPDATE repository SET name=?, name_with_namespace=?, namespace_id=?, namespace_name=?, root_repo=? WHERE gitlab_repo_id=?",
@@ -70,6 +83,52 @@ public class SyncDao {
     public void linkProjectRepository(long projectId, long repositoryId) {
         jdbc.update("INSERT INTO projects_to_repositorie (project_id, repository_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
                 projectId, repositoryId);
+    }
+
+    public record RepositoryAssignment(Long id, Long gitlabRepoId, String name, String nameWithNamespace, boolean assigned) {}
+
+    public List<RepositoryAssignment> listRepositoriesWithAssignment(long projectId, String search) {
+        StringBuilder sql = new StringBuilder("SELECT r.id, r.gitlab_repo_id, r.name, r.name_with_namespace, " +
+                "CASE WHEN ptr.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned " +
+                "FROM repository r " +
+                "LEFT JOIN projects_to_repositorie ptr ON ptr.repository_id = r.id AND ptr.project_id = ?");
+        List<Object> params = new ArrayList<>();
+        params.add(projectId);
+        if (search != null && !search.isBlank()) {
+            sql.append(" WHERE LOWER(r.name) LIKE ? OR LOWER(r.name_with_namespace) LIKE ?");
+            String like = "%" + search.toLowerCase() + "%";
+            params.add(like);
+            params.add(like);
+        }
+        sql.append(" ORDER BY r.name");
+        return jdbc.query(sql.toString(), (rs, rn) -> new RepositoryAssignment(
+                rs.getLong("id"),
+                (Long) rs.getObject("gitlab_repo_id"),
+                rs.getString("name"),
+                rs.getString("name_with_namespace"),
+                rs.getBoolean("assigned")
+        ), params.toArray());
+    }
+
+    @Transactional
+    public void replaceProjectRepositories(long projectId, List<Long> repositoryIds) {
+        jdbc.update("DELETE FROM projects_to_repositorie WHERE project_id = ?", projectId);
+        if (repositoryIds == null || repositoryIds.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate("INSERT INTO projects_to_repositorie (project_id, repository_id) VALUES (?, ?)",
+                new BatchPreparedStatementSetter() {
+                    @Override
+                    public void setValues(java.sql.PreparedStatement ps, int i) throws java.sql.SQLException {
+                        ps.setLong(1, projectId);
+                        ps.setLong(2, repositoryIds.get(i));
+                    }
+
+                    @Override
+                    public int getBatchSize() {
+                        return repositoryIds.size();
+                    }
+                });
     }
 
     public UpsertResult<Void> upsertIssueByRepo(Long repositoryId,

@@ -36,7 +36,14 @@ export type AllResult = {
   durationMs: number;
 };
 
-export type ProjectDTO = { id: number; gitlabProjectId: number; name: string };
+export type ProjectDTO = { id: number; gitlabProjectId: number | null; name: string };
+export type RepositoryAssignmentDTO = {
+  id: number;
+  gitlabRepoId: number | null;
+  name: string;
+  nameWithNamespace: string;
+  assigned: boolean;
+};
 
 async function parseJson<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -53,6 +60,49 @@ export async function getProjects(): Promise<ProjectDTO[]> {
   const res = await fetch(`${API_BASE}/api/projects`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO[]>(res);
+}
+
+export async function createProjectByName(name: string): Promise<ProjectDTO> {
+  const res = await fetch(`${API_BASE}/api/projects/by-name`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectDTO>(res);
+}
+
+export async function updateProjectName(id: number, name: string): Promise<ProjectDTO> {
+  const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectDTO>(res);
+}
+
+export async function deleteProject(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/projects/${id}`, { method: "DELETE" });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function getProjectRepositories(projectId: number, search?: string): Promise<RepositoryAssignmentDTO[]> {
+  const qs = new URLSearchParams();
+  if (search && search.trim()) qs.set('search', search.trim());
+  const url = `${API_BASE}/api/projects/${projectId}/repositories${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<RepositoryAssignmentDTO[]>(res);
+}
+
+export async function updateProjectRepositories(projectId: number, repositoryIds: number[]): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/repositories`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ repositoryIds }),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
 }
 
 export async function syncRepositories(): Promise<SyncSummary> {

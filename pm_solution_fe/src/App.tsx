@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import Navbar, { type Module } from './components/Navbar';
+import ProjectsPage from './components/ProjectsPage';
 import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, SyncSummary } from './api';
 
@@ -13,6 +14,13 @@ const modules: Module[] = [
     submodules: [
       { key: 'sync-on-demand', name: 'On-demand' },
       { key: 'sync-history', name: 'Historie' },
+    ],
+  },
+  {
+    key: 'projects',
+    name: 'Projekty',
+    submodules: [
+      { key: 'projects-admin', name: 'Správa projektů' },
     ],
   },
   {
@@ -60,6 +68,7 @@ function App() {
     [activeModule, activeSubmoduleKey],
   );
   const isOnDemand = activeSubmoduleKey === 'sync-on-demand';
+  const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
 
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     setActiveModuleKey(moduleKey);
@@ -190,9 +199,9 @@ function App() {
             <p className="page-header__eyebrow">{activeModule?.name}</p>
             <h1>{activeSubmodule?.name}</h1>
             <p className="page-header__description">
-              {isOnDemand
-                ? 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.'
-                : 'Tato sekce bude dostupná v dalších verzích aplikace.'}
+              {isOnDemand && 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.'}
+              {isProjectsAdmin && 'Vytvářejte a spravujte projekty v aplikaci.'}
+              {!isOnDemand && !isProjectsAdmin && 'Tato sekce bude dostupná v dalších verzích aplikace.'}
             </p>
           </header>
 
@@ -232,6 +241,8 @@ function App() {
                 </div>
               </div>
             </section>
+          ) : isProjectsAdmin ? (
+            <ProjectsPage />
           ) : (
             <section className="panel panel--placeholder">
               <div className="panel__body">

@@ -1,0 +1,121 @@
+﻿.repoManager {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.45fr) minmax(320px, 0.55fr);
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.repoManager__assigned,
+.repoManager__available {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  height: 100%;
+}
+
+.assignedList,
+.repoList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.assignedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: rgba(30, 58, 138, 0.08);
+  gap: 12px;
+}
+
+.assignedItem__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.assignedItem__name {
+  font-weight: 600;
+}
+
+.assignedItem__details {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.assignedRemove {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+}
+
+.assignedRemove:hover,
+.assignedRemove:focus-visible {
+  color: #b91c1c;
+  outline: none;
+  background: rgba(185, 28, 28, 0.1);
+}
+
+.repoList {
+  max-height: 100%;
+}
+
+.repoItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(219, 234, 254, 0.25);
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+.repoItem input[type="checkbox"] {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent-strong);
+}
+
+.repoItem__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.repoItem__name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.repoItem__details {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.repoItem--selected {
+  background: rgba(30, 58, 138, 0.08);
+  border-color: rgba(30, 58, 138, 0.18);
+}
+
+.modal__footer .spacer {
+  flex: 1;
+}

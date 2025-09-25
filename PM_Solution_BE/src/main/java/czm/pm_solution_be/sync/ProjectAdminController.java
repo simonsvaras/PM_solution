@@ -40,4 +40,22 @@ public class ProjectAdminController {
         }
         throw new IllegalArgumentException("Project not found: " + id);
     }
+
+    public record CreateByNameRequest(String name) {}
+
+    @PostMapping("/by-name")
+    public ResponseEntity<ProjectDto> createByName(@RequestBody CreateByNameRequest req) {
+        if (req == null || req.name == null || req.name.isBlank()) {
+            throw new IllegalArgumentException("name je povinnĂ©");
+        }
+        Long id = dao.createProjectByName(req.name);
+        ProjectDto body = new ProjectDto(id, null, req.name);
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id) {
+        dao.deleteProject(id);
+    }
 }
