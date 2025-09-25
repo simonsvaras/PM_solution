@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import Navbar, { type Module } from './components/Navbar';
 import ProjectsPage from './components/ProjectsPage';
+import InternsPage from './components/InternsPage';
 import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, SyncSummary } from './api';
 
@@ -21,6 +22,13 @@ const modules: Module[] = [
     name: 'Projekty',
     submodules: [
       { key: 'projects-admin', name: 'Správa projektů' },
+    ],
+  },
+  {
+    key: 'interns',
+    name: 'Stážisti',
+    submodules: [
+      { key: 'interns-admin', name: 'Správa uživatelů' },
     ],
   },
   {
@@ -69,6 +77,7 @@ function App() {
   );
   const isOnDemand = activeSubmoduleKey === 'sync-on-demand';
   const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
+  const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
 
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     setActiveModuleKey(moduleKey);
@@ -201,7 +210,8 @@ function App() {
             <p className="page-header__description">
               {isOnDemand && 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.'}
               {isProjectsAdmin && 'Vytvářejte a spravujte projekty v aplikaci.'}
-              {!isOnDemand && !isProjectsAdmin && 'Tato sekce bude dostupná v dalších verzích aplikace.'}
+              {isInternsAdmin && 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.'}
+              {!isOnDemand && !isProjectsAdmin && !isInternsAdmin && 'Tato sekce bude dostupná v dalších verzích aplikace.'}
             </p>
           </header>
 
@@ -243,6 +253,8 @@ function App() {
             </section>
           ) : isProjectsAdmin ? (
             <ProjectsPage />
+          ) : isInternsAdmin ? (
+            <InternsPage />
           ) : (
             <section className="panel panel--placeholder">
               <div className="panel__body">

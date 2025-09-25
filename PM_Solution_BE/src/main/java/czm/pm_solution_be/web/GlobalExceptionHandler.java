@@ -17,6 +17,20 @@ import java.net.SocketTimeoutException;
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiErrorResponse> handleApi(ApiException ex) {
+        if (ex.getStatus().is5xxServerError()) {
+            log.error("API internal error", ex);
+        }
+        ApiErrorResponse body = ApiErrorResponse.of(
+                ex.getCode(),
+                ex.getMessage(),
+                ex.getDetails(),
+                ex.getStatus().value(),
+                null);
+        return ResponseEntity.status(ex.getStatus()).body(body);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         ApiErrorResponse body = ApiErrorResponse.of(
@@ -103,4 +117,5 @@ public class GlobalExceptionHandler {
 
     private static String truncate(String s, int max) { if (s == null) return null; return s.length() <= max ? s : s.substring(0, max) + "..."; }
 }
+
 

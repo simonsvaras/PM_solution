@@ -80,3 +80,12 @@ Project management (local)
 
 Terminology note
 - GitLab API uses the term "projects". In our app, these are treated as repositories and persisted into table `repository`. Each repository row is linked to a local `project` (foreign key `repository.project_id`). To insert repositories from a group sync, a local project with matching `gitlab_project_id` must already exist; otherwise the repository is skipped.
+
+Interns
+- GET `/api/levels` — seznam dostupných úrovní (id, code, label).
+- GET `/api/groups` — seznam skupin (id, code, label).
+- POST `/api/interns` — registruje nového stážistu. Body: { "first_name": "Jan", "last_name": "Novák", "username": "jnovak" }. Vrací 201 + objekt; 400 VALIDATION při chybně zadaných datech, 409 CONFLICT při kolizi username.
+- PUT `/api/interns/{id}` — aktualizuje jméno/příjmení/username. Vrací 200 + objekt; 400 VALIDATION, 404 NOT_FOUND, 409 CONFLICT.
+- DELETE `/api/interns/{id}` — smaže stážistu. Vrací 204 NO_CONTENT; 404 NOT_FOUND pokud id neexistuje.
+- GET `/api/interns/{id}` — detail stážisty. Vrací 200 + objekt; 404 NOT_FOUND.
+- GET `/api/interns` — stránkovaný seznam. Query: `q`, `username`, `page` (default 0), `size` (default 20, max 100), `sort` (`pole,směr`). Vrací `{ "content": [...], "page": 0, "size": 20, "total_elements": 1, "total_pages": 1 }`.

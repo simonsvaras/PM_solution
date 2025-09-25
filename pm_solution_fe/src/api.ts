@@ -45,6 +45,56 @@ export type RepositoryAssignmentDTO = {
   assigned: boolean;
 };
 
+export type InternDTO = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  username: string;
+  level_id: number;
+  level_label: string;
+  groups: InternGroupDTO[];
+};
+export type InternListResponseDTO = {
+  content: InternDTO[];
+  page: number;
+  size: number;
+  total_elements: number;
+  total_pages: number;
+};
+
+export type InternGroup = { id: number; code: number; label: string };
+export type Intern = { id: number; firstName: string; lastName: string; username: string; levelId: number; levelLabel: string; groups: InternGroup[] };
+export type InternListResult = { content: Intern[]; page: number; size: number; totalElements: number; totalPages: number };
+export type InternPayload = { firstName: string; lastName: string; username: string; levelId: number; groupIds: number[] };
+export type InternGroupDTO = { id: number; code: number; label: string };
+export type LevelOption = { id: number; code: string; label: string };
+export type GroupOption = { id: number; code: number; label: string };
+export type InternListParams = { q?: string; username?: string; page?: number; size?: number; sort?: string };
+
+
+function mapIntern(dto: InternDTO): Intern {
+  const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
+  return {
+    id: dto.id,
+    firstName: dto.first_name,
+    lastName: dto.last_name,
+    username: dto.username,
+    levelId: dto.level_id,
+    levelLabel: dto.level_label,
+    groups,
+  };
+}
+
+function prepareInternBody(payload: InternPayload) {
+  return {
+    first_name: payload.firstName.trim(),
+    last_name: payload.lastName.trim(),
+    username: payload.username.trim(),
+    level_id: payload.levelId,
+    group_ids: payload.groupIds,
+  };
+}
+
 async function parseJson<T>(res: Response): Promise<T> {
   const text = await res.text();
   const ct = res.headers.get("content-type") || "";
@@ -87,6 +137,18 @@ export async function deleteProject(id: number): Promise<void> {
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
 }
 
+
+export async function getLevels(): Promise<LevelOption[]> {
+  const res = await fetch(`${API_BASE}/api/levels`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<LevelOption[]>(res);
+}
+
+export async function getGroups(): Promise<GroupOption[]> {
+  const res = await fetch(`${API_BASE}/api/groups`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<GroupOption[]>(res);
+}
 export async function getProjectRepositories(projectId: number, search?: string): Promise<RepositoryAssignmentDTO[]> {
   const qs = new URLSearchParams();
   if (search && search.trim()) qs.set('search', search.trim());
@@ -192,3 +254,51 @@ export async function waitForJob(
     await delay(pollMs);
   }
 }
+
+export async function listInterns(params: InternListParams = {}): Promise<InternListResult> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set("q", params.q.trim());
+  if (params.username) qs.set("username", params.username.trim());
+  if (typeof params.page === "number") qs.set("page", String(params.page));
+  if (typeof params.size === "number") qs.set("size", String(params.size));
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  const res = await fetch(`${API_BASE}/api/interns${query ? `?${query}` : ""}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternListResponseDTO>(res);
+  return {
+    content: data.content.map(mapIntern),
+    page: data.page,
+    size: data.size,
+    totalElements: data.total_elements,
+    totalPages: data.total_pages,
+  };
+}
+
+export async function createIntern(payload: InternPayload): Promise<Intern> {
+  const res = await fetch(`${API_BASE}/api/interns`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(prepareInternBody(payload)),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternDTO>(res);
+  return mapIntern(data);
+}
+
+export async function updateIntern(id: number, payload: InternPayload): Promise<Intern> {
+  const res = await fetch(`${API_BASE}/api/interns/${id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(prepareInternBody(payload)),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternDTO>(res);
+  return mapIntern(data);
+}
+
+export async function deleteIntern(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/interns/${id}`, { method: "DELETE" });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+

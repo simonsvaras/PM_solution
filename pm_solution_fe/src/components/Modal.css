@@ -47,7 +47,8 @@
 
 .field label { font-weight: 600; }
 
-.field input[type="text"] {
+.field input[type="text"],
+.field input[type="search"] {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -56,18 +57,37 @@
 }
 
 .btn {
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5f5;
+  background: #e5e7eb;
+  color: #1f2937;
   cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
+
+.btn:hover {
+  background: #d1d5db;
+}
+
 .btn--primary {
-  background: var(--color-accent-strong);
+  background: #2563eb;
+  border-color: #1d4ed8;
   color: #fff;
-  border-color: transparent;
 }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn--primary:hover {
+  background: #1d4ed8;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+}
 
 .errorText { color: #b91c1c; font-size: 0.9rem; }
 

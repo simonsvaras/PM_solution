@@ -67,3 +67,12 @@ export default tseslint.config([
   },
 ])
 ```
+## Interns module
+
+The Stážisti module in the navbar opens the intern management page where you can:
+- list interns with search, paging and actions,
+- register a new intern via the modal (+ Přidat stážistu),
+- edit or delete existing entries via the table actions.
+
+The UI talks to the backend endpoints (POST, PUT, DELETE, and GET /api/interns) and surfaces validation or conflict errors returned by the API.
+\r\n- Výběr úrovně probíhá přes radio tlačítka (povinná volba), skupiny lze přidělit vícenásobně přes checkboxy.

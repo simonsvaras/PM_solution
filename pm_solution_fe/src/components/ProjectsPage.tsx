@@ -110,7 +110,7 @@ export default function ProjectsPage() {
       <section className="panel">
         <div className="panel__body">
           <div className="actions">
-            <button onClick={openModal}>+ Vytvořit projekt</button>
+            <button className="btn btn--primary" onClick={openModal}>+ Vytvořit projekt</button>
           </div>
 
           {justCreated && (
@@ -184,4 +184,5 @@ export default function ProjectsPage() {
     </>
   );
 }
+
 
