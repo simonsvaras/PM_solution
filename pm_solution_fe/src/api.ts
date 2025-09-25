@@ -1,4 +1,4 @@
-// Default to same-origin (nginx proxies /api -> backend in docker)
+﻿// Default to same-origin (nginx proxies /api -> backend in docker)
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export type SyncSummary = {
@@ -138,12 +138,18 @@ export async function deleteProject(id: number): Promise<void> {
 }
 
 
+/**
+ * Loads all level options for the intern form.
+ */
 export async function getLevels(): Promise<LevelOption[]> {
   const res = await fetch(`${API_BASE}/api/levels`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<LevelOption[]>(res);
 }
 
+/**
+ * Loads all group options for the intern form.
+ */
 export async function getGroups(): Promise<GroupOption[]> {
   const res = await fetch(`${API_BASE}/api/groups`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
@@ -255,6 +261,9 @@ export async function waitForJob(
   }
 }
 
+/**
+ * Fetches a paginated list of interns with optional search parameters.
+ */
 export async function listInterns(params: InternListParams = {}): Promise<InternListResult> {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q.trim());
@@ -275,6 +284,9 @@ export async function listInterns(params: InternListParams = {}): Promise<Intern
   };
 }
 
+/**
+ * Creates a new intern with the provided payload.
+ */
 export async function createIntern(payload: InternPayload): Promise<Intern> {
   const res = await fetch(`${API_BASE}/api/interns`, {
     method: "POST",
@@ -286,6 +298,9 @@ export async function createIntern(payload: InternPayload): Promise<Intern> {
   return mapIntern(data);
 }
 
+/**
+ * Updates an existing intern identified by id.
+ */
 export async function updateIntern(id: number, payload: InternPayload): Promise<Intern> {
   const res = await fetch(`${API_BASE}/api/interns/${id}`, {
     method: "PUT",
@@ -297,8 +312,12 @@ export async function updateIntern(id: number, payload: InternPayload): Promise<
   return mapIntern(data);
 }
 
+/**
+ * Deletes an intern.
+ */
 export async function deleteIntern(id: number): Promise<void> {
   const res = await fetch(`${API_BASE}/api/interns/${id}`, { method: "DELETE" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
 }
+
 

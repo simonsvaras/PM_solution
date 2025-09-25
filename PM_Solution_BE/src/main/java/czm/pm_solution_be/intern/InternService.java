@@ -1,4 +1,4 @@
-package czm.pm_solution_be.intern;
+﻿package czm.pm_solution_be.intern;
 
 import czm.pm_solution_be.intern.InternDao.GroupRow;
 import czm.pm_solution_be.intern.InternDao.InternRow;
@@ -18,6 +18,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Application service orchestrating intern CRUD operations, including validation,
+ * level/group consistency and level history updates.
+ */
 @Service
 public class InternService {
     private static final Logger log = LoggerFactory.getLogger(InternService.class);
@@ -87,6 +91,9 @@ public class InternService {
         log.info("Intern deleted id={} username={}", existing.id(), existing.username());
     }
 
+    /**
+     * Returns an intern with resolved level and groups.
+     */
     public InternResponse get(long id) {
         InternRow row = dao.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
@@ -94,6 +101,9 @@ public class InternService {
         return toResponse(row, groupMap.getOrDefault(row.id(), List.of()));
     }
 
+    /**
+     * Lists interns using optional filtering, pagination and sorting.
+     */
     public InternListResponse list(String q,
                                    String username,
                                    Integer pageParam,
@@ -134,12 +144,18 @@ public class InternService {
         return new InternListResponse(content, page, size, total, totalPages);
     }
 
+    /**
+     * Exposes level references for the frontend.
+     */
     public List<LevelDto> listLevels() {
         return dao.listLevels().stream()
                 .map(l -> new LevelDto(l.id(), l.code(), l.label()))
                 .toList();
     }
 
+    /**
+     * Exposes group references for the frontend.
+     */
     public List<GroupDto> listGroups() {
         return dao.listGroups().stream()
                 .map(g -> new GroupDto(g.id(), g.code(), g.label()))
@@ -154,6 +170,9 @@ public class InternService {
         });
     }
 
+    /**
+     * Parses and sanitises incoming data before hitting the database layer.
+     */
     private NormalizedInput normalizeRequest(InternRequest request) {
         if (request == null) {
             throw ApiException.validation("Body nesmí být prázdné.", "body_required");
@@ -337,3 +356,5 @@ public class InternService {
     public record LevelDto(long id, String code, String label) {}
     public record GroupDto(long id, int code, String label) {}
 }
+
+

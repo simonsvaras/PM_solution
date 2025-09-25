@@ -12,6 +12,9 @@ import {
   type ProjectDTO,
 } from '../api';
 
+/**
+ * Validates user-provided project names.
+ */
 function validateName(raw: string): { ok: true; value: string } | { ok: false; error: string } {
   const value = (raw || '').trim();
   if (!value) return { ok: false, error: 'Název je povinný.' };
@@ -19,6 +22,9 @@ function validateName(raw: string): { ok: true; value: string } | { ok: false; e
   return { ok: true, value };
 }
 
+/**
+ * Page component rendering the project management experience (create/edit/delete, repo modal).
+ */
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDTO[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,6 +56,7 @@ export default function ProjectsPage() {
 
   const sorted = useMemo(() => (projects || []).slice().sort((a, b) => a.name.localeCompare(b.name)), [projects]);
 
+  // Open modal for creating a fresh project
   function openModal() {
     setIsOpen(true);
     setName('');
@@ -93,6 +100,7 @@ export default function ProjectsPage() {
     }
   }
 
+  // Prefill modal for editing an existing project
   function onEdit(p: ProjectDTO) {
     setEditing(p);
     setIsOpen(true);
@@ -184,5 +192,7 @@ export default function ProjectsPage() {
     </>
   );
 }
+
+
 
 

@@ -1,91 +1,81 @@
-PM_Solution_BE - GitLab Issue Sync (MVP)
+﻿PM_Solution_BE - GitLab Issue Sync & Intern Registry
+====================================================
 
 Overview
-- Syncs GitLab issues from GitLab into a local Postgres DB on demand.
-- Projects and their repository mappings are managed purely in the application (UI/BE), not via GitLab sync.
-- System notes/worklogs are out of scope; no GitLab notes API calls are performed.
+--------
+- Synchronises GitLab projects/issues into a local PostgreSQL database on demand.
+- Manages local projects, their repository assignments and intern allocations (levels + groups).
+- Provides REST endpoints for the React frontend used in the PM Solution suite.
 
-Run
-- Start DB: `docker compose -f docker-compose.yml up -d`
-- Env vars: set at process level or `.env` (export before `bootRun`)
-  - `GITLAB_API` default `https://gitlab.fel.cvut.cz/api/v4`
-  - `GITLAB_TOKEN` required, scope `read_api`
-  - `GITLAB_GROUP_ID` required for repositories group sync (numeric GitLab group id for CZM)
-  - `GITLAB_TIMEOUT_MS` default `10000`
-  - `GITLAB_RETRY_MAX` default `3`
-  - `GITLAB_RETRY_BACKOFF_MS` default `500`
-  - `GITLAB_PER_PAGE` default `100`
-- App: `./gradlew bootRun` (Windows: `gradlew.bat bootRun`)
+Running locally
+---------------
+1. Start Postgres (uses docker-compose in repo root):
+   ```bash
+   docker compose -f docker-compose.yml up -d db
+   ```
+2. Provide required environment variables (see `.env.example` or set process vars):
+   - `GITLAB_API` (default `https://gitlab.fel.cvut.cz/api/v4`)
+   - `GITLAB_TOKEN` (`read_api` scope)
+   - `GITLAB_GROUP_ID` (numeric group id for repository sync)
+3. Launch Spring Boot:
+   ```bash
+   ./gradlew bootRun      # Linux/macOS
+   gradlew.bat bootRun    # Windows
+   ```
 
-OpenAPI
-- Swagger UI: `http://localhost:8081/swagger-ui.html`
-- JSON: `http://localhost:8081/v3/api-docs`
+Key REST endpoints
+------------------
+### Synchronisation
+- `POST /api/sync/repositories` – sync repositories for the configured GitLab group.
+- `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
+- `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
+- `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
 
-Endpoints
-- GET `/api/projects` — list local projects (id, gitlabProjectId, name) for UI selection
-- POST `/api/sync/repositories`
-  - Syncs repositories for all GitLab projects in configured group (`gitlab.groupId`).
-  - Upserts only for local projects present in DB (matched by `project.gitlab_project_id`), others are counted as skipped.
-  - Response: `{ "fetched": n, "inserted": n, "updated": n, "skipped": n, "pages": n, "durationMs": n }`
-- POST `/api/sync/projects/{projectId}/repositories`
-  - Fetches GitLab project metadata and upserts the root repository into the `repository` table.
-  - Response: `{ "fetched": 1, "inserted": n, "updated": n, "skipped": 0, "pages": 0, "durationMs": n }`
-- POST `/api/sync/projects/{projectId}/issues?full={true|false}`
-  - `full=false` (default) -> incremental: adds `updated_after=<cursor>`.
-  - Upserts by `(project_id, iid)` and sets cursor on success.
-  - Response: `{ "fetched": n, "inserted": n, "updated": n, "skipped": 0, "pages": n, "durationMs": n }`
-- POST `/api/sync/projects/{projectId}/all?full={true|false}`
-  - Aggregates only issue sync.
-  - Rejects any `projects`/`notes` query parameters with 400.
-  - Response example: `{ "issues": {"status":"OK", "fetched": 10, ...}, "durationMs": 3200 }`
+### Local project management
+- `GET /api/projects` – list local projects (id, gitlabProjectId, name).
+- `POST /api/projects` – create/link a local project.
+- `PUT /api/projects/{id}` – rename a project.
+- `DELETE /api/projects/{id}` – remove a project.
+- `GET /api/projects/{id}/repositories` / `PUT /api/projects/{id}/repositories` – manage repository assignments.
 
-Deprecated/removed
-- POST `/api/sync/projects` — deprecated, returns 400 `Synchronizace projektu ani notes neni podporovana...`
-- `/api/sync/projects/{projectId}/notes` — removed, returns 400.
-- `/api/sync/projects/{projectId}/issues/{iid}/notes` — removed, returns 400.
-
-Database
-- Flyway migrations: `src/main/resources/db/migration`
-  - `V1__init.sql` core schema (project, repository, issue, report, etc.)
-  - `V2__gitlab_sync.sql` adds `project.gitlab_project_id`, `sync_cursor` (issues only), and report uniqueness for dedupe
-
-Error semantics
-- 400: invalid input (project missing locally, disallowed sync combination, removed endpoint)
-- 404: not found in GitLab
-- 503: rate limited after retries
-- 502: upstream GitLab failure (5xx)
+### Intern registry
+- `GET /api/levels` – list level reference data (id, code, label).
+- `GET /api/groups` – list intern groups (id, code, label).
+- `GET /api/interns` – paginated intern list (`q`, `username`, `page`, `size`, `sort`).
+- `GET /api/interns/{id}` – intern detail.
+- `POST /api/interns` – create intern (`first_name`, `last_name`, `username`, `level_id`, `group_ids`).
+- `PUT /api/interns/{id}` – update intern (same payload as create).
+- `DELETE /api/interns/{id}` – delete intern.
 
 Standard error contract
+-----------------------
+All errors return the common body:
+```json
+{
+  "error": {
+    "code": "VALIDATION|CONFLICT|NOT_FOUND|...",
+    "message": "Human friendly explanation",
+    "details": "optional machine hint",
+    "httpStatus": 400,
+    "requestId": "optional"
+  }
+}
 ```
-{ "error": { "code": "...", "message": "...", "details": "...", "httpStatus": 503, "requestId": "abc-123" } }
-```
 
-Logging
-- Start/end of each issue sync with parameters, pages processed, and counters.
-- 429/5xx logs include GitLab `X-Request-Id` when available.
-- Token is only sent via `PRIVATE-TOKEN` header and never logged.
+Database migrations
+-------------------
+Flyway migrations are located in `src/main/resources/db/migration`:
+- `V1__init.sql` – base schema (project, repository, intern, report, ...).
+- `V2__gitlab_sync.sql` – GitLab sync cursors + project IDs.
+- `V3__repository_m2m.sql`, `V4__issues_without_project.sql` – sync refinements.
+- `V5__intern_level_group_updates.sql` – converts `group.code` to integer, adds `intern.level_id`, backfills `intern_level_history` and leaves `level_id` `NOT NULL`. Ensure at least one level exists before running.
 
-Project management (local)
-- POST `/api/projects` — creates/links a local project; body: `{ "gitlabProjectId": 123, "name": "My Project" }`
-- PUT `/api/projects/{id}` — updates the project name; body: `{ "name": "New name" }`
+Logging & observability
+-----------------------
+- Sync operations log start/end, counts and duration.
+- HTTP clients attach GitLab `X-Request-Id` to warn logs when available.
+- Unexpected exceptions are logged by `GlobalExceptionHandler`.
 
-Terminology note
-- GitLab API uses the term "projects". In our app, these are treated as repositories and persisted into table `repository`.
-- The relation between local `project` and `repository` is many-to-many via the junction table `projects_to_repositorie`.
-- Group repositories sync inserts/updates repository rows even if there is no local project yet; linking to projects is managed later in the UI.
-
-Project management (local)
-- POST `/api/projects` — creates/links a local project; body: `{ "gitlabProjectId": 123, "name": "My Project" }`
-- PUT `/api/projects/{id}` — updates the project name; body: `{ "name": "New name" }`
-
-Terminology note
-- GitLab API uses the term "projects". In our app, these are treated as repositories and persisted into table `repository`. Each repository row is linked to a local `project` (foreign key `repository.project_id`). To insert repositories from a group sync, a local project with matching `gitlab_project_id` must already exist; otherwise the repository is skipped.
-
-Interns
-- GET `/api/levels` — seznam dostupných úrovní (id, code, label).
-- GET `/api/groups` — seznam skupin (id, code, label).
-- POST `/api/interns` — registruje nového stážistu. Body: { "first_name": "Jan", "last_name": "Novák", "username": "jnovak" }. Vrací 201 + objekt; 400 VALIDATION při chybně zadaných datech, 409 CONFLICT při kolizi username.
-- PUT `/api/interns/{id}` — aktualizuje jméno/příjmení/username. Vrací 200 + objekt; 400 VALIDATION, 404 NOT_FOUND, 409 CONFLICT.
-- DELETE `/api/interns/{id}` — smaže stážistu. Vrací 204 NO_CONTENT; 404 NOT_FOUND pokud id neexistuje.
-- GET `/api/interns/{id}` — detail stážisty. Vrací 200 + objekt; 404 NOT_FOUND.
-- GET `/api/interns` — stránkovaný seznam. Query: `q`, `username`, `page` (default 0), `size` (default 20, max 100), `sort` (`pole,směr`). Vrací `{ "content": [...], "page": 0, "size": 20, "total_elements": 1, "total_pages": 1 }`.
+Testing
+-------
+Run the full suite via `./gradlew test`. Unit coverage includes intern service logic and migration-safe H2 profile configuration.

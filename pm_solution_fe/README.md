@@ -1,78 +1,48 @@
-# React + TypeScript + Vite
+﻿pm_solution_fe - Frontend
+=========================
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Overview
+--------
+React + TypeScript single-page app providing UI for:
+- synchronising GitLab data (On-demand page),
+- managing local projects and their repositories,
+- managing interns (levels, groups, CRUD).
 
-Currently, two official plugins are available:
+Prerequisites
+-------------
+- Node.js 18+
+- Backend running on `http://localhost:8081` (adjust via `VITE_API_BASE_URL` in `.env`).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Scripts
+-------
+```bash
+npm install        # first time only
+npm run dev        # start Vite dev server on http://localhost:5173
+npm run build      # production build
+npm run preview    # serve built assets locally
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Key modules
+-----------
+- **Synchronizace** – triggers GitLab sync jobs, displays progress and result cards.
+- **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
+- **Stážisti** – full CRUD over interns. Radio buttons set the level, checkboxes assign any number of groups. Validation/messages mirror backend responses.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+API usage
+---------
+Frontend talks to the backend via helper functions in `src/api.ts`.
+- Project helpers (`getProjects`, `createProjectByName`, `updateProjectName`, `deleteProject`, etc.).
+- Intern helpers (`listInterns`, `createIntern`, `updateIntern`, `deleteIntern`, `getLevels`, `getGroups`).
+- Sync helpers for repositories/issues.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-## Interns module
+Styling
+-------
+- Component-specific CSS lives next to `.tsx` files (e.g. `InternsPage.css`).
+- Shared modal styles updated in `Modal.css` to give consistent contrast for primary/secondary buttons.
 
-The Stážisti module in the navbar opens the intern management page where you can:
-- list interns with search, paging and actions,
-- register a new intern via the modal (+ Přidat stážistu),
-- edit or delete existing entries via the table actions.
+Accessibility & UX notes
+------------------------
+- Buttons have clear hover/disabled states and sufficient contrast for dark text on light backgrounds.
+- Forms provide inline error messages plus backend validation hints when available.
+- Table views keep headers sticky for easier scanning of long lists.
 
-The UI talks to the backend endpoints (POST, PUT, DELETE, and GET /api/interns) and surfaces validation or conflict errors returned by the API.
-\r\n- Výběr úrovně probíhá přes radio tlačítka (povinná volba), skupiny lze přidělit vícenásobně přes checkboxy.

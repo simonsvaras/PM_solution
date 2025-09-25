@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import './InternsPage.css';
 import Modal from './Modal';
 import {
@@ -54,6 +54,9 @@ function validateForm(form: FormState): { valid: boolean; errors: FormErrors } {
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
+/**
+ * Top-level page component. Handles state and orchestrates API calls for the intern module.
+ */
 export default function InternsPage() {
   const [data, setData] = useState<InternListResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,6 +79,7 @@ export default function InternsPage() {
   const [activeIntern, setActiveIntern] = useState<Intern | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  // References (levels & groups) need to be fetched once per modal lifecycle
   const loadReferences = useCallback(async () => {
     setRefsLoading(true);
     setRefsError(null);
@@ -201,6 +205,7 @@ export default function InternsPage() {
     return { general: message };
   }
 
+  // Persist the form; handles both create and update flows
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitError(null);
@@ -452,3 +457,4 @@ export default function InternsPage() {
     </section>
   );
 }
+

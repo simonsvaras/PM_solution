@@ -1,5 +1,12 @@
-package czm.pm_solution_be.intern;
+﻿package czm.pm_solution_be.intern;
 
+/**
+ * Low-level JDBC access for the intern aggregate.
+ *
+ * The DAO encapsulates all SQL related to interns, including
+ * pagination, level/group lookups and writing helper tables
+ * such as intern_group or intern_level_history.
+ */
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
@@ -56,6 +63,9 @@ public class InternDao {
         this.jdbc = jdbc;
     }
 
+    /**
+     * Fetches a single intern by id including the resolved level label.
+     */
     public Optional<InternRow> findById(long id) {
         List<InternRow> rows = jdbc.query("""
                 SELECT i.id, i.first_name, i.last_name, i.username, i.level_id, l.label AS level_label
@@ -66,6 +76,9 @@ public class InternDao {
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
+    /**
+     * Looks up an intern by username ignoring case.
+     */
     public Optional<InternRow> findByUsernameIgnoreCase(String username) {
         List<InternRow> rows = jdbc.query("""
                 SELECT i.id, i.first_name, i.last_name, i.username, i.level_id, l.label AS level_label
@@ -76,6 +89,9 @@ public class InternDao {
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
+    /**
+     * Inserts a new intern and returns the stored row.
+     */
     public InternRow insert(String firstName, String lastName, String username, long levelId) {
         InternRow inserted = jdbc.queryForObject(
                 """
@@ -95,6 +111,9 @@ public class InternDao {
         return inserted;
     }
 
+    /**
+     * Updates an intern record and returns the current state.
+     */
     public InternRow update(long id, String firstName, String lastName, String username, long levelId) {
         InternRow updated = jdbc.queryForObject(
                 """
@@ -116,10 +135,16 @@ public class InternDao {
         return updated;
     }
 
+    /**
+     * Removes the intern row. Returns number of affected rows.
+     */
     public int delete(long id) {
         return jdbc.update("DELETE FROM intern WHERE id = ?", id);
     }
 
+    /**
+     * Lists interns with pagination, optional filtering and sorting.
+     */
     public PageResult list(InternQuery query) {
         StringBuilder sql = new StringBuilder("""
                 FROM intern i
@@ -158,19 +183,31 @@ public class InternDao {
         return new PageResult(rows, total != null ? total : 0L);
     }
 
+    /**
+     * Returns all configured levels ordered by label.
+     */
     public List<LevelRow> listLevels() {
         return jdbc.query("SELECT id, code, label FROM level ORDER BY label", LEVEL_MAPPER);
     }
 
+    /**
+     * Fetches a single level row by id.
+     */
     public Optional<LevelRow> findLevel(long levelId) {
         List<LevelRow> rows = jdbc.query("SELECT id, code, label FROM level WHERE id = ?", LEVEL_MAPPER, levelId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
+    /**
+     * Returns all groups ordered by label.
+     */
     public List<GroupRow> listGroups() {
         return jdbc.query("SELECT id, code, label FROM \"group\" ORDER BY label", GROUP_MAPPER);
     }
 
+    /**
+     * Resolves the details for the provided group ids.
+     */
     public List<GroupRow> findGroupsByIds(Collection<Long> groupIds) {
         if (groupIds == null || groupIds.isEmpty()) {
             return List.of();
@@ -181,6 +218,9 @@ public class InternDao {
         return jdbc.query("SELECT id, code, label FROM \"group\" WHERE id IN (" + inClause + ")", GROUP_MAPPER, params.toArray());
     }
 
+    /**
+     * Loads group allocations for a set of intern ids.
+     */
     public Map<Long, List<GroupRow>> findGroupsForInternIds(Collection<Long> internIds) {
         Map<Long, List<GroupRow>> map = new HashMap<>();
         if (internIds == null || internIds.isEmpty()) {
@@ -203,6 +243,9 @@ public class InternDao {
         return map;
     }
 
+    /**
+     * Replaces all group assignments for a given intern.
+     */
     public void replaceInternGroups(long internId, List<Long> groupIds) {
         jdbc.update("DELETE FROM intern_group WHERE intern_id = ?", internId);
         if (groupIds == null || groupIds.isEmpty()) {
@@ -214,6 +257,9 @@ public class InternDao {
         });
     }
 
+    /**
+     * Inserts a new record into intern_level_history for the supplied level.
+     */
     public void insertLevelHistory(long internId, long levelId, LocalDate fromDate) {
         jdbc.update(
                 "INSERT INTO intern_level_history (intern_id, level_id, valid_from, valid_to) VALUES (?, ?, ?, NULL)",
@@ -222,6 +268,9 @@ public class InternDao {
                 fromDate);
     }
 
+    /**
+     * Closes the current open level history record when a level changes.
+     */
     public void closeOpenLevelHistory(long internId, LocalDate newLevelStart) {
         jdbc.update(
                 """
@@ -250,3 +299,7 @@ public class InternDao {
         return sb.toString();
     }
 }
+
+
+
+

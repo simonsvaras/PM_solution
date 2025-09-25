@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from './Modal';
 import './ManageRepositoriesModal.css';
 import {
@@ -9,6 +9,9 @@ import {
   type RepositoryAssignmentDTO,
 } from '../api';
 
+/**
+ * Modal used for assigning/unassigning GitLab repositories to a local project.
+ */
 export type ManageRepositoriesModalProps = {
   project: ProjectDTO | null;
   onClose: () => void;
@@ -266,3 +269,8 @@ export default function ManageRepositoriesModal({ project, onClose, onSaved }: M
     </Modal>
   );
 }
+
+
+
+
+
