@@ -12,8 +12,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,12 +39,14 @@ public class InternDao {
                                       long levelId,
                                       String levelCode,
                                       String levelLabel,
+                                      BigDecimal workloadHours,
                                       boolean assigned) {}
     public record GroupRow(long id, int code, String label) {}
     public record LevelRow(long id, String code, String label) {}
     public record SortOrder(String column, boolean ascending) {}
     public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {}
     public record PageResult(List<InternRow> rows, long totalElements) {}
+    public record ProjectInternAllocation(long internId, BigDecimal workloadHours) {}
 
     private static final RowMapper<InternRow> INTERN_MAPPER = new RowMapper<>() {
         @Override
@@ -274,6 +278,7 @@ public class InternDao {
                        i.level_id,
                        l.code AS level_code,
                        l.label AS level_label,
+                       ip.uvazek AS workload_hours,
                        CASE WHEN ip.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
@@ -297,19 +302,25 @@ public class InternDao {
                 rs.getLong("level_id"),
                 rs.getString("level_code"),
                 rs.getString("level_label"),
+                rs.getBigDecimal("workload_hours"),
                 rs.getBoolean("assigned")),
                 params.toArray());
     }
 
-    public void replaceProjectInterns(long projectId, List<Long> internIds) {
+    public void replaceProjectInterns(long projectId, List<ProjectInternAllocation> assignments) {
         jdbc.update("DELETE FROM intern_project WHERE project_id = ?", projectId);
-        if (internIds == null || internIds.isEmpty()) {
+        if (assignments == null || assignments.isEmpty()) {
             return;
         }
-        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id) VALUES (?, ?)", internIds, internIds.size(),
-                (ps, internId) -> {
+        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id, uvazek) VALUES (?, ?, ?)", assignments, assignments.size(),
+                (ps, assignment) -> {
                     ps.setLong(1, projectId);
-                    ps.setLong(2, internId);
+                    ps.setLong(2, assignment.internId());
+                    if (assignment.workloadHours() == null) {
+                        ps.setNull(3, Types.NUMERIC);
+                    } else {
+                        ps.setBigDecimal(3, assignment.workloadHours());
+                    }
                 });
     }
 
@@ -355,7 +366,4 @@ public class InternDao {
         return sb.toString();
     }
 }
-
-
-
 

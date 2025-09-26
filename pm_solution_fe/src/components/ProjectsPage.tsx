@@ -8,9 +8,10 @@ import {
   createProjectByName,
   deleteProject,
   getProjects,
-  updateProjectName,
+  updateProject,
   type ErrorResponse,
   type ProjectDTO,
+  type ProjectBudgetPayload,
 } from '../api';
 
 /**
@@ -34,6 +35,11 @@ export default function ProjectsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [budget, setBudget] = useState('');
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+  const [budgetFrom, setBudgetFrom] = useState('');
+  const [budgetTo, setBudgetTo] = useState('');
+  const [budgetRangeError, setBudgetRangeError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ErrorResponse | null>(null);
   const [justCreated, setJustCreated] = useState<ProjectDTO | null>(null);
@@ -63,6 +69,11 @@ export default function ProjectsPage() {
     setIsOpen(true);
     setName('');
     setNameError(null);
+    setBudget('');
+    setBudgetError(null);
+    setBudgetFrom('');
+    setBudgetTo('');
+    setBudgetRangeError(null);
     setCreateError(null);
     setJustCreated(null);
     setEditing(null);
@@ -70,20 +81,50 @@ export default function ProjectsPage() {
 
   async function onCreate() {
     setCreateError(null);
+    setBudgetError(null);
+    setBudgetRangeError(null);
     const v = validateName(name);
     if (!v.ok) { setNameError(v.error); return; }
     setNameError(null);
+
+    let parsedBudget: number | null = null;
+    if (budget.trim().length > 0) {
+      const num = Number(budget);
+      if (!Number.isFinite(num) || num < 0) {
+        setBudgetError('Rozpočet musí být nezáporné číslo.');
+        return;
+      }
+      parsedBudget = num;
+    }
+
+    const normalizedFrom = budgetFrom.trim() || null;
+    const normalizedTo = budgetTo.trim() || null;
+    if (normalizedFrom && normalizedTo && normalizedFrom > normalizedTo) {
+      setBudgetRangeError('Datum "od" nesmí být později než datum "do".');
+      return;
+    }
+
+    const payload: ProjectBudgetPayload = {
+      name: v.value,
+      budget: parsedBudget,
+      budgetFrom: normalizedFrom,
+      budgetTo: normalizedTo,
+    };
+
     setCreating(true);
     try {
       if (editing) {
-        const updated = await updateProjectName(editing.id, v.value);
+        const updated = await updateProject(editing.id, payload);
         setJustCreated(updated);
       } else {
-        const created = await createProjectByName(v.value);
+        const created = await createProjectByName(payload);
         setJustCreated(created);
       }
       setIsOpen(false);
       setName('');
+      setBudget('');
+      setBudgetFrom('');
+      setBudgetTo('');
       await reload();
     } catch (e) {
       setCreateError(e as ErrorResponse);
@@ -108,6 +149,11 @@ export default function ProjectsPage() {
     setIsOpen(true);
     setName(p.name);
     setNameError(null);
+    setBudget(p.budget !== null && p.budget !== undefined ? String(p.budget) : '');
+    setBudgetFrom(p.budgetFrom ?? '');
+    setBudgetTo(p.budgetTo ?? '');
+    setBudgetError(null);
+    setBudgetRangeError(null);
     setCreateError(null);
   }
 
@@ -132,6 +178,10 @@ export default function ProjectsPage() {
               <b>Projekt vytvořen</b>
               <p>
                 ID: {justCreated.id} • Název: <b>{justCreated.name}</b>
+                <br />
+                Rozpočet: {justCreated.budget !== null ? `${justCreated.budget.toLocaleString('cs-CZ')} Kč` : 'neuveden'}
+                <br />
+                Období: {justCreated.budgetFrom ?? '—'} – {justCreated.budgetTo ?? '—'}
               </p>
             </div>
           )}
@@ -166,6 +216,40 @@ export default function ProjectsPage() {
             />
             {nameError && <div className="errorText">{nameError}</div>}
           </div>
+          <div className="field">
+            <label htmlFor="project-budget">Rozpočet (CZK)</label>
+            <input
+              id="project-budget"
+              type="number"
+              min="0"
+              step="1"
+              value={budget}
+              onChange={e => setBudget(e.target.value)}
+              placeholder="Např. 250000"
+            />
+            {budgetError && <div className="errorText">{budgetError}</div>}
+          </div>
+          <div className="field field--inline">
+            <div>
+              <label htmlFor="project-budget-from">Rozpočet od</label>
+              <input
+                id="project-budget-from"
+                type="date"
+                value={budgetFrom}
+                onChange={e => setBudgetFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="project-budget-to">Rozpočet do</label>
+              <input
+                id="project-budget-to"
+                type="date"
+                value={budgetTo}
+                onChange={e => setBudgetTo(e.target.value)}
+              />
+            </div>
+          </div>
+          {budgetRangeError && <div className="errorText">{budgetRangeError}</div>}
           {createError && (
             <div className="errorText">
               {createError.error.message} (kód: {createError.error.code})

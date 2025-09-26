@@ -13,12 +13,17 @@ public class ProjectQueryController {
 
     public ProjectQueryController(SyncDao dao) { this.dao = dao; }
 
-    public record ProjectDto(Long id, Long gitlabProjectId, String name) {}
+    public record ProjectDto(Long id,
+                             Long gitlabProjectId,
+                             String name,
+                             Integer budget,
+                             java.time.LocalDate budgetFrom,
+                             java.time.LocalDate budgetTo) {}
 
     @GetMapping
     public List<ProjectDto> list() {
         return dao.listProjects().stream()
-                .map(r -> new ProjectDto(r.id(), r.gitlabProjectId(), r.name()))
+                .map(r -> new ProjectDto(r.id(), r.gitlabProjectId(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo()))
                 .toList();
     }
 }

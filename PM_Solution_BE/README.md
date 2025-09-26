@@ -32,11 +32,13 @@ Key REST endpoints
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
 
 ### Local project management
-- `GET /api/projects` – list local projects (id, gitlabProjectId, name).
+- `GET /api/projects` – list local projects (id, gitlabProjectId, name, budget, budgetFrom, budgetTo).
 - `POST /api/projects` – create/link a local project.
-- `PUT /api/projects/{id}` – rename a project.
+- `PUT /api/projects/{id}` – update name + optional `budget`, `budget_from`, `budget_to` (dates in ISO form, `budget` ≥ 0).
 - `DELETE /api/projects/{id}` – remove a project.
 - `GET /api/projects/{id}/repositories` / `PUT /api/projects/{id}/repositories` – manage repository assignments.
+- `GET /api/projects/{id}/interns` – list assignable interns including `workloadHours` for already assigned members.
+- `PUT /api/projects/{id}/interns` – replace intern assignments with payload `{ "interns": [{ "internId": 1, "workloadHours": 20.5 }] }` where `workloadHours` is nullable and represents hours allocated on the project.
 
 ### Intern registry
 - `GET /api/levels` – list level reference data (id, code, label).
@@ -69,6 +71,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V2__gitlab_sync.sql` – GitLab sync cursors + project IDs.
 - `V3__repository_m2m.sql`, `V4__issues_without_project.sql` – sync refinements.
 - `V5__intern_level_group_updates.sql` – converts `group.code` to integer, adds `intern.level_id`, backfills `intern_level_history` and leaves `level_id` `NOT NULL`. Ensure at least one level exists before running.
+- `V6__project_budget_and_intern_workload.sql` – adds project budget columns (`budget`, `budget_from`, `budget_to`) and workload (`uvazek`) for the `intern_project` junction table.
 
 Logging & observability
 -----------------------

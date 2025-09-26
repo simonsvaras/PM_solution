@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/projects/{projectId}/interns")
@@ -36,9 +36,12 @@ public class ProjectInternController {
                                       String levelCode,
                                       String levelLabel,
                                       List<InternGroupDto> groups,
+                                      java.math.BigDecimal workloadHours,
                                       boolean assigned) {}
 
-    public record UpdateInternsRequest(List<Long> internIds) {}
+    public record UpdateInternAssignment(Long internId, java.math.BigDecimal workloadHours) {}
+
+    public record UpdateInternsRequest(List<UpdateInternAssignment> interns) {}
 
     @GetMapping
     public List<InternAssignmentDto> list(@PathVariable long projectId,
@@ -57,6 +60,7 @@ public class ProjectInternController {
                 groupMap.getOrDefault(row.id(), List.of()).stream()
                         .map(g -> new InternGroupDto(g.id(), g.code(), g.label()))
                         .toList(),
+                row.workloadHours(),
                 row.assigned()
         )).toList();
     }
@@ -64,14 +68,24 @@ public class ProjectInternController {
     @PutMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void update(@PathVariable long projectId, @RequestBody UpdateInternsRequest req) {
-        if (req == null || req.internIds() == null) {
-            throw new IllegalArgumentException("internIds je povinné pole.");
+        if (req == null || req.interns() == null) {
+            throw new IllegalArgumentException("interns je povinné pole.");
         }
-        List<Long> uniqueIds = req.internIds().stream()
-                .filter(Objects::nonNull)
-                .distinct()
+        Map<Long, java.math.BigDecimal> unique = new LinkedHashMap<>();
+        for (UpdateInternAssignment assignment : req.interns()) {
+            if (assignment == null || assignment.internId() == null) {
+                throw new IllegalArgumentException("internId je povinné pole.");
+            }
+            java.math.BigDecimal workload = assignment.workloadHours();
+            if (workload != null && workload.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("workloadHours nesmí být záporné.");
+            }
+            unique.put(assignment.internId(), workload);
+        }
+        List<InternDao.ProjectInternAllocation> allocations = unique.entrySet().stream()
+                .map(e -> new InternDao.ProjectInternAllocation(e.getKey(), e.getValue()))
                 .toList();
-        internDao.replaceProjectInterns(projectId, uniqueIds);
+        internDao.replaceProjectInterns(projectId, allocations);
     }
 }
 

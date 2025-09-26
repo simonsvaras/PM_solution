@@ -36,7 +36,20 @@ export type AllResult = {
   durationMs: number;
 };
 
-export type ProjectDTO = { id: number; gitlabProjectId: number | null; name: string };
+export type ProjectDTO = {
+  id: number;
+  gitlabProjectId: number | null;
+  name: string;
+  budget: number | null;
+  budgetFrom: string | null;
+  budgetTo: string | null;
+};
+export type ProjectBudgetPayload = {
+  name: string;
+  budget?: number | null;
+  budgetFrom?: string | null;
+  budgetTo?: string | null;
+};
 export type RepositoryAssignmentDTO = {
   id: number;
   gitlabRepoId: number | null;
@@ -81,6 +94,7 @@ export type ProjectInternAssignmentDTO = {
   levelCode: string;
   levelLabel: string;
   groups: ProjectInternAssignmentGroupDTO[];
+  workloadHours: number | null;
   assigned: boolean;
 };
 
@@ -125,21 +139,21 @@ export async function getProjects(): Promise<ProjectDTO[]> {
   return parseJson<ProjectDTO[]>(res);
 }
 
-export async function createProjectByName(name: string): Promise<ProjectDTO> {
+export async function createProjectByName(payload: ProjectBudgetPayload): Promise<ProjectDTO> {
   const res = await fetch(`${API_BASE}/api/projects/by-name`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO>(res);
 }
 
-export async function updateProjectName(id: number, name: string): Promise<ProjectDTO> {
+export async function updateProject(id: number, payload: ProjectBudgetPayload): Promise<ProjectDTO> {
   const res = await fetch(`${API_BASE}/api/projects/${id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO>(res);
@@ -195,11 +209,13 @@ export async function getProjectInterns(projectId: number, search?: string): Pro
   return parseJson<ProjectInternAssignmentDTO[]>(res);
 }
 
-export async function updateProjectInterns(projectId: number, internIds: number[]): Promise<void> {
+export type ProjectInternUpdatePayload = { internId: number; workloadHours: number | null };
+
+export async function updateProjectInterns(projectId: number, interns: ProjectInternUpdatePayload[]): Promise<void> {
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/interns`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ internIds }),
+    body: JSON.stringify({ interns }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
 }

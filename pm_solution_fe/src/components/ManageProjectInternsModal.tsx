@@ -7,6 +7,7 @@ import {
   type ErrorResponse,
   type ProjectDTO,
   type ProjectInternAssignmentDTO,
+  type ProjectInternUpdatePayload,
 } from '../api';
 
 export type ManageProjectInternsModalProps = {
@@ -24,9 +25,11 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
   const [internCache, setInternCache] = useState<Map<number, ProjectInternAssignmentDTO>>(new Map());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<ErrorResponse | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const initialised = useRef(false);
+  const [invalidWorkloads, setInvalidWorkloads] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search), 250);
@@ -52,6 +55,7 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
           setSelected(preset);
           initialised.current = true;
         }
+        setInvalidWorkloads(new Set());
       })
       .catch(err => setError(err as ErrorResponse))
       .finally(() => setLoading(false));
@@ -64,9 +68,11 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
       setLoading(false);
       setError(null);
       setSaveError(null);
+      setLocalError(null);
       setSearch('');
       setDebouncedSearch('');
       setInternCache(new Map());
+      setInvalidWorkloads(new Set());
       initialised.current = false;
     }
   }, [isOpen]);
@@ -77,6 +83,7 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
     setSearch('');
     setDebouncedSearch('');
     setInternCache(new Map());
+    setInvalidWorkloads(new Set());
   }, [project?.id]);
 
   const allSelected = useMemo(
@@ -100,7 +107,16 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
   function toggleIntern(id: number) {
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        setInvalidWorkloads(prevInvalid => {
+          const nextInvalid = new Set(prevInvalid);
+          nextInvalid.delete(id);
+          return nextInvalid;
+        });
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }
@@ -116,6 +132,11 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
       setSelected(prev => {
         const reduced = new Set(prev);
         interns.forEach(i => reduced.delete(i.id));
+        setInvalidWorkloads(prevInvalid => {
+          const nextInvalid = new Set(prevInvalid);
+          interns.forEach(i => nextInvalid.delete(i.id));
+          return nextInvalid;
+        });
         return reduced;
       });
     }
@@ -127,14 +148,58 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
       next.delete(id);
       return next;
     });
+    setInvalidWorkloads(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function updateWorkload(id: number, value: string) {
+    setLocalError(null);
+    setInternCache(prev => {
+      const existing = prev.get(id);
+      if (!existing) return prev;
+      const next = new Map(prev);
+      let workload: number | null = null;
+      let invalid = false;
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        const parsed = Number(trimmed);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          invalid = true;
+        } else {
+          workload = parsed;
+        }
+      }
+      const updated: ProjectInternAssignmentDTO = { ...existing, workloadHours: workload };
+      next.set(id, updated);
+      setInvalidWorkloads(prevInvalid => {
+        const nextInvalid = new Set(prevInvalid);
+        if (invalid) nextInvalid.add(id); else nextInvalid.delete(id);
+        return nextInvalid;
+      });
+      setInterns(prevList => prevList.map(item => (item.id === id ? updated : item)));
+      return next;
+    });
   }
 
   async function handleSave() {
     if (!project) return;
     setSaving(true);
     setSaveError(null);
+    setLocalError(null);
+    if (invalidWorkloads.size > 0) {
+      setSaving(false);
+      setLocalError('Opravte prosím neplatné hodnoty úvazku.');
+      return;
+    }
     try {
-      await updateProjectInterns(project.id, Array.from(selected));
+      const payload: ProjectInternUpdatePayload[] = Array.from(selected).map(id => {
+        const entry = internCache.get(id);
+        return { internId: id, workloadHours: entry?.workloadHours ?? null };
+      });
+      await updateProjectInterns(project.id, payload);
       onSaved();
       onClose();
     } catch (e) {
@@ -187,6 +252,23 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
                   <div className="teamAssignedItem__meta">
                     <span className="teamAssignedItem__name">{intern.firstName} {intern.lastName} ({intern.username})</span>
                     {renderSubtitle(intern)}
+                  </div>
+                  <div className="teamAssignedItem__workload">
+                    <label htmlFor={`workload-${intern.id}`} className="visually-hidden">Úvazek v hodinách</label>
+                    <input
+                      id={`workload-${intern.id}`}
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={intern.workloadHours ?? ''}
+                      onChange={e => updateWorkload(intern.id, e.target.value)}
+                      placeholder="Úvazek (h)"
+                      className={invalidWorkloads.has(intern.id) ? 'invalid' : ''}
+                    />
+                    <span className="teamAssignedItem__workloadUnit">h</span>
+                    {invalidWorkloads.has(intern.id) && (
+                      <div className="errorText">Zadejte nezáporné číslo.</div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -274,6 +356,9 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
 
       {saveError && (
         <div className="errorText">{saveError.error.message} (kód: {saveError.error.code})</div>
+      )}
+      {localError && (
+        <div className="errorText">{localError}</div>
       )}
     </Modal>
   );

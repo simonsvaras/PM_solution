@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,21 +28,35 @@ public class SyncDao {
         }
     }
 
-    public Long createProjectByName(String name) {
+    public Long createProjectByName(String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
         return jdbc.queryForObject(
-                "INSERT INTO project (name) VALUES (?) RETURNING id",
-                Long.class, name);
+                "INSERT INTO project (name, budget, budget_from, budget_to) VALUES (?, ?, ?, ?) RETURNING id",
+                Long.class,
+                name,
+                budget,
+                budgetFrom,
+                budgetTo);
     }
 
-    public UpsertResult<Long> upsertProject(long gitlabProjectId, String name) {
-        int updated = jdbc.update("UPDATE project SET name = ? WHERE gitlab_project_id = ?", name, gitlabProjectId);
+    public UpsertResult<Long> upsertProject(long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
+        int updated = jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE gitlab_project_id = ?",
+                name,
+                budget,
+                budgetFrom,
+                budgetTo,
+                gitlabProjectId);
         if (updated > 0) {
             Long id = jdbc.queryForObject("SELECT id FROM project WHERE gitlab_project_id = ?", Long.class, gitlabProjectId);
             return new UpsertResult<>(id, false);
         }
         Long id = jdbc.queryForObject(
-                "INSERT INTO project (gitlab_project_id, name) VALUES (?, ?) RETURNING id",
-                Long.class, gitlabProjectId, name);
+                "INSERT INTO project (gitlab_project_id, name, budget, budget_from, budget_to) VALUES (?, ?, ?, ?, ?) RETURNING id",
+                Long.class,
+                gitlabProjectId,
+                name,
+                budget,
+                budgetFrom,
+                budgetTo);
         return new UpsertResult<>(id, true);
     }
 
@@ -50,10 +65,16 @@ public class SyncDao {
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 
-    public record ProjectRow(Long id, Long gitlabProjectId, String name) {}
+    public record ProjectRow(Long id, Long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
     public List<ProjectRow> listProjects() {
-        return jdbc.query("SELECT id, gitlab_project_id, name FROM project ORDER BY name",
-                (rs, rn) -> new ProjectRow(rs.getLong("id"), (Long) rs.getObject("gitlab_project_id"), rs.getString("name")));
+        return jdbc.query("SELECT id, gitlab_project_id, name, budget, budget_from, budget_to FROM project ORDER BY name",
+                (rs, rn) -> new ProjectRow(
+                        rs.getLong("id"),
+                        (Long) rs.getObject("gitlab_project_id"),
+                        rs.getString("name"),
+                        (Integer) rs.getObject("budget"),
+                        rs.getObject("budget_from", LocalDate.class),
+                        rs.getObject("budget_to", LocalDate.class)));
     }
 
     public int deleteProject(long id) {
@@ -196,7 +217,12 @@ public class SyncDao {
         jdbc.update(sql, repositoryId, scope, lastRunAt);
     }
 
-        public void updateProjectName(long id, String name) {
-        jdbc.update("UPDATE project SET name = ? WHERE id = ?", name, id);
+    public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
+        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE id = ?",
+                name,
+                budget,
+                budgetFrom,
+                budgetTo,
+                id);
     }
 }
