@@ -248,6 +248,15 @@ public class SyncDao {
                 (rs, rn) -> rs.getLong(1));
     }
 
+    public List<Long> listAssignedGitLabRepositoryIds() {
+        return jdbc.query("SELECT DISTINCT r.gitlab_repo_id " +
+                        "FROM repository r " +
+                        "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.id " +
+                        "WHERE r.gitlab_repo_id IS NOT NULL " +
+                        "ORDER BY r.gitlab_repo_id",
+                (rs, rn) -> rs.getLong(1));
+    }
+
     public Optional<OffsetDateTime> getRepoCursor(long repositoryId, String scope) {
         List<OffsetDateTime> rows = jdbc.query("SELECT last_run_at FROM sync_cursor_repo WHERE repository_id = ? AND scope = ?",
                 (rs, rn) -> rs.getObject(1, OffsetDateTime.class), repositoryId, scope);

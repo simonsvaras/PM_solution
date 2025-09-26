@@ -258,14 +258,19 @@ export async function syncAll(projectId: number, full: boolean, since?: string):
 }
 
 // New global syncs (no project selection)
-export async function syncIssuesAll(full: boolean, onProgress?: (processed: number, total: number) => void): Promise<SyncSummary> {
-  const started = await startIssuesAsync(full);
+export async function syncIssuesAll(
+  full: boolean,
+  assignedOnly: boolean,
+  onProgress?: (processed: number, total: number) => void,
+): Promise<SyncSummary> {
+  const started = await startIssuesAsync(full, assignedOnly);
   return waitForJob(started.jobId, 2000, 60 * 60 * 1000, onProgress);
 }
 
-export async function syncAllGlobal(full: boolean, since?: string): Promise<AllResult> {
+export async function syncAllGlobal(full: boolean, assignedOnly: boolean, since?: string): Promise<AllResult> {
   const qs = new URLSearchParams();
   qs.set("full", String(full));
+  qs.set("assignedOnly", String(assignedOnly));
   if (since) qs.set("since", since);
   const res = await fetch(`${API_BASE}/api/sync/all?${qs.toString()}`, { method: "POST" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
@@ -284,8 +289,11 @@ export type JobStatusResponse = {
   currentRepoId?: number;
 };
 
-export async function startIssuesAsync(full: boolean): Promise<StartJobResponse> {
-  const res = await fetch(`${API_BASE}/api/sync/issues/async?full=${full}`, { method: "POST" });
+export async function startIssuesAsync(full: boolean, assignedOnly: boolean): Promise<StartJobResponse> {
+  const params = new URLSearchParams();
+  params.set("full", String(full));
+  params.set("assignedOnly", String(assignedOnly));
+  const res = await fetch(`${API_BASE}/api/sync/issues/async?${params.toString()}`, { method: "POST" });
   // Backend returns 202 Accepted for job start
   if (res.status !== 202 && !res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<StartJobResponse>(res);

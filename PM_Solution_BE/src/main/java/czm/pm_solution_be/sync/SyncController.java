@@ -121,9 +121,10 @@ public class SyncController {
 
     // New global Issues sync (no project selection)
     @PostMapping("/issues")
-    public SyncSummary syncIssuesAll(@RequestParam(defaultValue = "false") boolean full) {
+    public SyncSummary syncIssuesAll(@RequestParam(defaultValue = "false") boolean full,
+                                     @RequestParam(defaultValue = "false") boolean assignedOnly) {
         long start = System.currentTimeMillis();
-        SyncSummary s = issueSyncService.syncAllIssues(full);
+        SyncSummary s = issueSyncService.syncAllIssues(full, assignedOnly);
         s.durationMs = System.currentTimeMillis() - start;
         return s;
     }
@@ -131,6 +132,7 @@ public class SyncController {
     // Aggregated ALL for global run (currently only issues)
     @PostMapping("/all")
     public AllResult syncAllGlobal(@RequestParam(defaultValue = "false") boolean full,
+                                   @RequestParam(defaultValue = "false") boolean assignedOnly,
                                    @RequestParam(required = false)
                                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since) {
         long allStart = System.currentTimeMillis();
@@ -139,7 +141,7 @@ public class SyncController {
         StepAggregate issues = new StepAggregate();
         long st = System.currentTimeMillis();
         try {
-            SyncSummary s = issueSyncService.syncAllIssues(full);
+            SyncSummary s = issueSyncService.syncAllIssues(full, assignedOnly);
             issues.status = "OK";
             issues.fetched = s.fetched;
             issues.inserted = s.inserted;

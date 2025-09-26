@@ -93,15 +93,15 @@ public class IssueSyncService {
         void onRepoDone(int processedRepos, long gitlabRepoId, SyncSummary repoSummary);
     }
 
-    public SyncSummary syncAllIssues(boolean full) {
-        return syncAllIssues(full, null);
+    public SyncSummary syncAllIssues(boolean full, boolean assignedOnly) {
+        return syncAllIssues(full, assignedOnly, null);
     }
 
-    public SyncSummary syncAllIssues(boolean full, ProgressListener progress) {
+    public SyncSummary syncAllIssues(boolean full, boolean assignedOnly, ProgressListener progress) {
         // Refresh repositories from the configured CZM group
         repoSyncService.syncAllRepositories();
 
-        var repoIds = dao.listAllGitLabRepositoryIds();
+        var repoIds = assignedOnly ? dao.listAssignedGitLabRepositoryIds() : dao.listAllGitLabRepositoryIds();
         if (progress != null) progress.onStart(repoIds.size());
 
         SyncSummary total = new SyncSummary();

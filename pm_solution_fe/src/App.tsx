@@ -52,7 +52,8 @@ const modules: Module[] = [
 ];
 
 function App() {
-  const [full, setFull] = useState(false);
+  const [deltaOnly, setDeltaOnly] = useState(true);
+  const [assignedOnly, setAssignedOnly] = useState(false);
   const [since, setSince] = useState<string>('');
 
   const [running, setRunning] = useState<ActionKind | null>(null);
@@ -103,7 +104,7 @@ function App() {
     setError(null);
     setResult(null);
     setProgress(null);
-    console.info('Spouštím synchronizaci', { action, full });
+    console.info('Spouštím synchronizaci', { action, deltaOnly, assignedOnly, full: !deltaOnly });
     const t0 = performance.now();
     try {
       await fn();
@@ -136,7 +137,7 @@ function App() {
 
   async function doIssues() {
     await run('ISSUES', async () => {
-      const res = await syncIssuesAll(full, (p, t) => setProgress({ processed: p, total: t }));
+      const res = await syncIssuesAll(!deltaOnly, assignedOnly, (p, t) => setProgress({ processed: p, total: t }));
       setResult(res);
     });
     lastAction.current = doIssues;
@@ -144,7 +145,7 @@ function App() {
 
   async function doAll() {
     await run('ALL', async () => {
-      const res = await syncAllGlobal(full, since || undefined);
+      const res = await syncAllGlobal(!deltaOnly, assignedOnly, since || undefined);
       setResult(res);
     });
     lastAction.current = doAll;
@@ -224,8 +225,12 @@ function App() {
               <div className="panel__body">
                 <div className="toolbar">
                   <label className="checkbox">
-                    <input type="checkbox" checked={full} onChange={e => setFull(e.target.checked)} />
-                    <span>Full issues sync</span>
+                    <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
+                    <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
+                  </label>
+                  <label className="checkbox">
+                    <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
+                    <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
                   </label>
                   <label>
                     <span>Since</span>

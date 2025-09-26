@@ -25,8 +25,9 @@ public class SyncJobController {
     }
 
     @PostMapping("/issues/async")
-    public ResponseEntity<StartResponse> startIssuesAsync(@RequestParam(defaultValue = "false") boolean full) {
-        String id = jobs.startIssuesAll(full);
+    public ResponseEntity<StartResponse> startIssuesAsync(@RequestParam(defaultValue = "false") boolean full,
+                                                          @RequestParam(defaultValue = "false") boolean assignedOnly) {
+        String id = jobs.startIssuesAll(full, assignedOnly);
         StartResponse r = new StartResponse();
         r.jobId = id;
         return ResponseEntity.accepted().body(r);

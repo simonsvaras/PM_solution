@@ -34,13 +34,13 @@ public class SyncJobService {
         this.issueSyncService = issueSyncService;
     }
 
-    public String startIssuesAll(boolean full) {
+    public String startIssuesAll(boolean full, boolean assignedOnly) {
         String id = UUID.randomUUID().toString();
         Job job = new Job(id);
         jobs.put(id, job);
         executor.submit(() -> {
             try {
-                SyncSummary s = issueSyncService.syncAllIssues(full, new IssueSyncService.ProgressListener() {
+                SyncSummary s = issueSyncService.syncAllIssues(full, assignedOnly, new IssueSyncService.ProgressListener() {
                     @Override public void onStart(int totalRepos) {
                         job.totalRepos = totalRepos;
                         job.processedRepos = 0;
