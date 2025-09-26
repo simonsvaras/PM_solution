@@ -12,6 +12,7 @@ Prerequisites
 -------------
 - Node.js 18+
 - Backend running on `http://localhost:8081` (adjust via `VITE_API_BASE_URL` in `.env`).
+- For the Vite dev server proxy set `VITE_DEV_API_URL` in `.env` when the backend is not on `http://localhost:8081`.
 
 Scripts
 -------
