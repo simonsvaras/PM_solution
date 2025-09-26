@@ -1,4 +1,4 @@
--- V5__report_repository_id.sql
+-- V8__report_repository_id.sql
 -- Rename report.project_id to repository_id and ensure deduplication uses repository context.
 
 -- Drop old FK to project if present
