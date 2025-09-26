@@ -3,9 +3,11 @@ import './App.css';
 import Navbar, { type Module } from './components/Navbar';
 import ProjectsPage from './components/ProjectsPage';
 import ProjectsOverviewPage from './components/ProjectsOverviewPage';
+import ReportsOverviewPage from './components/ReportsOverviewPage';
+import ProjectReportPage from './components/ProjectReportPage';
 import InternsPage from './components/InternsPage';
 import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
-import type { AllResult, ErrorResponse, SyncSummary } from './api';
+import type { AllResult, ErrorResponse, ProjectOverviewDTO, SyncSummary } from './api';
 
 type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL';
 
@@ -62,6 +64,7 @@ function App() {
   const [toast, setToast] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const lastAction = useRef<null | (() => Promise<void>)>(null);
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
+  const [selectedReportProject, setSelectedReportProject] = useState<ProjectOverviewDTO | null>(null);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(modules[0].key);
   const [activeSubmoduleKey, setActiveSubmoduleKey] = useState<string>(modules[0].submodules[0].key);
@@ -82,6 +85,8 @@ function App() {
   const isProjectsOverview = activeSubmoduleKey === 'projects-overview';
   const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
   const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
+  const isReportsOverview = activeSubmoduleKey === 'reports-overview';
+  const isReportsProjectDetail = activeModuleKey === 'reports' && selectedReportProject !== null;
 
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     setActiveModuleKey(moduleKey);
@@ -92,6 +97,12 @@ function App() {
       if (fallback) setActiveSubmoduleKey(fallback);
     }
   }
+
+  useEffect(() => {
+    if (activeModuleKey !== 'reports' || activeSubmoduleKey !== 'reports-overview') {
+      setSelectedReportProject(null);
+    }
+  }, [activeModuleKey, activeSubmoduleKey]);
 
   function showToast(type: 'success' | 'warning' | 'error', text: string) {
     setToast({ type, text });
@@ -210,13 +221,20 @@ function App() {
         <div className="app-content__inner">
           <header className="page-header">
             <p className="page-header__eyebrow">{activeModule?.name}</p>
-            <h1>{activeSubmodule?.name}</h1>
+            <h1>{selectedReportProject ? selectedReportProject.name : activeSubmodule?.name}</h1>
             <p className="page-header__description">
               {isOnDemand && 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.'}
               {isProjectsOverview && 'Získejte rychlý přehled o projektech, jejich týmech a otevřených issue.'}
               {isProjectsAdmin && 'Vytvářejte a spravujte projekty v aplikaci.'}
               {isInternsAdmin && 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.'}
-              {!isOnDemand && !isProjectsOverview && !isProjectsAdmin && !isInternsAdmin && 'Tato sekce bude dostupná v dalších verzích aplikace.'}
+              {isReportsOverview && !isReportsProjectDetail && 'Vyberte projekt a zobrazte jeho detailní report.'}
+              {isReportsProjectDetail && 'Souhrn otevřených issue vybraného projektu.'}
+              {!isOnDemand &&
+                !isProjectsOverview &&
+                !isProjectsAdmin &&
+                !isInternsAdmin &&
+                !isReportsOverview &&
+                'Tato sekce bude dostupná v dalších verzích aplikace.'}
             </p>
           </header>
 
@@ -260,12 +278,16 @@ function App() {
                 </div>
               </div>
             </section>
+          ) : isReportsProjectDetail && selectedReportProject ? (
+            <ProjectReportPage project={selectedReportProject} onBack={() => setSelectedReportProject(null)} />
           ) : isProjectsOverview ? (
             <ProjectsOverviewPage />
           ) : isProjectsAdmin ? (
             <ProjectsPage />
           ) : isInternsAdmin ? (
             <InternsPage />
+          ) : isReportsOverview ? (
+            <ReportsOverviewPage onSelectProject={setSelectedReportProject} />
           ) : (
             <section className="panel panel--placeholder">
               <div className="panel__body">

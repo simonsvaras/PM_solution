@@ -1,0 +1,40 @@
+.projectReport {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.projectReport__backButton {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--color-accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.projectReport__backButton:hover,
+.projectReport__backButton:focus-visible {
+  text-decoration: underline;
+}
+
+.projectReport__card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 20px 36px rgba(15, 23, 42, 0.1);
+}
+
+.projectReport__card h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.projectReport__metric {
+  margin: 0;
+  font-size: clamp(2.4rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
