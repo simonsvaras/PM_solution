@@ -254,7 +254,7 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
                     {renderSubtitle(intern)}
                   </div>
                   <div className="teamAssignedItem__workload">
-                    <label htmlFor={`workload-${intern.id}`} className="visually-hidden">Úvazek v hodinách</label>
+                    <label htmlFor={`workload-${intern.id}`} className="teamAssignedItem__workloadLabel">Úvazek na projektu</label>
                     <input
                       id={`workload-${intern.id}`}
                       type="number"

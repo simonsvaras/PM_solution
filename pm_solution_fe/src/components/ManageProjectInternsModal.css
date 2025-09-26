@@ -53,6 +53,12 @@
   min-width: 120px;
 }
 
+.teamAssignedItem__workloadLabel {
+  align-self: stretch;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 .teamAssignedItem__workload input[type="number"] {
   width: 100%;
   padding: 6px 8px;
