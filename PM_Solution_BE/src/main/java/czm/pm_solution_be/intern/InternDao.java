@@ -278,7 +278,7 @@ public class InternDao {
                        i.level_id,
                        l.code AS level_code,
                        l.label AS level_label,
-                       ip.uvazek AS workload_hours,
+                       ip.workload_hours AS workload_hours,
                        CASE WHEN ip.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
@@ -312,7 +312,7 @@ public class InternDao {
         if (assignments == null || assignments.isEmpty()) {
             return;
         }
-        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id, uvazek) VALUES (?, ?, ?)", assignments, assignments.size(),
+        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id, workload_hours) VALUES (?, ?, ?)", assignments, assignments.size(),
                 (ps, assignment) -> {
                     ps.setLong(1, projectId);
                     ps.setLong(2, assignment.internId());
