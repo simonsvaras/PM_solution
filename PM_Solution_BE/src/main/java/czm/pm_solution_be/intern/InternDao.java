@@ -1,4 +1,4 @@
-﻿package czm.pm_solution_be.intern;
+package czm.pm_solution_be.intern;
 
 /**
  * Low-level JDBC access for the intern aggregate.
@@ -30,6 +30,14 @@ public class InternDao {
     private final JdbcTemplate jdbc;
 
     public record InternRow(long id, String firstName, String lastName, String username, long levelId, String levelLabel) {}
+    public record InternAssignmentRow(long id,
+                                      String firstName,
+                                      String lastName,
+                                      String username,
+                                      long levelId,
+                                      String levelCode,
+                                      String levelLabel,
+                                      boolean assigned) {}
     public record GroupRow(long id, int code, String label) {}
     public record LevelRow(long id, String code, String label) {}
     public record SortOrder(String column, boolean ascending) {}
@@ -255,6 +263,54 @@ public class InternDao {
             ps.setLong(1, internId);
             ps.setLong(2, groupId);
         });
+    }
+
+    public List<InternAssignmentRow> listInternsWithAssignment(long projectId, String search) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT i.id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.code AS level_code,
+                       l.label AS level_label,
+                       CASE WHEN ip.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned
+                FROM intern i
+                JOIN level l ON l.id = i.level_id
+                LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ?
+                """);
+        List<Object> params = new ArrayList<>();
+        params.add(projectId);
+        if (search != null && !search.isBlank()) {
+            String like = "%" + search.toLowerCase(Locale.ROOT) + "%";
+            sql.append(" WHERE LOWER(i.first_name) LIKE ? OR LOWER(i.last_name) LIKE ? OR LOWER(i.username) LIKE ?");
+            params.add(like);
+            params.add(like);
+            params.add(like);
+        }
+        sql.append(" ORDER BY i.last_name ASC, i.first_name ASC, i.id ASC");
+        return jdbc.query(sql.toString(), (rs, rn) -> new InternAssignmentRow(
+                rs.getLong("id"),
+                rs.getString("first_name"),
+                rs.getString("last_name"),
+                rs.getString("username"),
+                rs.getLong("level_id"),
+                rs.getString("level_code"),
+                rs.getString("level_label"),
+                rs.getBoolean("assigned")),
+                params.toArray());
+    }
+
+    public void replaceProjectInterns(long projectId, List<Long> internIds) {
+        jdbc.update("DELETE FROM intern_project WHERE project_id = ?", projectId);
+        if (internIds == null || internIds.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id) VALUES (?, ?)", internIds, internIds.size(),
+                (ps, internId) -> {
+                    ps.setLong(1, projectId);
+                    ps.setLong(2, internId);
+                });
     }
 
     /**

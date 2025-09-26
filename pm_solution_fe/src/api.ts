@@ -71,6 +71,19 @@ export type LevelOption = { id: number; code: string; label: string };
 export type GroupOption = { id: number; code: number; label: string };
 export type InternListParams = { q?: string; username?: string; page?: number; size?: number; sort?: string };
 
+export type ProjectInternAssignmentGroupDTO = { id: number; code: number; label: string };
+export type ProjectInternAssignmentDTO = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  levelId: number;
+  levelCode: string;
+  levelLabel: string;
+  groups: ProjectInternAssignmentGroupDTO[];
+  assigned: boolean;
+};
+
 
 function mapIntern(dto: InternDTO): Intern {
   const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
@@ -169,6 +182,24 @@ export async function updateProjectRepositories(projectId: number, repositoryIds
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ repositoryIds }),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function getProjectInterns(projectId: number, search?: string): Promise<ProjectInternAssignmentDTO[]> {
+  const qs = new URLSearchParams();
+  if (search && search.trim()) qs.set('search', search.trim());
+  const url = `${API_BASE}/api/projects/${projectId}/interns${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectInternAssignmentDTO[]>(res);
+}
+
+export async function updateProjectInterns(projectId: number, internIds: number[]): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/interns`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ internIds }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
 }

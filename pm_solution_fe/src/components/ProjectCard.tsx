@@ -6,9 +6,10 @@ export type ProjectCardProps = {
   onEdit: (p: ProjectDTO) => void;
   onDelete: (p: ProjectDTO) => void;
   onManageRepos: (p: ProjectDTO) => void;
+  onManageTeam: (p: ProjectDTO) => void;
 };
 
-export default function ProjectCard({ project, onEdit, onDelete, onManageRepos }: ProjectCardProps) {
+export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, onManageTeam }: ProjectCardProps) {
   return (
     <div className="projectCard" aria-label={`Projekt ${project.name}`}>
       <h3 className="projectCard__title">{project.name}</h3>
@@ -19,8 +20,8 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos }
         <button className="btn btn--danger" onClick={() => onDelete(project)}>Smazat</button>
         <button className="btn" onClick={() => onEdit(project)}>Editovat</button>
         <button className="btn btn--primary" onClick={() => onManageRepos(project)}>Správa repozitářů</button>
+        <button className="btn" onClick={() => onManageTeam(project)}>Správa tým</button>
       </div>
     </div>
   );
 }
-

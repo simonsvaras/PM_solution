@@ -2,6 +2,7 @@
 import Modal from './Modal';
 import ProjectCard from './ProjectCard';
 import ManageRepositoriesModal from './ManageRepositoriesModal';
+import ManageProjectInternsModal from './ManageProjectInternsModal';
 import {
   API_BASE,
   createProjectByName,
@@ -38,6 +39,7 @@ export default function ProjectsPage() {
   const [justCreated, setJustCreated] = useState<ProjectDTO | null>(null);
   const [editing, setEditing] = useState<ProjectDTO | null>(null);
   const [manageProject, setManageProject] = useState<ProjectDTO | null>(null);
+  const [manageTeamProject, setManageTeamProject] = useState<ProjectDTO | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -113,6 +115,10 @@ export default function ProjectsPage() {
     setManageProject(p);
   }
 
+  function onManageTeam(p: ProjectDTO) {
+    setManageTeamProject(p);
+  }
+
   return (
     <>
       <section className="panel">
@@ -176,7 +182,14 @@ export default function ProjectsPage() {
       {!loading && !error && (
         <div className="cardsGrid">
           {sorted.map(p => (
-            <ProjectCard key={p.id} project={p} onEdit={onEdit} onDelete={onDelete} onManageRepos={onManageRepos} />
+            <ProjectCard
+              key={p.id}
+              project={p}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onManageRepos={onManageRepos}
+              onManageTeam={onManageTeam}
+            />
           ))}
           {sorted.length === 0 && <div className="card-summary">Žádné projekty.</div>}
         </div>
@@ -184,6 +197,14 @@ export default function ProjectsPage() {
       <ManageRepositoriesModal
         project={manageProject}
         onClose={() => setManageProject(null)}
+        onSaved={() => {
+          setJustCreated(null);
+          reload();
+        }}
+      />
+      <ManageProjectInternsModal
+        project={manageTeamProject}
+        onClose={() => setManageTeamProject(null)}
         onSaved={() => {
           setJustCreated(null);
           reload();

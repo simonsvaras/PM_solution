@@ -1,4 +1,4 @@
-﻿package czm.pm_solution_be.intern;
+package czm.pm_solution_be.intern;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

@@ -1,4 +1,4 @@
-﻿package czm.pm_solution_be.intern;
+package czm.pm_solution_be.intern;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
