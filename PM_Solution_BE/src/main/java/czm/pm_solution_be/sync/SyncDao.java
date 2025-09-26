@@ -1,5 +1,8 @@
 package czm.pm_solution_be.sync;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -13,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class SyncDao {
+    private static final Logger log = LoggerFactory.getLogger(SyncDao.class);
     private final JdbcTemplate jdbc;
 
     public SyncDao(JdbcTemplate jdbc) {
@@ -150,6 +154,8 @@ public class SyncDao {
 
     public record RepositoryAssignment(Long id, Long gitlabRepoId, String name, String nameWithNamespace, boolean assigned) {}
 
+    public record ProjectRepositoryLink(long repositoryId, Long gitlabRepoId, String name) {}
+
     public List<RepositoryAssignment> listRepositoriesWithAssignment(long projectId, String search) {
         StringBuilder sql = new StringBuilder("SELECT r.id, r.gitlab_repo_id, r.name, r.name_with_namespace, " +
                 "CASE WHEN ptr.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned " +
@@ -171,6 +177,19 @@ public class SyncDao {
                 rs.getString("name_with_namespace"),
                 rs.getBoolean("assigned")
         ), params.toArray());
+    }
+
+    public List<ProjectRepositoryLink> listProjectRepositories(long projectId) {
+        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
+                "FROM repository r " +
+                "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.id " +
+                "WHERE ptr.project_id = ? " +
+                "ORDER BY r.name";
+        return jdbc.query(sql, (rs, rn) -> new ProjectRepositoryLink(
+                rs.getLong("repository_id"),
+                (Long) rs.getObject("gitlab_repo_id"),
+                rs.getString("name")
+        ), projectId);
     }
 
     @Transactional
@@ -266,6 +285,42 @@ public class SyncDao {
     public void upsertRepoCursor(long repositoryId, String scope, OffsetDateTime lastRunAt) {
         String sql = "INSERT INTO sync_cursor_repo (repository_id, scope, last_run_at) VALUES (?,?,?) ON CONFLICT (repository_id, scope) DO UPDATE SET last_run_at = EXCLUDED.last_run_at";
         jdbc.update(sql, repositoryId, scope, lastRunAt);
+    }
+
+    public Optional<OffsetDateTime> findLastReportSpentAt(long repositoryId) {
+        List<OffsetDateTime> rows = jdbc.query(
+                "SELECT spent_at FROM report WHERE repository_id = ? ORDER BY spent_at DESC LIMIT 1",
+                (rs, rn) -> rs.getObject(1, OffsetDateTime.class),
+                repositoryId);
+        return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0));
+    }
+
+    public record ReportRow(long repositoryId, Long issueIid, OffsetDateTime spentAt, int timeSpentSeconds, String username) {}
+
+    public record ReportInsertStats(int inserted, int duplicates, int failed) {}
+
+    public ReportInsertStats insertReports(List<ReportRow> rows) {
+        int inserted = 0;
+        int duplicates = 0;
+        int failed = 0;
+        for (ReportRow row : rows) {
+            try {
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, username) " +
+                                "VALUES (?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
+                        ps -> {
+                            ps.setLong(1, row.repositoryId());
+                            if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
+                            ps.setObject(3, row.spentAt());
+                            ps.setInt(4, row.timeSpentSeconds());
+                            ps.setString(5, row.username());
+                        });
+                if (result > 0) inserted += result; else duplicates++;
+            } catch (DataIntegrityViolationException ex) {
+                failed++;
+                log.warn("Nepodařilo se vložit report pro repo {}: {}", row.repositoryId(), ex.getMessage());
+            }
+        }
+        return new ReportInsertStats(inserted, duplicates, failed);
     }
 
     public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {

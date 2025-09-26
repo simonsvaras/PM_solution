@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,10 +19,12 @@ public class SyncController {
 
     private final IssueSyncService issueSyncService;
     private final RepositorySyncService repositorySyncService;
+    private final ReportSyncService reportSyncService;
 
-    public SyncController(IssueSyncService issueSyncService, RepositorySyncService repositorySyncService) {
+    public SyncController(IssueSyncService issueSyncService, RepositorySyncService repositorySyncService, ReportSyncService reportSyncService) {
         this.issueSyncService = issueSyncService;
         this.repositorySyncService = repositorySyncService;
+        this.reportSyncService = reportSyncService;
     }
 
     @Deprecated
@@ -67,6 +70,27 @@ public class SyncController {
         SyncSummary s = issueSyncService.syncProjectIssues(projectId, full);
         s.durationMs = System.currentTimeMillis() - start;
         return s;
+    }
+
+    public static class ProjectReportSyncRequest {
+        public boolean sinceLast;
+        public OffsetDateTime from;
+        public OffsetDateTime to;
+    }
+
+    @PostMapping("/projects/{projectId}/reports")
+    public SyncSummary syncProjectReports(@PathVariable long projectId,
+                                          @RequestBody(required = false) ProjectReportSyncRequest request) {
+        long start = System.currentTimeMillis();
+        boolean sinceLast = request != null && request.sinceLast;
+        OffsetDateTime from = request != null ? request.from : null;
+        OffsetDateTime to = request != null ? request.to : null;
+        if (sinceLast) {
+            from = null;
+        }
+        SyncSummary summary = reportSyncService.syncProjectReports(projectId, from, to, sinceLast);
+        summary.durationMs = System.currentTimeMillis() - start;
+        return summary;
     }
 
     public static class StepAggregate {
