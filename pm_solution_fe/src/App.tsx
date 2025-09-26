@@ -2,6 +2,7 @@
 import './App.css';
 import Navbar, { type Module } from './components/Navbar';
 import ProjectsPage from './components/ProjectsPage';
+import ProjectsOverviewPage from './components/ProjectsOverviewPage';
 import InternsPage from './components/InternsPage';
 import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, SyncSummary } from './api';
@@ -21,6 +22,7 @@ const modules: Module[] = [
     key: 'projects',
     name: 'Projekty',
     submodules: [
+      { key: 'projects-overview', name: 'Přehled projektů' },
       { key: 'projects-admin', name: 'Správa projektů' },
     ],
   },
@@ -76,6 +78,7 @@ function App() {
     [activeModule, activeSubmoduleKey],
   );
   const isOnDemand = activeSubmoduleKey === 'sync-on-demand';
+  const isProjectsOverview = activeSubmoduleKey === 'projects-overview';
   const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
   const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
 
@@ -209,9 +212,10 @@ function App() {
             <h1>{activeSubmodule?.name}</h1>
             <p className="page-header__description">
               {isOnDemand && 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.'}
+              {isProjectsOverview && 'Získejte rychlý přehled o projektech, jejich týmech a otevřených issue.'}
               {isProjectsAdmin && 'Vytvářejte a spravujte projekty v aplikaci.'}
               {isInternsAdmin && 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.'}
-              {!isOnDemand && !isProjectsAdmin && !isInternsAdmin && 'Tato sekce bude dostupná v dalších verzích aplikace.'}
+              {!isOnDemand && !isProjectsOverview && !isProjectsAdmin && !isInternsAdmin && 'Tato sekce bude dostupná v dalších verzích aplikace.'}
             </p>
           </header>
 
@@ -251,6 +255,8 @@ function App() {
                 </div>
               </div>
             </section>
+          ) : isProjectsOverview ? (
+            <ProjectsOverviewPage />
           ) : isProjectsAdmin ? (
             <ProjectsPage />
           ) : isInternsAdmin ? (

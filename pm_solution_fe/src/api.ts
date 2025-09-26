@@ -44,6 +44,15 @@ export type ProjectDTO = {
   budgetFrom: string | null;
   budgetTo: string | null;
 };
+export type ProjectOverviewDTO = {
+  id: number;
+  name: string;
+  budget: number | null;
+  budgetFrom: string | null;
+  budgetTo: string | null;
+  teamMembers: number;
+  openIssues: number;
+};
 export type ProjectBudgetPayload = {
   name: string;
   budget?: number | null;
@@ -137,6 +146,12 @@ export async function getProjects(): Promise<ProjectDTO[]> {
   const res = await fetch(`${API_BASE}/api/projects`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO[]>(res);
+}
+
+export async function getProjectsOverview(): Promise<ProjectOverviewDTO[]> {
+  const res = await fetch(`${API_BASE}/api/projects/overview`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectOverviewDTO[]>(res);
 }
 
 export async function createProjectByName(payload: ProjectBudgetPayload): Promise<ProjectDTO> {

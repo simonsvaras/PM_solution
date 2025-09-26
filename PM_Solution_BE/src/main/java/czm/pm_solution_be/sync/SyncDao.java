@@ -66,6 +66,13 @@ public class SyncDao {
     }
 
     public record ProjectRow(Long id, Long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
+    public record ProjectOverviewRow(Long id,
+                                     String name,
+                                     Integer budget,
+                                     LocalDate budgetFrom,
+                                     LocalDate budgetTo,
+                                     Integer teamMembers,
+                                     Integer openIssues) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, gitlab_project_id, name, budget, budget_from, budget_to FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
@@ -75,6 +82,41 @@ public class SyncDao {
                         (Integer) rs.getObject("budget"),
                         rs.getObject("budget_from", LocalDate.class),
                         rs.getObject("budget_to", LocalDate.class)));
+    }
+
+    public List<ProjectOverviewRow> listProjectOverview() {
+        String sql = """
+                SELECT p.id,
+                       p.name,
+                       p.budget,
+                       p.budget_from,
+                       p.budget_to,
+                       COALESCE(team_counts.team_members, 0) AS team_members,
+                       COALESCE(issue_counts.open_issues, 0) AS open_issues
+                FROM project p
+                LEFT JOIN (
+                    SELECT ip.project_id,
+                           COUNT(DISTINCT ip.intern_id) AS team_members
+                    FROM intern_project ip
+                    GROUP BY ip.project_id
+                ) AS team_counts ON team_counts.project_id = p.id
+                LEFT JOIN (
+                    SELECT ptr.project_id,
+                           COUNT(DISTINCT CASE WHEN iss.state = 'opened' THEN iss.id END) AS open_issues
+                    FROM projects_to_repositorie ptr
+                    JOIN issue iss ON iss.repository_id = ptr.repository_id
+                    GROUP BY ptr.project_id
+                ) AS issue_counts ON issue_counts.project_id = p.id
+                ORDER BY p.name
+                """;
+        return jdbc.query(sql, (rs, rn) -> new ProjectOverviewRow(
+                rs.getLong("id"),
+                rs.getString("name"),
+                (Integer) rs.getObject("budget"),
+                rs.getObject("budget_from", LocalDate.class),
+                rs.getObject("budget_to", LocalDate.class),
+                rs.getInt("team_members"),
+                rs.getInt("open_issues")));
     }
 
     public int deleteProject(long id) {

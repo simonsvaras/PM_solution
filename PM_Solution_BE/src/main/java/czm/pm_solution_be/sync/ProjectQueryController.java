@@ -20,10 +20,32 @@ public class ProjectQueryController {
                              java.time.LocalDate budgetFrom,
                              java.time.LocalDate budgetTo) {}
 
+    public record ProjectOverviewDto(Long id,
+                                     String name,
+                                     Integer budget,
+                                     java.time.LocalDate budgetFrom,
+                                     java.time.LocalDate budgetTo,
+                                     Integer teamMembers,
+                                     Integer openIssues) {}
+
     @GetMapping
     public List<ProjectDto> list() {
         return dao.listProjects().stream()
                 .map(r -> new ProjectDto(r.id(), r.gitlabProjectId(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo()))
+                .toList();
+    }
+
+    @GetMapping("/overview")
+    public List<ProjectOverviewDto> overview() {
+        return dao.listProjectOverview().stream()
+                .map(r -> new ProjectOverviewDto(
+                        r.id(),
+                        r.name(),
+                        r.budget(),
+                        r.budgetFrom(),
+                        r.budgetTo(),
+                        r.teamMembers(),
+                        r.openIssues()))
                 .toList();
     }
 }
