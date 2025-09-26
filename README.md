@@ -24,4 +24,4 @@ Services
 Notes
 - Frontend proxies `/api/*` to backend inside the compose network (to port 8081), so no CORS is needed in Docker.
 - For local dev outside Docker, frontend uses `VITE_API_BASE_URL` from `pm_solution_fe/.env` (defaults to same-origin if unset).
-- Vite's dev proxy reads `VITE_DEV_API_URL` from the same file; set it if your backend isn't on `http://localhost:8081`.
+- When running `npm run dev`, you can also set `VITE_DEV_API_URL` to force requests directly to a backend URL (falls back to `http://localhost:8081`).

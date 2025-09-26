@@ -1,5 +1,9 @@
-﻿// Default to same-origin (nginx proxies /api -> backend in docker)
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+﻿// Default to same-origin (nginx proxies /api -> backend in docker).
+// During local development fall back to the dev proxy target (or localhost)
+// so requests can bypass the Vite proxy when it is misconfigured.
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? import.meta.env.VITE_DEV_API_URL || "http://localhost:8081" : "");
 
 export type SyncSummary = {
   fetched: number;
