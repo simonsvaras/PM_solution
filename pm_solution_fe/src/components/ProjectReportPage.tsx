@@ -81,6 +81,7 @@ export default function ProjectReportPage({ project, onBack }: ProjectReportPage
           <p className="projectReport__syncDescription">
             Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
           </p>
+          <p className="projectReport__note">Výkazy se sycnhronizují jen pro uživatele, kteří v systému vytvoření.</p>
         </div>
         <label className="projectReport__checkbox">
           <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
@@ -112,6 +113,18 @@ export default function ProjectReportPage({ project, onBack }: ProjectReportPage
             Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
             {syncSummary.durationMs} ms.
           </p>
+        ) : null}
+        {syncSummary && syncSummary.missingUsernames.length > 0 ? (
+          <div className="projectReport__missing">
+            <p className="projectReport__missingTitle">
+              Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
+            </p>
+            <ul className="projectReport__missingList">
+              {syncSummary.missingUsernames.map(username => (
+                <li key={username}>{username}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         <button
           type="button"

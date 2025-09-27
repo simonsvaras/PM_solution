@@ -10,8 +10,12 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
@@ -297,13 +301,38 @@ public class SyncDao {
 
     public record ReportRow(long repositoryId, Long issueIid, OffsetDateTime spentAt, int timeSpentSeconds, String username) {}
 
-    public record ReportInsertStats(int inserted, int duplicates, int failed) {}
+    public record ReportInsertStats(int inserted, int duplicates, int failed, List<String> missingUsernames) {}
 
     public ReportInsertStats insertReports(List<ReportRow> rows) {
         int inserted = 0;
         int duplicates = 0;
         int failed = 0;
+        LinkedHashSet<String> missingUsernames = new LinkedHashSet<>();
+        if (rows == null || rows.isEmpty()) {
+            return new ReportInsertStats(0, 0, 0, List.of());
+        }
+
+        Set<String> uniqueUsernames = rows.stream()
+                .map(ReportRow::username)
+                .filter(username -> username != null && !username.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> existingUsernames = loadExistingInternUsernames(uniqueUsernames);
+
+        List<ReportRow> candidates = new ArrayList<>();
         for (ReportRow row : rows) {
+            if (!existingUsernames.contains(row.username())) {
+                failed++;
+                missingUsernames.add(row.username());
+                continue;
+            }
+            candidates.add(row);
+        }
+
+        if (candidates.isEmpty()) {
+            return new ReportInsertStats(0, 0, failed, List.copyOf(missingUsernames));
+        }
+
+        for (ReportRow row : candidates) {
             try {
                 int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, username) " +
                                 "VALUES (?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
@@ -320,7 +349,23 @@ public class SyncDao {
                 log.warn("Nepodařilo se vložit report pro repo {}: {}", row.repositoryId(), ex.getMessage());
             }
         }
-        return new ReportInsertStats(inserted, duplicates, failed);
+        return new ReportInsertStats(inserted, duplicates, failed, List.copyOf(missingUsernames));
+    }
+
+    private Set<String> loadExistingInternUsernames(Set<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return Set.of();
+        }
+        StringJoiner placeholders = new StringJoiner(", ");
+        List<Object> params = new ArrayList<>();
+        for (String username : usernames) {
+            placeholders.add("?");
+            params.add(username);
+        }
+        String sql = "SELECT username FROM intern WHERE username IN (" + placeholders + ")";
+        return jdbc.query(sql, (rs, rn) -> rs.getString(1), params.toArray())
+                .stream()
+                .collect(Collectors.toSet());
     }
 
     public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {

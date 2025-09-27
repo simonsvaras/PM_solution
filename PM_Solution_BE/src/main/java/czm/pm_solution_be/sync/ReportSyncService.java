@@ -94,6 +94,7 @@ public class ReportSyncService {
                     if (stats.failed() > 0) {
                         summary.addSkipped(stats.failed());
                     }
+                    summary.addMissingUsernames(stats.missingUsernames());
                 }
 
                 GitLabGraphQlClient.PageInfo pageInfo = page.pageInfo();

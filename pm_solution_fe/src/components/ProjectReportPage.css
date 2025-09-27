@@ -58,6 +58,12 @@
   max-width: 540px;
 }
 
+.projectReport__note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
 .projectReport__checkbox {
   display: inline-flex;
   align-items: center;
@@ -116,6 +122,30 @@
 
 .projectReport__status--success {
   color: var(--color-accent-strong);
+}
+
+.projectReport__missing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(30, 64, 175, 0.08);
+  border: 1px solid rgba(30, 64, 175, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.projectReport__missingTitle {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+}
+
+.projectReport__missingList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
 }
 
 .projectReport__syncButton {

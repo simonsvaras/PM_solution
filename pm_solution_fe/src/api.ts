@@ -8,6 +8,7 @@ export type SyncSummary = {
   skipped: number;
   pages: number;
   durationMs: number;
+  missingUsernames: string[];
 };
 
 export type ProjectReportSyncPayload = {
