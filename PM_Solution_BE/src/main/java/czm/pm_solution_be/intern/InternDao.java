@@ -43,6 +43,9 @@ public class InternDao {
                                       boolean assigned) {}
     public record GroupRow(long id, int code, String label) {}
     public record LevelRow(long id, String code, String label) {}
+    public record LevelHistoryRow(long id, long levelId, String levelCode, String levelLabel, LocalDate validFrom,
+                                  LocalDate validTo) {}
+    public record LevelHistoryInput(long levelId, LocalDate validFrom, LocalDate validTo) {}
     public record SortOrder(String column, boolean ascending) {}
     public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {}
     public record PageResult(List<InternRow> rows, long totalElements) {}
@@ -70,6 +73,14 @@ public class InternDao {
             rs.getLong("id"),
             rs.getString("code"),
             rs.getString("label"));
+
+    private static final RowMapper<LevelHistoryRow> LEVEL_HISTORY_MAPPER = (rs, rn) -> new LevelHistoryRow(
+            rs.getLong("id"),
+            rs.getLong("level_id"),
+            rs.getString("level_code"),
+            rs.getString("level_label"),
+            rs.getDate("valid_from").toLocalDate(),
+            rs.getDate("valid_to") != null ? rs.getDate("valid_to").toLocalDate() : null);
 
     public InternDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -210,6 +221,16 @@ public class InternDao {
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
+    public List<LevelRow> findLevelsByIds(Collection<Long> levelIds) {
+        if (levelIds == null || levelIds.isEmpty()) {
+            return List.of();
+        }
+        String inClause = levelIds.stream().map(id -> "?").reduce((a, b) -> a + "," + b).orElse("?");
+        List<Object> params = new ArrayList<>();
+        params.addAll(levelIds);
+        return jdbc.query("SELECT id, code, label FROM level WHERE id IN (" + inClause + ")", LEVEL_MAPPER, params.toArray());
+    }
+
     /**
      * Returns all groups ordered by label.
      */
@@ -327,28 +348,40 @@ public class InternDao {
     /**
      * Inserts a new record into intern_level_history for the supplied level.
      */
-    public void insertLevelHistory(long internId, long levelId, LocalDate fromDate) {
-        jdbc.update(
-                "INSERT INTO intern_level_history (intern_id, level_id, valid_from, valid_to) VALUES (?, ?, ?, NULL)",
-                internId,
-                levelId,
-                fromDate);
+    public List<LevelHistoryRow> findLevelHistory(long internId) {
+        return jdbc.query("""
+                SELECT h.id,
+                       h.level_id,
+                       l.code AS level_code,
+                       l.label AS level_label,
+                       h.valid_from,
+                       h.valid_to
+                FROM intern_level_history h
+                JOIN level l ON l.id = h.level_id
+                WHERE h.intern_id = ?
+                ORDER BY h.valid_from DESC, h.id DESC
+                """, LEVEL_HISTORY_MAPPER, internId);
     }
 
-    /**
-     * Closes the current open level history record when a level changes.
-     */
-    public void closeOpenLevelHistory(long internId, LocalDate newLevelStart) {
-        jdbc.update(
-                """
-                UPDATE intern_level_history
-                SET valid_to = CASE WHEN valid_from >= ? THEN ? ELSE ? END
-                WHERE intern_id = ? AND valid_to IS NULL
-                """,
-                newLevelStart,
-                newLevelStart,
-                newLevelStart.minusDays(1),
-                internId);
+    public void replaceLevelHistory(long internId, List<LevelHistoryInput> history) {
+        jdbc.update("DELETE FROM intern_level_history WHERE intern_id = ?", internId);
+        if (history == null || history.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate(
+                "INSERT INTO intern_level_history (intern_id, level_id, valid_from, valid_to) VALUES (?, ?, ?, ?)",
+                history,
+                history.size(),
+                (ps, entry) -> {
+                    ps.setLong(1, internId);
+                    ps.setLong(2, entry.levelId());
+                    ps.setObject(3, entry.validFrom());
+                    if (entry.validTo() == null) {
+                        ps.setNull(4, Types.DATE);
+                    } else {
+                        ps.setObject(4, entry.validTo());
+                    }
+                });
     }
 
     private static String buildOrderClause(List<SortOrder> orders) {

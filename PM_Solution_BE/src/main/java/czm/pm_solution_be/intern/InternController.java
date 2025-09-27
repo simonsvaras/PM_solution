@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/interns")
 @Tag(name = "Interns", description = "Registrace a správa stážistů")
@@ -52,6 +54,12 @@ public class InternController {
     @Operation(summary = "Detail stážisty")
     public InternResponse get(@PathVariable long id) {
         return service.get(id);
+    }
+
+    @GetMapping("/{id}/levels/history")
+    @Operation(summary = "Historie úrovní stážisty")
+    public List<InternLevelHistoryResponse> history(@PathVariable long id) {
+        return service.getLevelHistory(id);
     }
 
     @GetMapping

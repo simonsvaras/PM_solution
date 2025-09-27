@@ -6,24 +6,35 @@ import {
   createIntern,
   deleteIntern,
   getGroups,
+  getInternLevelHistory,
   getLevels,
   listInterns,
   updateIntern,
   type ErrorResponse,
   type GroupOption,
   type Intern,
+  type InternLevelHistoryPayload,
   type InternListResult,
   type InternPayload,
   type LevelOption,
 } from '../api';
+import InternLevelHistoryModal from './InternLevelHistoryModal';
+import { normalizeLevelHistoryDraft, type LevelHistoryDraft } from './internLevelHistory';
 
 const PAGE_SIZE = 20;
 const DEFAULT_SORT = 'last_name,asc';
 
-type FormState = { firstName: string; lastName: string; username: string; levelId: number | null; groupIds: number[] };
-const emptyForm: FormState = { firstName: '', lastName: '', username: '', levelId: null, groupIds: [] };
+type FormState = { firstName: string; lastName: string; username: string; groupIds: number[] };
+const emptyForm: FormState = { firstName: '', lastName: '', username: '', groupIds: [] };
 
-type FormErrors = { firstName?: string; lastName?: string; username?: string; level?: string; groups?: string; general?: string };
+type FormErrors = {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  history?: string;
+  groups?: string;
+  general?: string;
+};
 
 type Mode = 'create' | 'edit';
 
@@ -31,7 +42,7 @@ function normalizeUsername(value: string) {
   return value.trim().toLowerCase();
 }
 
-function validateForm(form: FormState): { valid: boolean; errors: FormErrors } {
+function validateForm(form: FormState, history: LevelHistoryDraft[]): { valid: boolean; errors: FormErrors } {
   const errors: FormErrors = {};
   const firstName = form.firstName.trim();
   const lastName = form.lastName.trim();
@@ -49,9 +60,16 @@ function validateForm(form: FormState): { valid: boolean; errors: FormErrors } {
   else if (username.length < 3 || username.length > 50) errors.username = 'Username musí mít 3–50 znaků.';
   else if (!/^[a-z0-9._-]+$/.test(username)) errors.username = 'Username smí obsahovat pouze malá písmena, číslice a znaky .-_.';
 
-  if (form.levelId === null) errors.level = 'Vyberte úroveň.';
+  const { error: historyError } = normalizeLevelHistoryDraft(history);
+  if (historyError) errors.history = historyError;
 
   return { valid: Object.keys(errors).length === 0, errors };
+}
+
+function buildDefaultHistory(levels: LevelOption[]): LevelHistoryDraft[] {
+  if (!levels.length) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  return [{ levelId: levels[0].id, validFrom: today, validTo: null }];
 }
 
 /**
@@ -74,6 +92,10 @@ export default function InternsPage() {
   const [mode, setMode] = useState<Mode>('create');
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [levelHistory, setLevelHistory] = useState<LevelHistoryDraft[]>([]);
+  const [levelHistoryModalOpen, setLevelHistoryModalOpen] = useState(false);
+  const [levelHistoryLoading, setLevelHistoryLoading] = useState(false);
+  const [levelHistoryError, setLevelHistoryError] = useState<ErrorResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<ErrorResponse | null>(null);
   const [activeIntern, setActiveIntern] = useState<Intern | null>(null);
@@ -94,15 +116,40 @@ export default function InternsPage() {
     }
   }, []);
 
+  const loadLevelHistory = useCallback(async (internId: number) => {
+    setLevelHistoryLoading(true);
+    setLevelHistoryError(null);
+    try {
+      const history = await getInternLevelHistory(internId);
+      const drafts: LevelHistoryDraft[] = history.map(item => ({
+        levelId: item.levelId,
+        validFrom: item.validFrom,
+        validTo: item.validTo,
+      }));
+      const { error: normalizationError, sorted } = normalizeLevelHistoryDraft(drafts);
+      if (normalizationError) {
+        setLevelHistory(drafts);
+        setLevelHistoryError({ error: { code: 'INVALID_HISTORY', message: normalizationError, httpStatus: 500 } });
+      } else {
+        setLevelHistory(sorted);
+      }
+    } catch (e) {
+      setLevelHistory([]);
+      setLevelHistoryError(e as ErrorResponse);
+    } finally {
+      setLevelHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadReferences();
   }, [loadReferences]);
 
   useEffect(() => {
-    if (form.levelId === null && levels.length > 0) {
-      setForm(current => ({ ...current, levelId: current.levelId ?? levels[0].id }));
+    if (mode === 'create' && modalOpen && levelHistory.length === 0 && levels.length > 0) {
+      setLevelHistory(buildDefaultHistory(levels));
     }
-  }, [levels, form.levelId]);
+  }, [levels, mode, modalOpen, levelHistory.length]);
 
   const loadInterns = useCallback(async (targetPage: number, targetSearch: string) => {
     setLoading(true);
@@ -138,10 +185,14 @@ export default function InternsPage() {
     setMode('create');
     setModalOpen(true);
     setInfo(null);
-    setForm({ ...emptyForm, levelId: levels.length > 0 ? levels[0].id : null });
+    setForm(emptyForm);
     setFormErrors({});
     setSubmitError(null);
     setActiveIntern(null);
+    setLevelHistory(buildDefaultHistory(levels));
+    setLevelHistoryError(null);
+    setLevelHistoryLoading(false);
+    setLevelHistoryModalOpen(false);
   }
 
   function openEdit(intern: Intern) {
@@ -152,18 +203,21 @@ export default function InternsPage() {
       firstName: intern.firstName,
       lastName: intern.lastName,
       username: intern.username,
-      levelId: intern.levelId,
       groupIds: intern.groups.map(g => g.id),
     });
     setFormErrors({});
     setSubmitError(null);
     setActiveIntern(intern);
+    setLevelHistory([]);
+    setLevelHistoryError(null);
+    void loadLevelHistory(intern.id);
   }
 
   function closeModal() {
     if (submitting) return;
     setModalOpen(false);
     setSubmitError(null);
+    setLevelHistoryModalOpen(false);
   }
 
   function handleSearchSubmit(e: FormEvent) {
@@ -193,9 +247,17 @@ export default function InternsPage() {
       if (details === 'last_name_required') return { lastName: 'Příjmení je povinné.' };
       if (details === 'username_format') return { username: 'Username smí obsahovat pouze malá písmena, číslice a znaky .-_ a mít 3–50 znaků.' };
       if (details === 'username_filter_invalid') return { username: 'Username obsahuje neplatné znaky.' };
-      if (details === 'level_required') return { level: 'Vyberte úroveň.' };
-      if (details === 'level_not_found') return { level: 'Zvolená úroveň neexistuje.' };
       if (details === 'group_not_found' || details === 'group_null') return { groups: 'Vyberte platné skupiny.' };
+      if (details === 'level_not_found') return { history: 'Zvolená úroveň neexistuje.' };
+      if (details === 'level_required') return { history: 'Vyberte úroveň.' };
+      if (details === 'level_history_required') return { history: 'Přidejte alespoň jednu úroveň.' };
+      if (details === 'level_history_item_required') return { history: 'Položka historie nesmí být prázdná.' };
+      if (details === 'level_valid_from_required') return { history: 'Datum od je povinné.' };
+      if (details === 'level_history_multiple_open') return { history: 'Pouze jedna úroveň může být aktuální.' };
+      if (details === 'level_history_open_required') return { history: 'Jedna úroveň musí být aktuálně otevřená.' };
+      if (details === 'level_history_overlap') return { history: 'Období úrovní se nesmí překrývat.' };
+      if (details === 'level_history_open_position') return { history: 'Aktuální úroveň musí být poslední v pořadí.' };
+      if (details === 'level_history_current_required') return { history: 'Aktuální úroveň musí mít prázdné datum do.' };
       if (details === 'body_required') return { general: 'Tělo požadavku nesmí být prázdné.' };
       return { general: message };
     }
@@ -210,25 +272,35 @@ export default function InternsPage() {
     e.preventDefault();
     setSubmitError(null);
     const normalizedUsername = normalizeUsername(form.username);
-    const validation = validateForm({ ...form, username: normalizedUsername });
+    const validation = validateForm({ ...form, username: normalizedUsername }, levelHistory);
     if (!validation.valid) {
       setFormErrors(validation.errors);
       return;
     }
-    if (form.levelId === null) {
-      setFormErrors(current => ({ ...current, level: 'Vyberte úroveň.' }));
+    const { error: historyError, sorted } = normalizeLevelHistoryDraft(levelHistory);
+    if (historyError) {
+      setFormErrors(current => ({ ...current, history: historyError }));
       return;
     }
+    setLevelHistory(sorted);
     setFormErrors({});
     setSubmitting(true);
     try {
       const uniqueGroupIds = Array.from(new Set(form.groupIds));
+      const historyPayload: InternLevelHistoryPayload[] = [];
+      for (const entry of sorted) {
+        if (entry.levelId == null) {
+          setFormErrors(current => ({ ...current, history: 'Vyberte platnou úroveň.' }));
+          return;
+        }
+        historyPayload.push({ levelId: entry.levelId, validFrom: entry.validFrom, validTo: entry.validTo ?? null });
+      }
       const payload: InternPayload = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         username: normalizedUsername,
-        levelId: form.levelId,
         groupIds: uniqueGroupIds,
+        levelHistory: historyPayload,
       };
       if (mode === 'edit' && activeIntern) {
         await updateIntern(activeIntern.id, payload);
@@ -249,6 +321,17 @@ export default function InternsPage() {
       setSubmitting(false);
     }
   }
+
+  function handleHistoryChange(next: LevelHistoryDraft[]) {
+    setLevelHistory(next);
+    setFormErrors(current => ({ ...current, history: undefined }));
+  }
+
+  const currentHistory = levelHistory.length > 0 ? levelHistory[levelHistory.length - 1] : null;
+  const currentLevelOption = currentHistory ? levels.find(level => level.id === currentHistory.levelId) : null;
+  const currentHistorySummary = currentHistory
+    ? `${currentLevelOption?.label ?? currentHistory.levelId} od ${currentHistory.validFrom}`
+    : null;
 
   return (
     <section className="panel">
@@ -394,24 +477,32 @@ export default function InternsPage() {
             {formErrors.username && <div className="errorText">{formErrors.username}</div>}
           </div>
           <div className="field">
-            <span>Úroveň</span>
-            <div className="interns-levels">
-              {levels.map(level => (
-                <label key={level.id} className="radio">
-                  <input
-                    type="radio"
-                    name="intern-level"
-                    value={level.id}
-                    checked={form.levelId === level.id}
-                    onChange={() => setForm(current => ({ ...current, levelId: level.id }))}
-                    disabled={submitting}
-                  />
-                  <span>{level.label}</span>
-                </label>
-              ))}
-              {levels.length === 0 && !refsLoading && <span className="notice">Žádné úrovně nejsou k dispozici.</span>}
+            <span>Úrovně</span>
+            <div className="interns-history-control">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setLevelHistoryModalOpen(true)}
+                disabled={refsLoading || levels.length === 0}
+              >
+                Nastavit úroveň
+              </button>
+              {levelHistory.length > 0 && currentHistorySummary && (
+                <div className="interns-history-summary">
+                  <strong>{currentHistorySummary}</strong>
+                  {levelHistory.length > 1 && <span> • {levelHistory.length} záznamů</span>}
+                </div>
+              )}
+              {levelHistory.length === 0 && !levelHistoryLoading && (
+                <span className="notice">Historie není nastavena.</span>
+              )}
+              {levels.length === 0 && !refsLoading && (
+                <span className="notice">Žádné úrovně nejsou k dispozici.</span>
+              )}
             </div>
-            {formErrors.level && <div className="errorText">{formErrors.level}</div>}
+            {levelHistoryLoading && <div className="notice">Načítám historii…</div>}
+            {levelHistoryError && <div className="errorText">{levelHistoryError.error.message}</div>}
+            {formErrors.history && <div className="errorText">{formErrors.history}</div>}
           </div>
           <div className="field">
             <span>Skupiny</span>
@@ -454,6 +545,15 @@ export default function InternsPage() {
           </div>
         </form>
       </Modal>
+      <InternLevelHistoryModal
+        isOpen={levelHistoryModalOpen}
+        onClose={() => setLevelHistoryModalOpen(false)}
+        value={levelHistory}
+        onChange={handleHistoryChange}
+        levels={levels}
+        loading={levelHistoryLoading}
+        error={levelHistoryError}
+      />
     </section>
   );
 }

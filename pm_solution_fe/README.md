@@ -6,7 +6,7 @@ Overview
 React + TypeScript single-page app providing UI for:
 - synchronising GitLab data (On-demand page),
 - managing local projects and their repositories,
-- managing interns (levels, groups, CRUD).
+- managing interns (groups, full CRUD and timeline of level changes).
 
 Prerequisites
 -------------
@@ -26,13 +26,13 @@ Key modules
 -----------
 - **Synchronizace** – triggers GitLab sync jobs, displays progress and result cards.
 - **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
-- **Stážisti** – full CRUD over interns. Radio buttons set the level, checkboxes assign any number of groups. Validation/messages mirror backend responses.
+- **Stážisti** – full CRUD over interns. Samostatný modál "Nastavit úroveň" umožňuje spravovat historii úrovní včetně dat od-do a mazání položek. Skupiny se vybírají pomocí zaškrtávacích políček. Validace zobrazuje reakce backendu.
 
 API usage
 ---------
 Frontend talks to the backend via helper functions in `src/api.ts`.
 - Project helpers (`getProjects`, `createProjectByName`, `updateProjectName`, `deleteProject`, etc.).
-- Intern helpers (`listInterns`, `createIntern`, `updateIntern`, `deleteIntern`, `getLevels`, `getGroups`).
+- Intern helpers (`listInterns`, `createIntern`, `updateIntern`, `deleteIntern`, `getLevels`, `getGroups`, `getInternLevelHistory`).
 - Sync helpers for repositories/issues.
 
 Styling

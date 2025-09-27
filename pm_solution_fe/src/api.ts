@@ -94,11 +94,21 @@ export type InternListResponseDTO = {
 export type InternGroup = { id: number; code: number; label: string };
 export type Intern = { id: number; firstName: string; lastName: string; username: string; levelId: number; levelLabel: string; groups: InternGroup[] };
 export type InternListResult = { content: Intern[]; page: number; size: number; totalElements: number; totalPages: number };
-export type InternPayload = { firstName: string; lastName: string; username: string; levelId: number; groupIds: number[] };
+export type InternLevelHistoryPayload = { levelId: number; validFrom: string; validTo: string | null };
+export type InternPayload = { firstName: string; lastName: string; username: string; groupIds: number[]; levelHistory: InternLevelHistoryPayload[] };
 export type InternGroupDTO = { id: number; code: number; label: string };
 export type LevelOption = { id: number; code: string; label: string };
 export type GroupOption = { id: number; code: number; label: string };
 export type InternListParams = { q?: string; username?: string; page?: number; size?: number; sort?: string };
+
+export type InternLevelHistoryEntry = {
+  id: number;
+  levelId: number;
+  levelCode: string;
+  levelLabel: string;
+  validFrom: string;
+  validTo: string | null;
+};
 
 export type ProjectInternAssignmentGroupDTO = { id: number; code: number; label: string };
 export type ProjectInternAssignmentDTO = {
@@ -129,12 +139,17 @@ function mapIntern(dto: InternDTO): Intern {
 }
 
 function prepareInternBody(payload: InternPayload) {
+  const history = (payload.levelHistory ?? []).map(item => ({
+    level_id: item.levelId,
+    valid_from: item.validFrom,
+    valid_to: item.validTo ?? null,
+  }));
   return {
     first_name: payload.firstName.trim(),
     last_name: payload.lastName.trim(),
     username: payload.username.trim(),
-    level_id: payload.levelId,
     group_ids: payload.groupIds,
+    level_history: history,
   };
 }
 
@@ -400,6 +415,12 @@ export async function updateIntern(id: number, payload: InternPayload): Promise<
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<InternDTO>(res);
   return mapIntern(data);
+}
+
+export async function getInternLevelHistory(id: number): Promise<InternLevelHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/api/interns/${id}/levels/history`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<InternLevelHistoryEntry[]>(res);
 }
 
 /**

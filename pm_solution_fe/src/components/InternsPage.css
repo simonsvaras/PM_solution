@@ -188,7 +188,6 @@
   cursor: not-allowed;
 }
 
-.interns-levels,
 .interns-groups {
   display: flex;
   flex-wrap: wrap;
@@ -196,7 +195,6 @@
   align-items: center;
 }
 
-.interns-levels .radio,
 .interns-groups .checkbox {
   display: flex;
   align-items: center;
@@ -206,9 +204,23 @@
   color: #1f2937;
 }
 
-.interns-levels input[type="radio"],
 .interns-groups input[type="checkbox"] {
   margin: 0;
+}
+
+.interns-history-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.interns-history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  color: #1f2937;
 }
 
 .notice {

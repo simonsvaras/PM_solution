@@ -45,8 +45,9 @@ Key REST endpoints
 - `GET /api/groups` – list intern groups (id, code, label).
 - `GET /api/interns` – paginated intern list (`q`, `username`, `page`, `size`, `sort`).
 - `GET /api/interns/{id}` – intern detail.
-- `POST /api/interns` – create intern (`first_name`, `last_name`, `username`, `level_id`, `group_ids`).
-- `PUT /api/interns/{id}` – update intern (same payload as create).
+- `POST /api/interns` – create intern (`first_name`, `last_name`, `username`, `group_ids`, `level_history` – list of `{ level_id, valid_from, valid_to? }`, one entry must be open with `valid_to = null`).
+- `PUT /api/interns/{id}` – update intern (same payload, replaces full history and current level).
+- `GET /api/interns/{id}/levels/history` – list the full level history for a given intern (used by FE modal).
 - `DELETE /api/interns/{id}` – delete intern.
 
 Standard error contract
