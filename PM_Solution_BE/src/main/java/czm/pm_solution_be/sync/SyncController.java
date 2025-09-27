@@ -2,9 +2,16 @@ package czm.pm_solution_be.sync;
 
 import czm.pm_solution_be.sync.dto.SyncSummary;
 import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,10 +25,12 @@ public class SyncController {
 
     private final IssueSyncService issueSyncService;
     private final RepositorySyncService repositorySyncService;
+    private final ReportSyncService reportSyncService;
 
-    public SyncController(IssueSyncService issueSyncService, RepositorySyncService repositorySyncService) {
+    public SyncController(IssueSyncService issueSyncService, RepositorySyncService repositorySyncService, ReportSyncService reportSyncService) {
         this.issueSyncService = issueSyncService;
         this.repositorySyncService = repositorySyncService;
+        this.reportSyncService = reportSyncService;
     }
 
     @Deprecated
@@ -67,6 +76,46 @@ public class SyncController {
         SyncSummary s = issueSyncService.syncProjectIssues(projectId, full);
         s.durationMs = System.currentTimeMillis() - start;
         return s;
+    }
+
+    @Schema(description = "Parametry pro synchronizaci reportů projektu.")
+    public static class ProjectReportSyncRequest {
+        @Schema(description = "Pokud je true, vezme se jako počáteční datum poslední uložený záznam.", defaultValue = "false")
+        public boolean sinceLast;
+        @Schema(description = "Volitelný časový začátek synchronizace ve formátu ISO-8601.")
+        public OffsetDateTime from;
+        @Schema(description = "Volitelné časové ukončení synchronizace ve formátu ISO-8601.")
+        public OffsetDateTime to;
+    }
+
+    @Operation(
+            summary = "Synchronizuje výkazy pro zadaný projekt",
+            description = "Načte timelog záznamy ze všech repozitářů přiřazených k projektu a uloží je do tabulky report."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Souhrn průběhu synchronizace."),
+            @ApiResponse(responseCode = "400", description = "Projekt nemá přiřazené repozitáře nebo vstup neprošel validací."),
+            @ApiResponse(responseCode = "500", description = "Neočekávaná chyba při komunikaci s GitLabem."),
+    })
+    @PostMapping("/projects/{projectId}/reports")
+    public SyncSummary syncProjectReports(@Parameter(description = "ID projektu v aplikaci.") @PathVariable long projectId,
+                                          @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                                                  required = false,
+                                                  description = "Nastavení rozsahu synchronizace.",
+                                                  content = @Content(schema = @Schema(implementation = ProjectReportSyncRequest.class))
+                                          )
+                                          @RequestBody(required = false) ProjectReportSyncRequest request) {
+        long start = System.currentTimeMillis();
+        boolean sinceLast = request != null && request.sinceLast;
+        OffsetDateTime from = request != null ? request.from : null;
+        OffsetDateTime to = request != null ? request.to : null;
+        if (sinceLast) {
+            // Pokud se synchronizuje od posledního běhu, explicitní "from" ztrácí smysl.
+            from = null;
+        }
+        SyncSummary summary = reportSyncService.syncProjectReports(projectId, from, to, sinceLast);
+        summary.durationMs = System.currentTimeMillis() - start;
+        return summary;
     }
 
     public static class StepAggregate {

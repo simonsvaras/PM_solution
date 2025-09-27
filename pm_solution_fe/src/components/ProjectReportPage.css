@@ -1,0 +1,174 @@
+/* Layout for the project report detail view including sync controls. */
+.projectReport {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.projectReport__backButton {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--color-accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.projectReport__backButton:hover,
+.projectReport__backButton:focus-visible {
+  text-decoration: underline;
+}
+
+.projectReport__card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 20px 36px rgba(15, 23, 42, 0.1);
+}
+
+.projectReport__card h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.projectReport__metric {
+  margin: 0;
+  font-size: clamp(2.4rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.projectReport__syncCard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.projectReport__syncHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.projectReport__syncDescription {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  max-width: 540px;
+}
+
+.projectReport__note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.projectReport__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.projectReport__checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent-strong);
+}
+
+.projectReport__range {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.projectReport__range label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.projectReport__range span {
+  font-size: 0.9rem;
+}
+
+.projectReport__range input {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.projectReport__range input:disabled {
+  background: var(--color-background);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.projectReport__status {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.projectReport__status--error {
+  color: #d1434b;
+}
+
+.projectReport__status--success {
+  color: var(--color-accent-strong);
+}
+
+.projectReport__missing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(30, 64, 175, 0.08);
+  border: 1px solid rgba(30, 64, 175, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.projectReport__missingTitle {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+}
+
+.projectReport__missingList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+}
+
+.projectReport__syncButton {
+  align-self: flex-start;
+  background: var(--color-accent-strong);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 22px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.projectReport__syncButton:hover:not(:disabled),
+.projectReport__syncButton:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(30, 64, 175, 0.18);
+}
+
+.projectReport__syncButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}

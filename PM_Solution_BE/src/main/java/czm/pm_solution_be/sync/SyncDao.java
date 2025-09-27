@@ -1,18 +1,27 @@
 package czm.pm_solution_be.sync;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class SyncDao {
+    private static final Logger log = LoggerFactory.getLogger(SyncDao.class);
     private final JdbcTemplate jdbc;
 
     public SyncDao(JdbcTemplate jdbc) {
@@ -150,6 +159,8 @@ public class SyncDao {
 
     public record RepositoryAssignment(Long id, Long gitlabRepoId, String name, String nameWithNamespace, boolean assigned) {}
 
+    public record ProjectRepositoryLink(long repositoryId, Long gitlabRepoId, String name) {}
+
     public List<RepositoryAssignment> listRepositoriesWithAssignment(long projectId, String search) {
         StringBuilder sql = new StringBuilder("SELECT r.id, r.gitlab_repo_id, r.name, r.name_with_namespace, " +
                 "CASE WHEN ptr.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned " +
@@ -171,6 +182,24 @@ public class SyncDao {
                 rs.getString("name_with_namespace"),
                 rs.getBoolean("assigned")
         ), params.toArray());
+    }
+
+    /**
+     * Lists all repositories linked to a given project.  The result provides both the
+     * local repository identifier (needed for persistence) and the GitLab repository
+     * id that must be used when calling the GraphQL API.
+     */
+    public List<ProjectRepositoryLink> listProjectRepositories(long projectId) {
+        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
+                "FROM repository r " +
+                "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.id " +
+                "WHERE ptr.project_id = ? " +
+                "ORDER BY r.name";
+        return jdbc.query(sql, (rs, rn) -> new ProjectRepositoryLink(
+                rs.getLong("repository_id"),
+                (Long) rs.getObject("gitlab_repo_id"),
+                rs.getString("name")
+        ), projectId);
     }
 
     @Transactional
@@ -266,6 +295,103 @@ public class SyncDao {
     public void upsertRepoCursor(long repositoryId, String scope, OffsetDateTime lastRunAt) {
         String sql = "INSERT INTO sync_cursor_repo (repository_id, scope, last_run_at) VALUES (?,?,?) ON CONFLICT (repository_id, scope) DO UPDATE SET last_run_at = EXCLUDED.last_run_at";
         jdbc.update(sql, repositoryId, scope, lastRunAt);
+    }
+
+    /**
+     * Returns the newest {@code spent_at} timestamp stored for a repository.  The
+     * timestamp acts as a cursor for incremental synchronisation.
+     */
+    public Optional<OffsetDateTime> findLastReportSpentAt(long repositoryId) {
+        List<OffsetDateTime> rows = jdbc.query(
+                "SELECT spent_at FROM report WHERE repository_id = ? ORDER BY spent_at DESC LIMIT 1",
+                (rs, rn) -> rs.getObject(1, OffsetDateTime.class),
+                repositoryId);
+        return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0));
+    }
+
+    public record ReportRow(long repositoryId,
+                            Long issueIid,
+                            OffsetDateTime spentAt,
+                            int timeSpentSeconds,
+                            BigDecimal timeSpentHours,
+                            String username) {}
+
+    public record ReportInsertStats(int inserted, int duplicates, int failed, List<String> missingUsernames) {}
+
+    /**
+     * Inserts timelog rows and reports how many entries were persisted,
+     * deduplicated or rejected because of referential problems (e.g. missing
+     * intern accounts).
+     */
+    public ReportInsertStats insertReports(List<ReportRow> rows) {
+        int inserted = 0;
+        int duplicates = 0;
+        int failed = 0;
+        LinkedHashSet<String> missingUsernames = new LinkedHashSet<>();
+        if (rows == null || rows.isEmpty()) {
+            return new ReportInsertStats(0, 0, 0, List.of());
+        }
+
+        Set<String> uniqueUsernames = rows.stream()
+                .map(ReportRow::username)
+                .filter(username -> username != null && !username.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> existingUsernames = loadExistingInternUsernames(uniqueUsernames);
+
+        List<ReportRow> candidates = new ArrayList<>();
+        for (ReportRow row : rows) {
+            if (!existingUsernames.contains(row.username())) {
+                failed++;
+                missingUsernames.add(row.username());
+                continue;
+            }
+            candidates.add(row);
+        }
+
+        if (candidates.isEmpty()) {
+            return new ReportInsertStats(0, 0, failed, List.copyOf(missingUsernames));
+        }
+
+        for (ReportRow row : candidates) {
+            try {
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username) " +
+                                "VALUES (?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
+                        ps -> {
+                            ps.setLong(1, row.repositoryId());
+                            if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
+                            ps.setObject(3, row.spentAt());
+                            ps.setInt(4, row.timeSpentSeconds());
+                            ps.setBigDecimal(5, row.timeSpentHours());
+                            ps.setString(6, row.username());
+                        });
+                if (result > 0) inserted += result; else duplicates++;
+            } catch (DataIntegrityViolationException ex) {
+                failed++;
+                log.warn("Nepodařilo se vložit report pro repo {}: {}", row.repositoryId(), ex.getMessage());
+            }
+        }
+        return new ReportInsertStats(inserted, duplicates, failed, List.copyOf(missingUsernames));
+    }
+
+    /**
+     * Resolves which usernames already exist in the {@code intern} table.  Keeping the
+     * lookup close to the data layer ensures we do not accidentally duplicate
+     * validation logic in multiple services.
+     */
+    private Set<String> loadExistingInternUsernames(Set<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return Set.of();
+        }
+        StringJoiner placeholders = new StringJoiner(", ");
+        List<Object> params = new ArrayList<>();
+        for (String username : usernames) {
+            placeholders.add("?");
+            params.add(username);
+        }
+        String sql = "SELECT username FROM intern WHERE username IN (" + placeholders + ")";
+        return jdbc.query(sql, (rs, rn) -> rs.getString(1), params.toArray())
+                .stream()
+                .collect(Collectors.toSet());
     }
 
     public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {

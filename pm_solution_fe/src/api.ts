@@ -8,6 +8,13 @@ export type SyncSummary = {
   skipped: number;
   pages: number;
   durationMs: number;
+  missingUsernames: string[];
+};
+
+export type ProjectReportSyncPayload = {
+  sinceLast: boolean;
+  from?: string;
+  to?: string;
 };
 
 export type ErrorBody = {
@@ -237,6 +244,19 @@ export async function updateProjectInterns(projectId: number, interns: ProjectIn
 
 export async function syncRepositories(): Promise<SyncSummary> {
   const res = await fetch(`${API_BASE}/api/sync/repositories`, { method: "POST" });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<SyncSummary>(res);
+}
+
+/**
+ * Triggers backend synchronisation for a single project and returns aggregated statistics.
+ */
+export async function syncProjectReports(projectId: number, payload: ProjectReportSyncPayload): Promise<SyncSummary> {
+  const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/reports`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<SyncSummary>(res);
 }

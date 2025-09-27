@@ -111,6 +111,7 @@ CREATE TABLE report (
                         iid                   BIGINT NOT NULL,
                         spent_at              TIMESTAMPTZ NOT NULL,     -- kdy byl čas zapsán/odpracován
                         time_spent_seconds    INTEGER NOT NULL CHECK (time_spent_seconds <> 0),
+                        time_spent_hours      NUMERIC(12,6) NOT NULL,
                         username              TEXT NOT NULL,
     -- Volitelné FK: na issue přes (project_id, iid)
                         CONSTRAINT fk_report_issue
@@ -138,7 +139,8 @@ CREATE VIEW intern_time_summary AS
 SELECT
     i.id            AS intern_id,
     i.username      AS intern_username,
-    COALESCE(SUM(r.time_spent_seconds), 0) AS seconds_spent_total
+    COALESCE(SUM(r.time_spent_seconds), 0) AS seconds_spent_total,
+    COALESCE(SUM(r.time_spent_hours), 0)   AS hours_spent_total
 FROM intern i
          LEFT JOIN report r
                    ON r.username = i.username
