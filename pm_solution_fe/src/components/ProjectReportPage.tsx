@@ -6,13 +6,14 @@ import { syncProjectReports, type ErrorResponse } from '../api';
 type ProjectReportPageProps = {
   project: ProjectOverviewDTO;
   onBack: () => void;
+  onShowDetail: () => void;
 };
 
 /**
  * Page displaying project level metrics together with the controls for triggering
  * report synchronisation.
  */
-export default function ProjectReportPage({ project, onBack }: ProjectReportPageProps) {
+export default function ProjectReportPage({ project, onBack, onShowDetail }: ProjectReportPageProps) {
   const [sinceLast, setSinceLast] = useState(true);
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
@@ -74,9 +75,14 @@ export default function ProjectReportPage({ project, onBack }: ProjectReportPage
 
   return (
     <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
-      <button type="button" className="projectReport__backButton" onClick={onBack}>
-        ← Zpět na projekty
-      </button>
+      <div className="projectReport__toolbar">
+        <button type="button" className="projectReport__backButton" onClick={onBack}>
+          ← Zpět na projekty
+        </button>
+        <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
+          Zobrazit detailní report
+        </button>
+      </div>
       <div className="projectReport__card">
         <h2>Otevřené issue</h2>
         <p className="projectReport__metric">{project.openIssues}</p>

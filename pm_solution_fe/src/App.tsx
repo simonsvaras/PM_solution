@@ -5,6 +5,7 @@ import ProjectsPage from './components/ProjectsPage';
 import ProjectsOverviewPage from './components/ProjectsOverviewPage';
 import ReportsOverviewPage from './components/ReportsOverviewPage';
 import ProjectReportPage from './components/ProjectReportPage';
+import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import InternsPage from './components/InternsPage';
 import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, ProjectOverviewDTO, SyncSummary } from './api';
@@ -66,6 +67,7 @@ function App() {
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   // Keeps track of the project whose report detail is currently displayed.
   const [selectedReportProject, setSelectedReportProject] = useState<ProjectOverviewDTO | null>(null);
+  const [showReportDetail, setShowReportDetail] = useState(false);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(modules[0].key);
   const [activeSubmoduleKey, setActiveSubmoduleKey] = useState<string>(modules[0].submodules[0].key);
@@ -87,7 +89,9 @@ function App() {
   const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
   const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
   const isReportsOverview = activeSubmoduleKey === 'reports-overview';
-  const isReportsProjectDetail = activeModuleKey === 'reports' && selectedReportProject !== null;
+  const isReportsProject = activeModuleKey === 'reports' && selectedReportProject !== null;
+  const isReportsProjectSummary = isReportsProject && !showReportDetail;
+  const isReportsProjectDetail = isReportsProject && showReportDetail;
 
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     setActiveModuleKey(moduleKey);
@@ -103,8 +107,19 @@ function App() {
   useEffect(() => {
     if (activeModuleKey !== 'reports' || activeSubmoduleKey !== 'reports-overview') {
       setSelectedReportProject(null);
+      setShowReportDetail(false);
     }
   }, [activeModuleKey, activeSubmoduleKey]);
+
+  function handleSelectReportProject(project: ProjectOverviewDTO) {
+    setSelectedReportProject(project);
+    setShowReportDetail(false);
+  }
+
+  function handleExitReportProject() {
+    setSelectedReportProject(null);
+    setShowReportDetail(false);
+  }
 
   function showToast(type: 'success' | 'warning' | 'error', text: string) {
     setToast({ type, text });
@@ -229,8 +244,9 @@ function App() {
               {isProjectsOverview && 'Získejte rychlý přehled o projektech, jejich týmech a otevřených issue.'}
               {isProjectsAdmin && 'Vytvářejte a spravujte projekty v aplikaci.'}
               {isInternsAdmin && 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.'}
-              {isReportsOverview && !isReportsProjectDetail && 'Vyberte projekt a zobrazte jeho detailní report.'}
-              {isReportsProjectDetail && 'Souhrn otevřených issue vybraného projektu.'}
+              {isReportsOverview && !isReportsProject && 'Vyberte projekt a zobrazte jeho detailní report.'}
+              {isReportsProjectSummary && 'Souhrn otevřených issue vybraného projektu.'}
+              {isReportsProjectDetail && 'Detailní kontingenční tabulka odpracovaných hodin.'}
               {!isOnDemand &&
                 !isProjectsOverview &&
                 !isProjectsAdmin &&
@@ -280,8 +296,20 @@ function App() {
                 </div>
               </div>
             </section>
-          ) : isReportsProjectDetail && selectedReportProject ? (
-            <ProjectReportPage project={selectedReportProject} onBack={() => setSelectedReportProject(null)} />
+          ) : isReportsProject && selectedReportProject ? (
+            showReportDetail ? (
+              <ProjectReportDetailPage
+                project={selectedReportProject}
+                onBack={handleExitReportProject}
+                onCloseDetail={() => setShowReportDetail(false)}
+              />
+            ) : (
+              <ProjectReportPage
+                project={selectedReportProject}
+                onBack={handleExitReportProject}
+                onShowDetail={() => setShowReportDetail(true)}
+              />
+            )
           ) : isProjectsOverview ? (
             <ProjectsOverviewPage />
           ) : isProjectsAdmin ? (
@@ -289,7 +317,7 @@ function App() {
           ) : isInternsAdmin ? (
             <InternsPage />
           ) : isReportsOverview ? (
-            <ReportsOverviewPage onSelectProject={setSelectedReportProject} />
+            <ReportsOverviewPage onSelectProject={handleSelectReportProject} />
           ) : (
             <section className="panel panel--placeholder">
               <div className="panel__body">

@@ -30,6 +30,8 @@ Key REST endpoints
 - `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
 - `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
+- `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}` – aggregated timelog hours per issue/intern for the
+  project's repositories within the optional time range.
 
 ### Local project management
 - `GET /api/projects` – list local projects (id, gitlabProjectId, name, budget, budgetFrom, budgetTo).
