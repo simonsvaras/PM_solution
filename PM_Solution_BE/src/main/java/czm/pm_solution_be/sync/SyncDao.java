@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -308,7 +309,12 @@ public class SyncDao {
         return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0));
     }
 
-    public record ReportRow(long repositoryId, Long issueIid, OffsetDateTime spentAt, int timeSpentSeconds, String username) {}
+    public record ReportRow(long repositoryId,
+                            Long issueIid,
+                            OffsetDateTime spentAt,
+                            int timeSpentSeconds,
+                            BigDecimal timeSpentHours,
+                            String username) {}
 
     public record ReportInsertStats(int inserted, int duplicates, int failed, List<String> missingUsernames) {}
 
@@ -348,14 +354,15 @@ public class SyncDao {
 
         for (ReportRow row : candidates) {
             try {
-                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, username) " +
-                                "VALUES (?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username) " +
+                                "VALUES (?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
                         ps -> {
                             ps.setLong(1, row.repositoryId());
                             if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
                             ps.setObject(3, row.spentAt());
                             ps.setInt(4, row.timeSpentSeconds());
-                            ps.setString(5, row.username());
+                            ps.setBigDecimal(5, row.timeSpentHours());
+                            ps.setString(6, row.username());
                         });
                 if (result > 0) inserted += result; else duplicates++;
             } catch (DataIntegrityViolationException ex) {

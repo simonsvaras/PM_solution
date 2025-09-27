@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +103,9 @@ public class ReportSyncService {
                         continue;
                     }
                     Long issueIid = node.issue() != null ? node.issue().iid() : null;
-                    rows.add(new SyncDao.ReportRow(repo.repositoryId(), issueIid, spentAt, seconds, username));
+                    BigDecimal hours = BigDecimal.valueOf(seconds)
+                            .divide(BigDecimal.valueOf(3600), 4, RoundingMode.HALF_UP);
+                    rows.add(new SyncDao.ReportRow(repo.repositoryId(), issueIid, spentAt, seconds, hours, username));
                 }
                 if (invalid > 0) {
                     summary.addSkipped(invalid);
