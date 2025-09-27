@@ -32,8 +32,8 @@ public class GitLabGraphQlClient {
             ) {
               timelogs(
                 projectId: $projectId
-                startDateTime: $from
-                endDateTime: $to
+                startDate: $from
+                endDate: $to
                 first: $first
                 after: $after
                 sort: SPENT_AT_DESC
