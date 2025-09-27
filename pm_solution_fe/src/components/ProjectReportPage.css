@@ -1,3 +1,4 @@
+/* Layout for the project report detail view including sync controls. */
 .projectReport {
   display: flex;
   flex-direction: column;

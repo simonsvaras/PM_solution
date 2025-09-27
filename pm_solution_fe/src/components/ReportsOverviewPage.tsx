@@ -7,11 +7,15 @@ type ReportsOverviewPageProps = {
   onSelectProject: (project: ProjectOverviewDTO) => void;
 };
 
+/**
+ * Shows all projects available for reporting and exposes a simple click-through to the detail view.
+ */
 export default function ReportsOverviewPage({ onSelectProject }: ReportsOverviewPageProps) {
   const [projects, setProjects] = useState<ProjectOverviewDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorResponse | null>(null);
 
+  // Load the project overview once the component mounts.
   useEffect(() => {
     setLoading(true);
     setError(null);

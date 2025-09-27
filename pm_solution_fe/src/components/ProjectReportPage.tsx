@@ -8,6 +8,10 @@ type ProjectReportPageProps = {
   onBack: () => void;
 };
 
+/**
+ * Page displaying project level metrics together with the controls for triggering
+ * report synchronisation.
+ */
 export default function ProjectReportPage({ project, onBack }: ProjectReportPageProps) {
   const [sinceLast, setSinceLast] = useState(true);
   const [fromValue, setFromValue] = useState('');
@@ -23,6 +27,7 @@ export default function ProjectReportPage({ project, onBack }: ProjectReportPage
     return date.toISOString();
   }
 
+  // Validates the current form state and triggers the backend synchronisation endpoint.
   async function handleSync() {
     setSyncError(null);
     setSyncSummary(null);
@@ -57,6 +62,7 @@ export default function ProjectReportPage({ project, onBack }: ProjectReportPage
     }
   }
 
+  // When toggling the "since last" switch we clear the manual range to avoid inconsistent UI state.
   function handleToggleSinceLast(event: ChangeEvent<HTMLInputElement>) {
     const checked = event.target.checked;
     setSinceLast(checked);
@@ -81,7 +87,7 @@ export default function ProjectReportPage({ project, onBack }: ProjectReportPage
           <p className="projectReport__syncDescription">
             Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
           </p>
-          <p className="projectReport__note">Výkazy se sycnhronizují jen pro uživatele, kteří v systému vytvoření.</p>
+          <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
         </div>
         <label className="projectReport__checkbox">
           <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />

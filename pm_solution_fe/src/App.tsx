@@ -64,6 +64,7 @@ function App() {
   const [toast, setToast] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const lastAction = useRef<null | (() => Promise<void>)>(null);
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
+  // Keeps track of the project whose report detail is currently displayed.
   const [selectedReportProject, setSelectedReportProject] = useState<ProjectOverviewDTO | null>(null);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(modules[0].key);
@@ -98,6 +99,7 @@ function App() {
     }
   }
 
+  // Reset the selected project whenever the user navigates away from the report overview module.
   useEffect(() => {
     if (activeModuleKey !== 'reports' || activeSubmoduleKey !== 'reports-overview') {
       setSelectedReportProject(null);

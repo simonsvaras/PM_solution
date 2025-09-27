@@ -248,6 +248,9 @@ export async function syncRepositories(): Promise<SyncSummary> {
   return parseJson<SyncSummary>(res);
 }
 
+/**
+ * Triggers backend synchronisation for a single project and returns aggregated statistics.
+ */
 export async function syncProjectReports(projectId: number, payload: ProjectReportSyncPayload): Promise<SyncSummary> {
   const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/reports`, {
     method: "POST",

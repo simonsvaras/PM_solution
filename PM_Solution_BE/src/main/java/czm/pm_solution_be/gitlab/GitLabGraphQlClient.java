@@ -19,9 +19,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Thin wrapper around the GitLab GraphQL API that exposes only the pieces of
+ * functionality the project currently needs.  The client focuses on the
+ * {@code timelogs} connection because GitLab does not offer an equivalent REST
+ * endpoint for the data we need while synchronising reports.
+ */
 @Component
 public class GitLabGraphQlClient {
     private static final Logger log = LoggerFactory.getLogger(GitLabGraphQlClient.class);
+    /**
+     * GraphQL document used for fetching timelog entries.  The query is kept as
+     * a raw string for readability and to make it obvious which arguments are
+     * supported by the upstream schema.
+     */
     private static final String TIMELOG_QUERY = """
             query ProjectTimelogsIssues(
               $projectId: ProjectID!,
@@ -58,6 +69,16 @@ public class GitLabGraphQlClient {
         this.props = props;
     }
 
+    /**
+     * Fetches a single page of timelog entries from GitLab.
+     *
+     * @param projectGid GitLab "global ID" of the project (e.g. {@code gid://gitlab/Project/123})
+     * @param from       lower bound (inclusive) for {@code spentAt}
+     * @param to         upper bound (inclusive) for {@code spentAt}
+     * @param afterCursor pagination cursor returned by the previous page; {@code null} for the first request
+     * @param pageSize   number of records requested from GitLab
+     * @return hydrated {@link TimelogPage} wrapper containing both the rows and page information
+     */
     public TimelogPage fetchTimelogs(String projectGid, OffsetDateTime from, OffsetDateTime to, String afterCursor, int pageSize) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("projectId", projectGid);
@@ -102,6 +123,11 @@ public class GitLabGraphQlClient {
         }
     }
 
+    /**
+     * Turns the configured REST URL into the GraphQL endpoint.  GitLab exposes
+     * the GraphQL API either at {@code /api/graphql} (if {@code /api/v4}
+     * suffix is present) or {@code /graphql} relative to the instance root.
+     */
     private URI resolveGraphQlUri() {
         String api = props.getApi();
         if (api == null || api.isBlank()) {

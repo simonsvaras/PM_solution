@@ -1,3 +1,4 @@
+/* Simple responsive grid wrapper for the report overview page. */
 .reportsOverview {
   display: flex;
   flex-direction: column;

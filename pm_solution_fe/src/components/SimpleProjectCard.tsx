@@ -6,6 +6,9 @@ type SimpleProjectCardProps = {
   onSelect: (project: ProjectOverviewDTO) => void;
 };
 
+/**
+ * Minimal card showing a project name that can be used inside responsive grids.
+ */
 export default function SimpleProjectCard({ project, onSelect }: SimpleProjectCardProps) {
   return (
     <article className="simpleProjectCard">

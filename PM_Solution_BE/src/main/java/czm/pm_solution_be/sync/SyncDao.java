@@ -183,6 +183,11 @@ public class SyncDao {
         ), params.toArray());
     }
 
+    /**
+     * Lists all repositories linked to a given project.  The result provides both the
+     * local repository identifier (needed for persistence) and the GitLab repository
+     * id that must be used when calling the GraphQL API.
+     */
     public List<ProjectRepositoryLink> listProjectRepositories(long projectId) {
         String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
                 "FROM repository r " +
@@ -291,6 +296,10 @@ public class SyncDao {
         jdbc.update(sql, repositoryId, scope, lastRunAt);
     }
 
+    /**
+     * Returns the newest {@code spent_at} timestamp stored for a repository.  The
+     * timestamp acts as a cursor for incremental synchronisation.
+     */
     public Optional<OffsetDateTime> findLastReportSpentAt(long repositoryId) {
         List<OffsetDateTime> rows = jdbc.query(
                 "SELECT spent_at FROM report WHERE repository_id = ? ORDER BY spent_at DESC LIMIT 1",
@@ -303,6 +312,11 @@ public class SyncDao {
 
     public record ReportInsertStats(int inserted, int duplicates, int failed, List<String> missingUsernames) {}
 
+    /**
+     * Inserts timelog rows and reports how many entries were persisted,
+     * deduplicated or rejected because of referential problems (e.g. missing
+     * intern accounts).
+     */
     public ReportInsertStats insertReports(List<ReportRow> rows) {
         int inserted = 0;
         int duplicates = 0;
@@ -352,6 +366,11 @@ public class SyncDao {
         return new ReportInsertStats(inserted, duplicates, failed, List.copyOf(missingUsernames));
     }
 
+    /**
+     * Resolves which usernames already exist in the {@code intern} table.  Keeping the
+     * lookup close to the data layer ensures we do not accidentally duplicate
+     * validation logic in multiple services.
+     */
     private Set<String> loadExistingInternUsernames(Set<String> usernames) {
         if (usernames == null || usernames.isEmpty()) {
             return Set.of();

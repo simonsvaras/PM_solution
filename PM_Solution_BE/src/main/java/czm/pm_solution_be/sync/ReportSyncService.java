@@ -10,6 +10,11 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Coordinates report synchronisation for a single project.  The service
+ * resolves all repositories linked to the project, fetches timelog data from
+ * GitLab and persists only valid, non-duplicated rows.
+ */
 @Service
 public class ReportSyncService {
     private static final Logger log = LoggerFactory.getLogger(ReportSyncService.class);
@@ -23,6 +28,16 @@ public class ReportSyncService {
         this.graphQlClient = graphQlClient;
     }
 
+    /**
+     * Synchronises all timelog entries for the repositories attached to the
+     * provided project.
+     *
+     * @param projectId ID of the project in our database
+     * @param from      optional lower bound for timelog timestamps.  Ignored when {@code sinceLast} is {@code true}.
+     * @param to        optional upper bound for timelog timestamps (falls back to {@link OffsetDateTime#now()}).
+     * @param sinceLast whether the caller explicitly requested to continue from the latest stored record.
+     * @return aggregated sync statistics propagated back to the controller and the frontend.
+     */
     public SyncSummary syncProjectReports(long projectId, OffsetDateTime from, OffsetDateTime to, boolean sinceLast) {
         List<SyncDao.ProjectRepositoryLink> repositories = syncDao.listProjectRepositories(projectId);
         if (repositories.isEmpty()) {
@@ -38,9 +53,14 @@ public class ReportSyncService {
                 summary.addSkipped(1);
                 continue;
             }
-            OffsetDateTime repoFrom = (!sinceLast && from != null) ? from : syncDao.findLastReportSpentAt(repo.repositoryId()).orElse(from);
+            OffsetDateTime repoFrom = (!sinceLast && from != null)
+                    ? from
+                    : syncDao.findLastReportSpentAt(repo.repositoryId()).orElse(from);
             if (repoFrom == null) {
-                repoFrom = effectiveTo.minusYears(1); // fallback to fetch last year if nothing synced yet
+                // If we have absolutely no cursor information we still fetch a
+                // reasonably-sized slice (last year) instead of the whole
+                // history.
+                repoFrom = effectiveTo.minusYears(1);
             }
             if (!repoFrom.isBefore(effectiveTo)) {
                 log.debug("Repo {}: počáteční datum {} není před {} – přeskočeno", repo.name(), repoFrom, effectiveTo);
@@ -94,6 +114,9 @@ public class ReportSyncService {
                     if (stats.failed() > 0) {
                         summary.addSkipped(stats.failed());
                     }
+                    // Missing usernames are bubbled up to the caller so the
+                    // frontend can inform the user about data that requires a
+                    // follow-up (e.g. onboarding a new intern).
                     summary.addMissingUsernames(stats.missingUsernames());
                 }
 
