@@ -402,4 +402,64 @@ public class SyncDao {
                 budgetTo,
                 id);
     }
+
+    public record ProjectReportDetailRow(long repositoryId,
+                                         String repositoryName,
+                                         Long issueId,
+                                         Long issueIid,
+                                         String issueTitle,
+                                         long internId,
+                                         String internUsername,
+                                         String internFirstName,
+                                         String internLastName,
+                                         BigDecimal hours) {}
+
+    public List<ProjectReportDetailRow> listProjectReportDetail(long projectId,
+                                                                OffsetDateTime from,
+                                                                OffsetDateTime to) {
+        StringBuilder sql = new StringBuilder("SELECT r.repository_id, " +
+                "repo.name AS repository_name, " +
+                "iss.id AS issue_id, " +
+                "r.iid AS issue_iid, " +
+                "iss.title AS issue_title, " +
+                "i.id AS intern_id, " +
+                "i.username AS intern_username, " +
+                "i.first_name AS intern_first_name, " +
+                "i.last_name AS intern_last_name, " +
+                "SUM(r.time_spent_hours) AS hours " +
+                "FROM report r " +
+                "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id " +
+                "JOIN repository repo ON repo.id = r.repository_id " +
+                "JOIN intern i ON i.username = r.username " +
+                "LEFT JOIN issue iss ON iss.repository_id = r.repository_id AND iss.iid = r.iid " +
+                "WHERE ptr.project_id = ?");
+
+        List<Object> params = new ArrayList<>();
+        params.add(projectId);
+
+        if (from != null) {
+            sql.append(" AND r.spent_at >= ?");
+            params.add(from);
+        }
+        if (to != null) {
+            sql.append(" AND r.spent_at <= ?");
+            params.add(to);
+        }
+
+        sql.append(" GROUP BY r.repository_id, repo.name, iss.id, r.iid, iss.title, i.id, i.username, i.first_name, i.last_name");
+        sql.append(" ORDER BY repo.name, r.iid NULLS LAST, iss.title NULLS LAST, i.last_name, i.first_name, i.username");
+
+        return jdbc.query(sql.toString(), (rs, rn) -> new ProjectReportDetailRow(
+                rs.getLong("repository_id"),
+                rs.getString("repository_name"),
+                (Long) rs.getObject("issue_id"),
+                (Long) rs.getObject("issue_iid"),
+                rs.getString("issue_title"),
+                rs.getLong("intern_id"),
+                rs.getString("intern_username"),
+                rs.getString("intern_first_name"),
+                rs.getString("intern_last_name"),
+                rs.getBigDecimal("hours")
+        ), params.toArray());
+    }
 }

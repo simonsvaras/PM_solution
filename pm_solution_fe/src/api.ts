@@ -114,6 +114,37 @@ export type ProjectInternAssignmentDTO = {
   assigned: boolean;
 };
 
+export type ProjectReportDetailIntern = {
+  id: number;
+  username: string;
+  firstName: string;
+  lastName: string;
+};
+
+export type ProjectReportDetailIssueCell = {
+  internId: number;
+  hours: number;
+};
+
+export type ProjectReportDetailIssue = {
+  repositoryId: number;
+  repositoryName: string;
+  issueId: number | null;
+  issueIid: number | null;
+  issueTitle: string;
+  internHours: ProjectReportDetailIssueCell[];
+};
+
+export type ProjectReportDetailResponse = {
+  interns: ProjectReportDetailIntern[];
+  issues: ProjectReportDetailIssue[];
+};
+
+export type ProjectReportDetailParams = {
+  from?: string;
+  to?: string;
+};
+
 
 function mapIntern(dto: InternDTO): Intern {
   const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
@@ -259,6 +290,19 @@ export async function syncProjectReports(projectId: number, payload: ProjectRepo
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<SyncSummary>(res);
+}
+
+export async function getProjectReportDetail(
+  projectId: number,
+  params: ProjectReportDetailParams,
+): Promise<ProjectReportDetailResponse> {
+  const qs = new URLSearchParams();
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  const query = qs.toString();
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/reports/detail${query ? `?${query}` : ""}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectReportDetailResponse>(res);
 }
 
 // (Legacy project-specific) Not used now, kept for compatibility
