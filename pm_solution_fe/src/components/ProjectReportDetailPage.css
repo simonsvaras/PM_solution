@@ -1,15 +1,18 @@
 .projectReportDetail {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) 1fr;
+  gap: 32px;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 0;
 }
 
 .projectReportDetail__toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .projectReportDetail__link {
@@ -31,11 +34,12 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 18px;
-  padding: 28px;
+  padding: 24px;
   box-shadow: 0 20px 36px rgba(15, 23, 42, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
+  max-width: 420px;
 }
 
 .projectReportDetail__header h2 {
@@ -51,7 +55,7 @@
 .projectReportDetail__filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-end;
 }
 
@@ -110,10 +114,61 @@
   color: #d1434b;
 }
 
+.projectReportDetail__internFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.projectReportDetail__internButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border 120ms ease;
+}
+
+.projectReportDetail__internButton:hover:not(:disabled),
+.projectReportDetail__internButton:focus-visible:not(:disabled) {
+  border-color: var(--color-accent-strong);
+  color: var(--color-accent-strong);
+}
+
+.projectReportDetail__internButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.projectReportDetail__internButton--active,
+.projectReportDetail__internButton[aria-pressed='true'] {
+  background: var(--color-accent-strong);
+  color: #fff;
+  border-color: var(--color-accent-strong);
+}
+
+.projectReportDetail__tableSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.projectReportDetail__tablePlaceholder {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
 .projectReportDetail__tableWrapper {
-  overflow-x: auto;
+  overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: 16px;
+  max-height: 50vh;
+  background: var(--color-surface);
 }
 
 .projectReportDetail__table {
@@ -129,6 +184,9 @@
   text-align: right;
   padding: 14px 16px;
   border-bottom: 1px solid rgba(30, 64, 175, 0.18);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .projectReportDetail__table thead th:first-child {
@@ -196,6 +254,20 @@
   font-size: 0.85rem;
   color: var(--color-text-muted);
   margin-top: 4px;
+}
+
+@media (max-width: 1024px) {
+  .projectReportDetail {
+    grid-template-columns: 1fr;
+  }
+
+  .projectReportDetail__panel {
+    max-width: none;
+  }
+
+  .projectReportDetail__tableWrapper {
+    max-height: 60vh;
+  }
 }
 
 .projectReportDetail__totalHeader,

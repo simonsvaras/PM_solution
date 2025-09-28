@@ -30,8 +30,9 @@ Key REST endpoints
 - `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
 - `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
-- `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}` – aggregated timelog hours per issue/intern for the
-  project's repositories within the optional time range.
+- `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}&internUsername={username?}` – aggregated timelog hours per
+  issue/intern for the project's repositories within the optional time range. Passing `internUsername` narrows the aggregation to a
+  single intern while still returning the complete list of assigned members for UI filters.
 - `DELETE /api/sync/reports?projectId=1&projectId=2` – trvale odstraní uložené výkazy. Bez parametrů smaže vše, s opakovaným `projectId` zlikviduje jen záznamy repozitářů přiřazených k vybraným projektům. Volání vrací `{ "deleted": <počet_záznamů> }`.
 
 ### Local project management

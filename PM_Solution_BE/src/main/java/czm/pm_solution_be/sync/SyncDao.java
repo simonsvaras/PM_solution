@@ -500,6 +500,8 @@ public class SyncDao {
                 id);
     }
 
+    public record ProjectInternRow(long id, String username, String firstName, String lastName) {}
+
     public record ProjectReportDetailRow(long repositoryId,
                                          String repositoryName,
                                          Long issueId,
@@ -512,9 +514,29 @@ public class SyncDao {
                                          BigDecimal hours,
                                          BigDecimal cost) {}
 
+    public List<ProjectInternRow> listProjectInterns(long projectId) {
+        String sql = """
+                SELECT DISTINCT i.id,
+                                i.username,
+                                i.first_name,
+                                i.last_name
+                FROM intern_project ip
+                JOIN intern i ON i.id = ip.intern_id
+                WHERE ip.project_id = ?
+                ORDER BY i.last_name, i.first_name, i.username
+                """;
+        return jdbc.query(sql, (rs, rn) -> new ProjectInternRow(
+                rs.getLong("id"),
+                rs.getString("username"),
+                rs.getString("first_name"),
+                rs.getString("last_name")
+        ), projectId);
+    }
+
     public List<ProjectReportDetailRow> listProjectReportDetail(long projectId,
                                                                 OffsetDateTime from,
-                                                                OffsetDateTime to) {
+                                                                OffsetDateTime to,
+                                                                String internUsername) {
         StringBuilder sql = new StringBuilder("SELECT r.repository_id, " +
                 "repo.name AS repository_name, " +
                 "iss.id AS issue_id, " +
@@ -543,6 +565,10 @@ public class SyncDao {
         if (to != null) {
             sql.append(" AND r.spent_at <= ?");
             params.add(to);
+        }
+        if (internUsername != null && !internUsername.isBlank()) {
+            sql.append(" AND i.username = ?");
+            params.add(internUsername);
         }
 
         sql.append(" GROUP BY r.repository_id, repo.name, iss.id, r.iid, iss.title, i.id, i.username, i.first_name, i.last_name");

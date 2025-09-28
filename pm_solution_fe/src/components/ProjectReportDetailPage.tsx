@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './ProjectReportDetailPage.css';
 import type {
   ErrorResponse,
   ProjectOverviewDTO,
+  ProjectReportDetailIntern,
   ProjectReportDetailResponse,
 } from '../api';
-import { getProjectReportDetail } from '../api';
+import { getProjectInterns, getProjectReportDetail } from '../api';
 
 type ProjectReportDetailPageProps = {
   project: ProjectOverviewDTO;
@@ -34,6 +35,27 @@ function formatCost(value?: number | null): string {
   return value.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' });
 }
 
+function sortInterns(list: ProjectReportDetailIntern[]): ProjectReportDetailIntern[] {
+  return [...list].sort((a, b) => {
+    const lastName = a.lastName.localeCompare(b.lastName, 'cs');
+    if (lastName !== 0) return lastName;
+    const firstName = a.firstName.localeCompare(b.firstName, 'cs');
+    if (firstName !== 0) return firstName;
+    return a.username.localeCompare(b.username, 'cs');
+  });
+}
+
+function mergeInternLists(
+  first: ProjectReportDetailIntern[],
+  second: ProjectReportDetailIntern[],
+): ProjectReportDetailIntern[] {
+  const map = new Map<number, ProjectReportDetailIntern>();
+  for (const intern of [...first, ...second]) {
+    map.set(intern.id, intern);
+  }
+  return sortInterns(Array.from(map.values()));
+}
+
 export default function ProjectReportDetailPage({ project, onBack, onCloseDetail }: ProjectReportDetailPageProps) {
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
@@ -41,6 +63,34 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
   const [validationError, setValidationError] = useState<string | null>(null);
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [report, setReport] = useState<ProjectReportDetailResponse | null>(null);
+  const [availableInterns, setAvailableInterns] = useState<ProjectReportDetailIntern[]>([]);
+  const [internsError, setInternsError] = useState<string | null>(null);
+  const [selectedInternUsername, setSelectedInternUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    setInternsError(null);
+    getProjectInterns(project.id)
+      .then(interns => {
+        if (ignore) return;
+        const assigned = interns.filter(intern => intern.assigned);
+        const mapped = assigned.map(intern => ({
+          id: intern.id,
+          username: intern.username,
+          firstName: intern.firstName,
+          lastName: intern.lastName,
+        }));
+        setAvailableInterns(sortInterns(mapped));
+      })
+      .catch(() => {
+        if (!ignore) {
+          setInternsError('Nepodařilo se načíst seznam stážistů.');
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [project.id]);
 
   const totals = useMemo(() => {
     if (!report) {
@@ -68,27 +118,38 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     return { perInternHours, perInternCost, overallHours, overallCost };
   }, [report]);
 
-  async function handleLoad() {
-    setValidationError(null);
-    setError(null);
-
+  function validateRange(): boolean {
     if (fromValue && toValue) {
       const fromDate = new Date(fromValue);
       const toDate = new Date(toValue);
       if (!Number.isNaN(fromDate.getTime()) && !Number.isNaN(toDate.getTime()) && toDate < fromDate) {
         setValidationError('Datum "Do" nesmí být dříve než datum "Od".');
-        return;
+        return false;
       }
     }
+    setValidationError(null);
+    return true;
+  }
 
+  async function loadReport(nextInternUsername: string | null) {
+    if (!validateRange()) {
+      return;
+    }
+
+    setError(null);
     setLoading(true);
     try {
       const params = {
         from: toIsoOrUndefined(fromValue),
         to: toIsoOrUndefined(toValue),
+        internUsername: nextInternUsername ?? undefined,
       };
       const data = await getProjectReportDetail(project.id, params);
       setReport(data);
+      setAvailableInterns(prev => mergeInternLists(prev, data.interns));
+      if (nextInternUsername && !data.interns.some(intern => intern.username === nextInternUsername)) {
+        setSelectedInternUsername(null);
+      }
     } catch (err) {
       setError(err as ErrorResponse);
     } finally {
@@ -96,8 +157,26 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     }
   }
 
+  function handleLoad() {
+    void loadReport(selectedInternUsername);
+  }
+
+  function handleInternFilterChange(username: string | null) {
+    const next = username === selectedInternUsername ? null : username;
+    if (next === selectedInternUsername) {
+      return;
+    }
+    setSelectedInternUsername(next);
+    if (report) {
+      void loadReport(next);
+    }
+  }
+
   const interns = report?.interns ?? [];
   const issues = report?.issues ?? [];
+  const visibleInterns = selectedInternUsername
+    ? interns.filter(intern => intern.username === selectedInternUsername)
+    : interns;
 
   function renderCell(hours?: number | null, cost?: number | null) {
     const formattedHours = formatHours(hours);
@@ -113,16 +192,16 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
 
   return (
     <section className="projectReportDetail" aria-label={`Detailní report projektu ${project.name}`}>
-      <div className="projectReportDetail__toolbar">
-        <button type="button" className="projectReport__backButton" onClick={onBack}>
-          ← Zpět na projekty
-        </button>
-        <button type="button" className="projectReportDetail__link" onClick={onCloseDetail}>
-          ← Zpět na souhrn
-        </button>
-      </div>
-
       <div className="projectReportDetail__panel">
+        <div className="projectReportDetail__toolbar">
+          <button type="button" className="projectReport__backButton" onClick={onBack}>
+            ← Zpět na projekty
+          </button>
+          <button type="button" className="projectReportDetail__link" onClick={onCloseDetail}>
+            ← Zpět na souhrn
+          </button>
+        </div>
+
         <div className="projectReportDetail__header">
           <h2>Detailní report</h2>
           <p>
@@ -144,6 +223,39 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
           </button>
         </div>
 
+        {availableInterns.length > 0 ? (
+          <div className="projectReportDetail__internFilters" role="group" aria-label="Filtr stážistů">
+            <button
+              type="button"
+              className={`projectReportDetail__internButton${selectedInternUsername === null ? ' projectReportDetail__internButton--active' : ''}`}
+              onClick={() => handleInternFilterChange(null)}
+              disabled={loading}
+              aria-pressed={selectedInternUsername === null}
+            >
+              Všichni
+            </button>
+            {availableInterns.map(intern => {
+              const isActive = selectedInternUsername === intern.username;
+              return (
+                <button
+                  type="button"
+                  key={intern.id}
+                  className={`projectReportDetail__internButton${isActive ? ' projectReportDetail__internButton--active' : ''}`}
+                  onClick={() => handleInternFilterChange(intern.username)}
+                  disabled={loading}
+                  aria-pressed={isActive}
+                >
+                  @{intern.username}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {internsError ? (
+          <p className="projectReportDetail__status projectReportDetail__status--error" role="alert">{internsError}</p>
+        ) : null}
+
         {validationError ? (
           <p className="projectReportDetail__status projectReportDetail__status--error">{validationError}</p>
         ) : null}
@@ -153,20 +265,22 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
             {error.error.message}
           </p>
         ) : null}
+      </div>
 
-        {!loading && report && issues.length === 0 ? (
-          <p className="projectReportDetail__status">V zadaném období nejsou žádné výkazy.</p>
-        ) : null}
-
-        {loading ? <p className="projectReportDetail__status">Načítám data…</p> : null}
-
-        {issues.length > 0 ? (
+      <div className="projectReportDetail__tableSection">
+        {loading ? (
+          <p className="projectReportDetail__tablePlaceholder">Načítám data…</p>
+        ) : !report ? (
+          <p className="projectReportDetail__tablePlaceholder">Zadejte filtr a klikněte na „Načíst“.</p>
+        ) : issues.length === 0 ? (
+          <p className="projectReportDetail__tablePlaceholder">V zadaném období nejsou žádné výkazy.</p>
+        ) : (
           <div className="projectReportDetail__tableWrapper">
             <table className="projectReportDetail__table">
               <thead>
                 <tr>
                   <th scope="col">Issue</th>
-                  {interns.map(intern => (
+                  {visibleInterns.map(intern => (
                     <th scope="col" key={intern.id}>
                       <span className="projectReportDetail__internName">{intern.firstName} {intern.lastName}</span>
                       <span className="projectReportDetail__internUsername">@{intern.username}</span>
@@ -207,7 +321,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                           </span>
                         </div>
                       </th>
-                      {interns.map(intern => {
+                      {visibleInterns.map(intern => {
                         const value = valuesByIntern.get(intern.id);
                         return <td key={intern.id}>{renderCell(value?.hours, value?.cost)}</td>;
                       })}
@@ -220,7 +334,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                 <tfoot>
                   <tr>
                     <th scope="row">Celkem</th>
-                    {interns.map(intern => (
+                    {visibleInterns.map(intern => (
                       <td key={intern.id}>
                         {renderCell(totals.perInternHours.get(intern.id), totals.perInternCost.get(intern.id))}
                       </td>
@@ -233,7 +347,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
               ) : null}
             </table>
           </div>
-        ) : null}
+        )}
       </div>
     </section>
   );

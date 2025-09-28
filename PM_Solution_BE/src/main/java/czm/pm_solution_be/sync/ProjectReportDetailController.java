@@ -40,14 +40,22 @@ public class ProjectReportDetailController {
     @GetMapping("/{projectId}/reports/detail")
     public ProjectReportDetailResponse getProjectReportDetail(@PathVariable long projectId,
                                                               @RequestParam(required = false) OffsetDateTime from,
-                                                              @RequestParam(required = false) OffsetDateTime to) {
+                                                              @RequestParam(required = false) OffsetDateTime to,
+                                                              @RequestParam(required = false) String internUsername) {
         if (from != null && to != null && to.isBefore(from)) {
             throw ApiException.validation("Datum \"Do\" nesmí být dříve než datum \"Od\".");
         }
 
-        List<SyncDao.ProjectReportDetailRow> rows = dao.listProjectReportDetail(projectId, from, to);
+        String normalizedInternUsername = internUsername != null && !internUsername.isBlank() ? internUsername.trim() : null;
 
+        List<SyncDao.ProjectInternRow> projectInternRows = dao.listProjectInterns(projectId);
         Map<Long, InternSummary> internMap = new LinkedHashMap<>();
+        for (SyncDao.ProjectInternRow row : projectInternRows) {
+            internMap.put(row.id(), new InternSummary(row.id(), row.username(), row.firstName(), row.lastName()));
+        }
+
+        List<SyncDao.ProjectReportDetailRow> rows = dao.listProjectReportDetail(projectId, from, to, normalizedInternUsername);
+
         Map<String, IssueRowBuilder> issueMap = new LinkedHashMap<>();
 
         for (SyncDao.ProjectReportDetailRow row : rows) {

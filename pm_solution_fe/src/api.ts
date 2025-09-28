@@ -182,6 +182,7 @@ export type ProjectReportDetailResponse = {
 export type ProjectReportDetailParams = {
   from?: string;
   to?: string;
+  internUsername?: string;
 };
 
 
@@ -402,6 +403,7 @@ export async function getProjectReportDetail(
   const qs = new URLSearchParams();
   if (params.from) qs.set("from", params.from);
   if (params.to) qs.set("to", params.to);
+  if (params.internUsername) qs.set("internUsername", params.internUsername);
   const query = qs.toString();
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/reports/detail${query ? `?${query}` : ""}`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);

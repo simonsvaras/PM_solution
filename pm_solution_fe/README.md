@@ -28,8 +28,10 @@ Key modules
   projekty, pro které se výkazy smažou (nebo ponechat výběr prázdný pro kompletní vyčištění před novou synchronizací).
 - **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
 - **Stážisti** – full CRUD over interns. Samostatný modál "Nastavit úroveň" umožňuje spravovat historii úrovní včetně dat od-do a mazání položek. Skupiny se vybírají pomocí zaškrtávacích políček. Validace zobrazuje reakce backendu.
-- **Reporty / Přehled** – vyberte projekt, zobrazte souhrn otevřených issue a z tlačítka „Zobrazit detailní report“ otevřete kontingenční
-  tabulku s hodinami podle issue × stážista za zvolené období.
+- **Reporty / Přehled** – vyberte projekt, zobrazte souhrn otevřených issue a z tlačítka „Zobrazit detailní report“ otevřete
+  kontingenční tabulku s hodinami podle issue × stážista za zvolené období. Detail má nově kompaktní panel vlevo s ovládáním
+  časového rozmezí a rychlými filtry na jednotlivé stážisty; tabulka využívá pravou část plochy, má fixní hlavičku a maximálně
+  50 % výšky viewportu se scrollováním.
 - **Stážisti** – full CRUD over interns. Radio buttons set the level, checkboxes assign any number of groups. Validation/messages mirror backend responses.
 - **Přehled stážistů** – card-based overview of every intern with total tracked hours and project workload breakdown accessible via modal detail.
 
