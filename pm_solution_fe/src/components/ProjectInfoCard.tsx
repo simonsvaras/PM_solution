@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import './ProjectInfoCard.css';
 import type { ProjectOverviewDTO } from '../api';
+import BudgetBurnIndicator from './BudgetBurnIndicator';
 
 type ProjectInfoCardProps = {
   project: ProjectOverviewDTO;
@@ -14,8 +15,6 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
   );
 
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
-  const reportedCostLabel = currencyFormatter.format(project.reportedCost ?? 0);
-
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
       <header className="projectInfoCard__header">
@@ -30,13 +29,21 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
           <dt>Rozpočet</dt>
           <dd>{budgetLabel}</dd>
         </div>
+        <div className="projectInfoCard__stat projectInfoCard__stat--progress">
+          <dt>Vykázané náklady</dt>
+          <dd>
+            <BudgetBurnIndicator
+              budget={project.budget}
+              reportedCost={project.reportedCost}
+              currencyFormatter={currencyFormatter}
+              className="budgetBurn--compact"
+              label={null}
+            />
+          </dd>
+        </div>
         <div className="projectInfoCard__stat">
           <dt>Otevřené issue</dt>
           <dd>{numberFormatter.format(project.openIssues)}</dd>
-        </div>
-        <div className="projectInfoCard__stat">
-          <dt>Vykázané náklady</dt>
-          <dd>{reportedCostLabel}</dd>
         </div>
       </dl>
     </article>

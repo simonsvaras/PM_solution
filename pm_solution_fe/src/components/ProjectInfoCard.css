@@ -33,6 +33,22 @@
   border-radius: 14px;
 }
 
+.projectInfoCard__stat--progress {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.projectInfoCard__stat--progress dt {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.projectInfoCard__stat--progress dd {
+  width: 100%;
+}
+
 .projectInfoCard__stat dt {
   margin: 0;
   font-size: 0.95rem;
@@ -59,5 +75,9 @@
 
   .projectInfoCard__stat dd {
     font-size: 1.05rem;
+  }
+
+  .projectInfoCard__stat--progress {
+    gap: 10px;
   }
 }

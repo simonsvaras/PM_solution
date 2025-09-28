@@ -1,7 +1,8 @@
-import { useState, type ChangeEvent } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import './ProjectReportPage.css';
 import type { ProjectOverviewDTO, SyncSummary } from '../api';
 import { syncProjectReports, type ErrorResponse } from '../api';
+import BudgetBurnIndicator from './BudgetBurnIndicator';
 
 type ProjectReportPageProps = {
   project: ProjectOverviewDTO;
@@ -20,6 +21,11 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+    [],
+  );
 
   function toIsoOrUndefined(value: string): string | undefined {
     if (!value) return undefined;
@@ -83,9 +89,16 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
           Zobrazit detailní report
         </button>
       </div>
-      <div className="projectReport__card">
-        <h2>Otevřené issue</h2>
-        <p className="projectReport__metric">{project.openIssues}</p>
+      <div className="projectReport__card projectReport__overviewCard">
+        <div className="projectReport__overviewHeader">
+          <h2>Otevřené issue</h2>
+          <p className="projectReport__metric">{project.openIssues}</p>
+        </div>
+        <BudgetBurnIndicator
+          budget={project.budget}
+          reportedCost={project.reportedCost}
+          currencyFormatter={currencyFormatter}
+        />
       </div>
       <div className="projectReport__card projectReport__syncCard">
         <div className="projectReport__syncHeader">
