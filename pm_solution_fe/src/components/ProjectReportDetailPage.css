@@ -1,18 +1,18 @@
 .projectReportDetail {
-  display: grid;
-  grid-template-columns: minmax(300px, 360px) 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 32px;
-  align-items: flex-start;
   width: 100%;
-  min-height: 0;
+  min-height: 100vh;
+  padding: clamp(24px, 4vw, 48px);
+  box-sizing: border-box;
 }
 
-.projectReportDetail__toolbar {
+.projectReportDetail__nav {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  justify-content: flex-start;
 }
 
 .projectReportDetail__link {
@@ -30,26 +30,40 @@
   text-decoration: underline;
 }
 
-.projectReportDetail__panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  padding: 24px;
-  box-shadow: 0 20px 36px rgba(15, 23, 42, 0.1);
+.projectReportDetail__header {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  max-width: 420px;
+  gap: 20px;
 }
 
-.projectReportDetail__header h2 {
-  margin: 0 0 8px;
+.projectReportDetail__title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
 }
 
-.projectReportDetail__header p {
+.projectReportDetail__title h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+}
+
+.projectReportDetail__title p {
   margin: 0;
   color: var(--color-text-muted);
-  max-width: 620px;
+  line-height: 1.5;
+}
+
+.projectReportDetail__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 24px 44px rgba(15, 23, 42, 0.12);
 }
 
 .projectReportDetail__filters {
@@ -74,7 +88,7 @@
 
 .projectReportDetail__filters input {
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
   font-size: 0.95rem;
   color: var(--color-text-primary);
@@ -85,7 +99,7 @@
   background: var(--color-accent-strong);
   color: #fff;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 12px 24px;
   font-weight: 600;
   cursor: pointer;
@@ -104,29 +118,21 @@
   box-shadow: none;
 }
 
-.projectReportDetail__status {
-  margin: 0;
-  font-size: 0.95rem;
-  color: var(--color-text-muted);
-}
-
-.projectReportDetail__status--error {
-  color: #d1434b;
-}
-
 .projectReportDetail__internFilters {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 240px;
 }
 
 .projectReportDetail__internButton {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  padding: 8px 16px;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease, border 120ms ease;
@@ -150,6 +156,22 @@
   border-color: var(--color-accent-strong);
 }
 
+.projectReportDetail__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.projectReportDetail__status {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.projectReportDetail__status--error {
+  color: #d1434b;
+}
+
 .projectReportDetail__tableSection {
   display: flex;
   flex-direction: column;
@@ -166,9 +188,10 @@
 .projectReportDetail__tableWrapper {
   overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: 20px;
   max-height: 50vh;
   background: var(--color-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .projectReportDetail__table {
@@ -178,7 +201,7 @@
 }
 
 .projectReportDetail__table thead th {
-  background: rgba(30, 64, 175, 0.08);
+  background: var(--color-surface);
   color: var(--color-text-primary);
   font-weight: 600;
   text-align: right;
@@ -186,7 +209,8 @@
   border-bottom: 1px solid rgba(30, 64, 175, 0.18);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
 }
 
 .projectReportDetail__table thead th:first-child {
@@ -257,16 +281,32 @@
 }
 
 @media (max-width: 1024px) {
-  .projectReportDetail {
-    grid-template-columns: 1fr;
-  }
-
-  .projectReportDetail__panel {
-    max-width: none;
+  .projectReportDetail__controls {
+    padding: 20px;
   }
 
   .projectReportDetail__tableWrapper {
     max-height: 60vh;
+  }
+}
+
+@media (max-width: 720px) {
+  .projectReportDetail {
+    padding: 24px;
+  }
+
+  .projectReportDetail__filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .projectReportDetail__filters label {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .projectReportDetail__internFilters {
+    justify-content: flex-start;
   }
 }
 

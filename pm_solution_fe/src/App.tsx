@@ -330,7 +330,7 @@ function App() {
         onSelect={handleNavigation}
       />
       <main className="app-content">
-        <div className="app-content__inner">
+        <div className={`app-content__inner${isReportsProjectDetail ? ' app-content__inner--full' : ''}`}>
           <header className="page-header">
             <p className="page-header__eyebrow">{activeModule?.name}</p>
             <h1>{selectedReportProject ? selectedReportProject.name : activeSubmodule?.name}</h1>

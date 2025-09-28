@@ -192,8 +192,8 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
 
   return (
     <section className="projectReportDetail" aria-label={`Detailní report projektu ${project.name}`}>
-      <div className="projectReportDetail__panel">
-        <div className="projectReportDetail__toolbar">
+      <header className="projectReportDetail__header" role="banner">
+        <div className="projectReportDetail__nav">
           <button type="button" className="projectReport__backButton" onClick={onBack}>
             ← Zpět na projekty
           </button>
@@ -202,56 +202,60 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
           </button>
         </div>
 
-        <div className="projectReportDetail__header">
-          <h2>Detailní report</h2>
+        <div className="projectReportDetail__title">
+          <h1>Detailní report</h1>
           <p>
             Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.
           </p>
         </div>
 
-        <div className="projectReportDetail__filters">
-          <label>
-            <span>Od</span>
-            <input type="datetime-local" value={fromValue} onChange={event => setFromValue(event.target.value)} />
-          </label>
-          <label>
-            <span>Do</span>
-            <input type="datetime-local" value={toValue} onChange={event => setToValue(event.target.value)} />
-          </label>
-          <button type="button" onClick={handleLoad} disabled={loading}>
-            {loading ? 'Načítám…' : 'Načíst'}
-          </button>
-        </div>
-
-        {availableInterns.length > 0 ? (
-          <div className="projectReportDetail__internFilters" role="group" aria-label="Filtr stážistů">
-            <button
-              type="button"
-              className={`projectReportDetail__internButton${selectedInternUsername === null ? ' projectReportDetail__internButton--active' : ''}`}
-              onClick={() => handleInternFilterChange(null)}
-              disabled={loading}
-              aria-pressed={selectedInternUsername === null}
-            >
-              Všichni
+        <div className="projectReportDetail__controls">
+          <div className="projectReportDetail__filters">
+            <label>
+              <span>Od</span>
+              <input type="datetime-local" value={fromValue} onChange={event => setFromValue(event.target.value)} />
+            </label>
+            <label>
+              <span>Do</span>
+              <input type="datetime-local" value={toValue} onChange={event => setToValue(event.target.value)} />
+            </label>
+            <button type="button" onClick={handleLoad} disabled={loading}>
+              {loading ? 'Načítám…' : 'Načíst'}
             </button>
-            {availableInterns.map(intern => {
-              const isActive = selectedInternUsername === intern.username;
-              return (
-                <button
-                  type="button"
-                  key={intern.id}
-                  className={`projectReportDetail__internButton${isActive ? ' projectReportDetail__internButton--active' : ''}`}
-                  onClick={() => handleInternFilterChange(intern.username)}
-                  disabled={loading}
-                  aria-pressed={isActive}
-                >
-                  @{intern.username}
-                </button>
-              );
-            })}
           </div>
-        ) : null}
 
+          {availableInterns.length > 0 ? (
+            <div className="projectReportDetail__internFilters" role="group" aria-label="Filtr stážistů">
+              <button
+                type="button"
+                className={`projectReportDetail__internButton${selectedInternUsername === null ? ' projectReportDetail__internButton--active' : ''}`}
+                onClick={() => handleInternFilterChange(null)}
+                disabled={loading}
+                aria-pressed={selectedInternUsername === null}
+              >
+                Všichni
+              </button>
+              {availableInterns.map(intern => {
+                const isActive = selectedInternUsername === intern.username;
+                return (
+                  <button
+                    type="button"
+                    key={intern.id}
+                    className={`projectReportDetail__internButton${isActive ? ' projectReportDetail__internButton--active' : ''}`}
+                    onClick={() => handleInternFilterChange(intern.username)}
+                    disabled={loading}
+                    aria-pressed={isActive}
+                  >
+                    @{intern.username}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      <div className="projectReportDetail__body">
         {internsError ? (
           <p className="projectReportDetail__status projectReportDetail__status--error" role="alert">{internsError}</p>
         ) : null}
@@ -265,89 +269,89 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
             {error.error.message}
           </p>
         ) : null}
-      </div>
 
-      <div className="projectReportDetail__tableSection">
-        {loading ? (
-          <p className="projectReportDetail__tablePlaceholder">Načítám data…</p>
-        ) : !report ? (
-          <p className="projectReportDetail__tablePlaceholder">Zadejte filtr a klikněte na „Načíst“.</p>
-        ) : issues.length === 0 ? (
-          <p className="projectReportDetail__tablePlaceholder">V zadaném období nejsou žádné výkazy.</p>
-        ) : (
-          <div className="projectReportDetail__tableWrapper">
-            <table className="projectReportDetail__table">
-              <thead>
-                <tr>
-                  <th scope="col">Issue</th>
-                  {visibleInterns.map(intern => (
-                    <th scope="col" key={intern.id}>
-                      <span className="projectReportDetail__internName">{intern.firstName} {intern.lastName}</span>
-                      <span className="projectReportDetail__internUsername">@{intern.username}</span>
+        <div className="projectReportDetail__tableSection">
+          {loading ? (
+            <p className="projectReportDetail__tablePlaceholder">Načítám data…</p>
+          ) : !report ? (
+            <p className="projectReportDetail__tablePlaceholder">Zadejte filtr a klikněte na „Načíst“.</p>
+          ) : issues.length === 0 ? (
+            <p className="projectReportDetail__tablePlaceholder">V zadaném období nejsou žádné výkazy.</p>
+          ) : (
+            <div className="projectReportDetail__tableWrapper">
+              <table className="projectReportDetail__table">
+                <thead>
+                  <tr>
+                    <th scope="col">Issue</th>
+                    {visibleInterns.map(intern => (
+                      <th scope="col" key={intern.id}>
+                        <span className="projectReportDetail__internName">{intern.firstName} {intern.lastName}</span>
+                        <span className="projectReportDetail__internUsername">@{intern.username}</span>
+                        <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
+                      </th>
+                    ))}
+                    <th scope="col" className="projectReportDetail__totalHeader">
+                      <span>Celkem</span>
                       <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
                     </th>
-                  ))}
-                  <th scope="col" className="projectReportDetail__totalHeader">
-                    <span>Celkem</span>
-                    <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {issues.map(issue => {
-                  const key = `${issue.repositoryId}-${issue.issueId ?? 'none'}-${issue.issueIid ?? 'none'}`;
-                  const valuesByIntern = new Map<number, { hours: number; cost: number }>();
-                  for (const cell of issue.internHours) {
-                    valuesByIntern.set(cell.internId, {
-                      hours: cell.hours ?? 0,
-                      cost: cell.cost ?? 0,
-                    });
-                  }
-                  let rowTotalHours = 0;
-                  let rowTotalCost = 0;
-                  for (const value of valuesByIntern.values()) {
-                    rowTotalHours += value.hours;
-                    rowTotalCost += value.cost;
-                  }
-                  const issueLabel = issue.issueIid ? `#${issue.issueIid}` : 'Bez čísla';
-                  return (
-                    <tr key={key}>
-                      <th scope="row">
-                        <div className="projectReportDetail__issue">
-                          <span className="projectReportDetail__issueTitle">{issue.issueTitle}</span>
-                          <span className="projectReportDetail__issueMeta">
-                            {issue.repositoryName}
-                            {issue.issueIid ? ` • ${issueLabel}` : ''}
-                          </span>
-                        </div>
-                      </th>
-                      {visibleInterns.map(intern => {
-                        const value = valuesByIntern.get(intern.id);
-                        return <td key={intern.id}>{renderCell(value?.hours, value?.cost)}</td>;
-                      })}
-                      <td className="projectReportDetail__totalCell">{renderCell(rowTotalHours, rowTotalCost)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {interns.length > 0 ? (
-                <tfoot>
-                  <tr>
-                    <th scope="row">Celkem</th>
-                    {visibleInterns.map(intern => (
-                      <td key={intern.id}>
-                        {renderCell(totals.perInternHours.get(intern.id), totals.perInternCost.get(intern.id))}
-                      </td>
-                    ))}
-                    <td className="projectReportDetail__totalCell">
-                      {renderCell(totals.overallHours, totals.overallCost)}
-                    </td>
                   </tr>
-                </tfoot>
-              ) : null}
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {issues.map(issue => {
+                    const key = `${issue.repositoryId}-${issue.issueId ?? 'none'}-${issue.issueIid ?? 'none'}`;
+                    const valuesByIntern = new Map<number, { hours: number; cost: number }>();
+                    for (const cell of issue.internHours) {
+                      valuesByIntern.set(cell.internId, {
+                        hours: cell.hours ?? 0,
+                        cost: cell.cost ?? 0,
+                      });
+                    }
+                    let rowTotalHours = 0;
+                    let rowTotalCost = 0;
+                    for (const value of valuesByIntern.values()) {
+                      rowTotalHours += value.hours;
+                      rowTotalCost += value.cost;
+                    }
+                    const issueLabel = issue.issueIid ? `#${issue.issueIid}` : 'Bez čísla';
+                    return (
+                      <tr key={key}>
+                        <th scope="row">
+                          <div className="projectReportDetail__issue">
+                            <span className="projectReportDetail__issueTitle">{issue.issueTitle}</span>
+                            <span className="projectReportDetail__issueMeta">
+                              {issue.repositoryName}
+                              {issue.issueIid ? ` • ${issueLabel}` : ''}
+                            </span>
+                          </div>
+                        </th>
+                        {visibleInterns.map(intern => {
+                          const value = valuesByIntern.get(intern.id);
+                          return <td key={intern.id}>{renderCell(value?.hours, value?.cost)}</td>;
+                        })}
+                        <td className="projectReportDetail__totalCell">{renderCell(rowTotalHours, rowTotalCost)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {interns.length > 0 ? (
+                  <tfoot>
+                    <tr>
+                      <th scope="row">Celkem</th>
+                      {visibleInterns.map(intern => (
+                        <td key={intern.id}>
+                          {renderCell(totals.perInternHours.get(intern.id), totals.perInternCost.get(intern.id))}
+                        </td>
+                      ))}
+                      <td className="projectReportDetail__totalCell">
+                        {renderCell(totals.overallHours, totals.overallCost)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
