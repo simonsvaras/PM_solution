@@ -348,3 +348,168 @@
   font-weight: 600;
 }
 
+.projectReportDetail__chartSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(20px, 3vw, 32px);
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+}
+
+.projectReportDetail__chartHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.projectReportDetail__chartTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.projectReportDetail__chartNote {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.projectReportDetail__chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.projectReportDetail__chartLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.projectReportDetail__chartLegendSwatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+}
+
+.projectReportDetail__chartLegendSwatch--actual {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.9) 0%, rgba(30, 64, 175, 0.7) 100%);
+}
+
+.projectReportDetail__chartLegendSwatch--expected {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.8) 0%, rgba(16, 185, 129, 0.6) 100%);
+}
+
+.projectReportDetail__chartPlaceholder {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.projectReportDetail__chart {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(16px, 4vw, 32px);
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.projectReportDetail__chartItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 140px;
+  flex: 0 0 auto;
+}
+
+.projectReportDetail__chartBars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 12px;
+  width: 100%;
+  min-height: 160px;
+}
+
+.projectReportDetail__chartBarWrapper {
+  flex: 1 1 50px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.projectReportDetail__chartBar {
+  position: relative;
+  width: 100%;
+  max-width: 72px;
+  border-radius: 12px 12px 4px 4px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px 8px 8px;
+  box-sizing: border-box;
+  transition: transform 120ms ease;
+}
+
+.projectReportDetail__chartBar--actual {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.95) 0%, rgba(30, 64, 175, 0.75) 100%);
+  color: #fff;
+}
+
+.projectReportDetail__chartBar--expected {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.85) 0%, rgba(16, 185, 129, 0.65) 100%);
+  color: #0f172a;
+}
+
+.projectReportDetail__chartBar:hover,
+.projectReportDetail__chartBar:focus-within {
+  transform: translateY(-2px);
+}
+
+.projectReportDetail__chartBarValue {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.projectReportDetail__chartLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.projectReportDetail__chartLabelName {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.projectReportDetail__chartLabelUsername {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .projectReportDetail__chartSection {
+    padding: 20px;
+  }
+
+  .projectReportDetail__chart {
+    gap: 16px;
+  }
+
+  .projectReportDetail__chartItem {
+    min-width: 120px;
+  }
+}
+
