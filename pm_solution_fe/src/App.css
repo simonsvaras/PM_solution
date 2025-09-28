@@ -67,6 +67,23 @@
   background: linear-gradient(140deg, rgba(219, 234, 254, 0.6), #fff 45%, rgba(243, 245, 249, 0.9));
 }
 
+.panel--danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.9), #fff 65%);
+}
+
+.danger-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.danger-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

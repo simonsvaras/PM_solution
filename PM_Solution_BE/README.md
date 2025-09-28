@@ -32,6 +32,7 @@ Key REST endpoints
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}` – aggregated timelog hours per issue/intern for the
   project's repositories within the optional time range.
+- `DELETE /api/sync/reports` – trvale odstraní všechny uložené výkazy (použijte pouze pro údržbu/čištění dat).
 
 ### Local project management
 - `GET /api/projects` – list local projects (id, gitlabProjectId, name, budget, budgetFrom, budgetTo).
@@ -78,6 +79,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V5__intern_level_group_updates.sql` – converts `group.code` to integer, adds `intern.level_id`, backfills `intern_level_history` and leaves `level_id` `NOT NULL`. Ensure at least one level exists before running.
 - `V6__project_budget_and_intern_workload.sql` – adds project budget columns (`budget`, `budget_from`, `budget_to`) and workload (`workload_hours`) for the `intern_project` junction table.
 - `V7__rename_uvazek_to_workload_hours.sql` – renames the intern workload column to `workload_hours` for clarity.
+- `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 
 Logging & observability
 -----------------------

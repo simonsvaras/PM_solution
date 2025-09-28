@@ -132,4 +132,13 @@ public class ReportSyncService {
 
         return summary;
     }
+
+    /**
+     * Deletes all persisted report rows.
+     *
+     * @return number of removed records
+     */
+    public int purgeAllReports() {
+        return syncDao.deleteAllReports();
+    }
 }

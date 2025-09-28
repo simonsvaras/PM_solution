@@ -24,7 +24,8 @@ npm run preview    # serve built assets locally
 
 Key modules
 -----------
-- **Synchronizace** – triggers GitLab sync jobs, displays progress and result cards.
+- **Synchronizace** – triggers GitLab sync jobs, displays progress/result cards a nově obsahuje panel pro smazání všech reportů
+  (vyžaduje potvrzení, použijte pouze pro reset dat před novou synchronizací).
 - **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
 - **Stážisti** – full CRUD over interns. Samostatný modál "Nastavit úroveň" umožňuje spravovat historii úrovní včetně dat od-do a mazání položek. Skupiny se vybírají pomocí zaškrtávacích políček. Validace zobrazuje reakce backendu.
 - **Reporty / Přehled** – vyberte projekt, zobrazte souhrn otevřených issue a z tlačítka „Zobrazit detailní report“ otevřete kontingenční
