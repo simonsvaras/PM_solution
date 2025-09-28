@@ -340,7 +340,7 @@ public class SyncDao {
                 .filter(username -> username != null && !username.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> existingUsernames = loadExistingInternUsernames(uniqueUsernames);
-        Map<String, BigDecimal> hourlyRates = loadInternHourlyRates(existingUsernames);
+        Map<String, List<HourlyRateSlice>> hourlyRateTimeline = loadInternHourlyRateTimeline(existingUsernames);
 
         List<ReportRow> candidates = new ArrayList<>();
         for (ReportRow row : rows) {
@@ -357,10 +357,17 @@ public class SyncDao {
         }
 
         for (ReportRow row : candidates) {
-            BigDecimal hourlyRate = hourlyRates.get(row.username());
+            List<HourlyRateSlice> slices = hourlyRateTimeline.get(row.username());
+            if (slices == null || slices.isEmpty()) {
+                failed++;
+                log.warn("Chybí historie sazeb pro uživatele {} – záznam nebyl uložen.", row.username());
+                continue;
+            }
+            LocalDate spentDate = row.spentAt().toLocalDate();
+            BigDecimal hourlyRate = resolveHourlyRate(slices, spentDate);
             if (hourlyRate == null) {
                 failed++;
-                log.warn("Chybí sazba pro uživatele {} – záznam nebyl uložen.", row.username());
+                log.warn("Nenalezena sazba pro uživatele {} k datu {} – záznam nebyl uložen.", row.username(), spentDate);
                 continue;
             }
             BigDecimal cost = row.timeSpentHours().multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
@@ -415,7 +422,7 @@ public class SyncDao {
                 .collect(Collectors.toSet());
     }
 
-    private Map<String, BigDecimal> loadInternHourlyRates(Set<String> usernames) {
+    private Map<String, List<HourlyRateSlice>> loadInternHourlyRateTimeline(Set<String> usernames) {
         if (usernames == null || usernames.isEmpty()) {
             return Map.of();
         }
@@ -425,15 +432,40 @@ public class SyncDao {
             placeholders.add("?");
             params.add(username);
         }
-        String sql = "SELECT i.username, l.hourly_rate_czk " +
+        String sql = "SELECT i.username, h.valid_from, h.valid_to, l.hourly_rate_czk " +
                 "FROM intern i " +
-                "JOIN level l ON l.id = i.level_id " +
-                "WHERE i.username IN (" + placeholders + ")";
-        Map<String, BigDecimal> rates = new HashMap<>();
+                "JOIN intern_level_history h ON h.intern_id = i.id " +
+                "JOIN level l ON l.id = h.level_id " +
+                "WHERE i.username IN (" + placeholders + ") " +
+                "ORDER BY i.username, h.valid_from";
+        Map<String, List<HourlyRateSlice>> rates = new HashMap<>();
         jdbc.query(sql, params.toArray(), rs -> {
-            rates.put(rs.getString("username"), rs.getBigDecimal("hourly_rate_czk"));
+            String username = rs.getString("username");
+            LocalDate validFrom = rs.getObject("valid_from", LocalDate.class);
+            LocalDate validTo = rs.getObject("valid_to", LocalDate.class);
+            BigDecimal hourlyRate = rs.getBigDecimal("hourly_rate_czk");
+            rates.computeIfAbsent(username, ignored -> new ArrayList<>())
+                    .add(new HourlyRateSlice(validFrom, validTo, hourlyRate));
         });
         return rates;
+    }
+
+    private BigDecimal resolveHourlyRate(List<HourlyRateSlice> slices, LocalDate spentDate) {
+        for (HourlyRateSlice slice : slices) {
+            if (slice.covers(spentDate)) {
+                return slice.hourlyRate();
+            }
+        }
+        return null;
+    }
+
+    private record HourlyRateSlice(LocalDate validFrom, LocalDate validTo, BigDecimal hourlyRate) {
+        boolean covers(LocalDate date) {
+            if (date.isBefore(validFrom)) {
+                return false;
+            }
+            return validTo == null || !date.isAfter(validTo);
+        }
     }
 
     public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
@@ -513,9 +545,12 @@ public class SyncDao {
                 UPDATE report r
                 SET cost = ROUND(l.hourly_rate_czk * r.time_spent_hours, 2)
                 FROM intern i
-                JOIN level l ON l.id = i.level_id
+                JOIN intern_level_history h ON h.intern_id = i.id
+                JOIN level l ON l.id = h.level_id
                 WHERE i.id = ?
                   AND r.username = i.username
+                  AND r.spent_at::date >= h.valid_from
+                  AND (h.valid_to IS NULL OR r.spent_at::date <= h.valid_to)
                 """;
         return jdbc.update(sql, internId);
     }
