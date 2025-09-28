@@ -56,6 +56,13 @@ function mergeInternLists(
   return sortInterns(Array.from(map.values()));
 }
 
+type StoredReportState = {
+  fromValue: string;
+  toValue: string;
+  selectedInternUsername: string | null;
+  report: ProjectReportDetailResponse | null;
+};
+
 export default function ProjectReportDetailPage({ project, onBack, onCloseDetail }: ProjectReportDetailPageProps) {
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
@@ -66,6 +73,43 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
   const [availableInterns, setAvailableInterns] = useState<ProjectReportDetailIntern[]>([]);
   const [internsError, setInternsError] = useState<string | null>(null);
   const [selectedInternUsername, setSelectedInternUsername] = useState<string | null>(null);
+  const storageKey = useMemo(() => `project-report-detail:${project.id}`, [project.id]);
+
+  useEffect(() => {
+    setFromValue('');
+    setToValue('');
+    setSelectedInternUsername(null);
+    setReport(null);
+    setAvailableInterns([]);
+    setValidationError(null);
+    setError(null);
+    setInternsError(null);
+    setLoading(false);
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) {
+        return;
+      }
+      const stored = JSON.parse(raw) as StoredReportState;
+      if (typeof stored.fromValue === 'string') setFromValue(stored.fromValue);
+      if (typeof stored.toValue === 'string') setToValue(stored.toValue);
+      setSelectedInternUsername(stored.selectedInternUsername ?? null);
+      if (stored.report) {
+        const storedReport = stored.report;
+        setReport(storedReport);
+        if (Array.isArray(storedReport.interns)) {
+          setAvailableInterns(prev => mergeInternLists(prev, storedReport.interns));
+        }
+      }
+    } catch (err) {
+      console.warn('Nepodařilo se obnovit uložený stav detailu reportu', err);
+    }
+  }, [storageKey]);
 
   useEffect(() => {
     let ignore = false;
@@ -80,7 +124,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
           firstName: intern.firstName,
           lastName: intern.lastName,
         }));
-        setAvailableInterns(sortInterns(mapped));
+        setAvailableInterns(prev => mergeInternLists(prev, mapped));
       })
       .catch(() => {
         if (!ignore) {
@@ -91,6 +135,23 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
       ignore = true;
     };
   }, [project.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const stored: StoredReportState = {
+      fromValue,
+      toValue,
+      selectedInternUsername,
+      report,
+    };
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(stored));
+    } catch (err) {
+      console.warn('Nepodařilo se uložit stav detailu reportu', err);
+    }
+  }, [storageKey, fromValue, toValue, selectedInternUsername, report]);
 
   const totals = useMemo(() => {
     if (!report) {
@@ -201,14 +262,6 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
             ← Zpět na souhrn
           </button>
         </div>
-
-        <div className="projectReportDetail__title">
-          <h1>Detailní report</h1>
-          <p>
-            Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.
-          </p>
-        </div>
-
         <div className="projectReportDetail__controls">
           <div className="projectReportDetail__filters">
             <label>
