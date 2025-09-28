@@ -9,11 +9,12 @@ type ProjectInfoCardProps = {
 export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('cs-CZ'), []);
   const currencyFormatter = useMemo(
-    () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }),
+    () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
     [],
   );
 
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
+  const reportedCostLabel = currencyFormatter.format(project.reportedCost ?? 0);
 
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
@@ -32,6 +33,10 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
         <div className="projectInfoCard__stat">
           <dt>Otevřené issue</dt>
           <dd>{numberFormatter.format(project.openIssues)}</dd>
+        </div>
+        <div className="projectInfoCard__stat">
+          <dt>Vykázané náklady</dt>
+          <dd>{reportedCostLabel}</dd>
         </div>
       </dl>
     </article>

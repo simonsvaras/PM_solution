@@ -63,6 +63,10 @@ export default function ProjectsPage() {
   useEffect(() => { reload(); }, []);
 
   const sorted = useMemo(() => (projects || []).slice().sort((a, b) => a.name.localeCompare(b.name)), [projects]);
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+    [],
+  );
 
   // Open modal for creating a fresh project
   function openModal() {
@@ -182,6 +186,8 @@ export default function ProjectsPage() {
                 Rozpočet: {justCreated.budget !== null ? `${justCreated.budget.toLocaleString('cs-CZ')} Kč` : 'neuveden'}
                 <br />
                 Období: {justCreated.budgetFrom ?? '—'} – {justCreated.budgetTo ?? '—'}
+                <br />
+                Vykázané náklady: {currencyFormatter.format(justCreated.reportedCost ?? 0)}
               </p>
             </div>
           )}

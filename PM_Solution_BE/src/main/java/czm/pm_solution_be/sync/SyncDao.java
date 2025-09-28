@@ -77,23 +77,31 @@ public class SyncDao {
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 
-    public record ProjectRow(Long id, Long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
+    public record ProjectRow(Long id,
+                             Long gitlabProjectId,
+                             String name,
+                             Integer budget,
+                             LocalDate budgetFrom,
+                             LocalDate budgetTo,
+                             BigDecimal reportedCost) {}
     public record ProjectOverviewRow(Long id,
                                      String name,
                                      Integer budget,
                                      LocalDate budgetFrom,
                                      LocalDate budgetTo,
+                                     BigDecimal reportedCost,
                                      Integer teamMembers,
                                      Integer openIssues) {}
     public List<ProjectRow> listProjects() {
-        return jdbc.query("SELECT id, gitlab_project_id, name, budget, budget_from, budget_to FROM project ORDER BY name",
+        return jdbc.query("SELECT id, gitlab_project_id, name, budget, budget_from, budget_to, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
                         rs.getLong("id"),
                         (Long) rs.getObject("gitlab_project_id"),
                         rs.getString("name"),
                         (Integer) rs.getObject("budget"),
                         rs.getObject("budget_from", LocalDate.class),
-                        rs.getObject("budget_to", LocalDate.class)));
+                        rs.getObject("budget_to", LocalDate.class),
+                        rs.getBigDecimal("reported_cost")));
     }
 
     public List<ProjectOverviewRow> listProjectOverview() {
@@ -103,6 +111,7 @@ public class SyncDao {
                        p.budget,
                        p.budget_from,
                        p.budget_to,
+                       p.reported_cost,
                        COALESCE(team_counts.team_members, 0) AS team_members,
                        COALESCE(issue_counts.open_issues, 0) AS open_issues
                 FROM project p
@@ -127,6 +136,7 @@ public class SyncDao {
                 (Integer) rs.getObject("budget"),
                 rs.getObject("budget_from", LocalDate.class),
                 rs.getObject("budget_to", LocalDate.class),
+                rs.getBigDecimal("reported_cost"),
                 rs.getInt("team_members"),
                 rs.getInt("open_issues")));
     }
