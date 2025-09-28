@@ -24,7 +24,8 @@ npm run preview    # serve built assets locally
 
 Key modules
 -----------
-- **Synchronizace** – triggers GitLab sync jobs, displays progress and result cards.
+- **Synchronizace** – triggers GitLab sync jobs, displays progress/result cards a nově obsahuje panel pro smazání všech reportů
+  (vyžaduje potvrzení, použijte pouze pro reset dat před novou synchronizací).
 - **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
 - **Stážisti** – full CRUD over interns. Radio buttons set the level, checkboxes assign any number of groups. Validation/messages mirror backend responses.
 

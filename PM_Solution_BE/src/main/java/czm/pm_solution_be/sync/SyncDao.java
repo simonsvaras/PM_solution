@@ -374,6 +374,15 @@ public class SyncDao {
     }
 
     /**
+     * Removes every stored timelog entry. Used by the on-demand maintenance action.
+     *
+     * @return number of deleted rows.
+     */
+    public int deleteAllReports() {
+        return jdbc.update("DELETE FROM report");
+    }
+
+    /**
      * Resolves which usernames already exist in the {@code intern} table.  Keeping the
      * lookup close to the data layer ensures we do not accidentally duplicate
      * validation logic in multiple services.

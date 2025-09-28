@@ -43,6 +43,10 @@ export type AllResult = {
   durationMs: number;
 };
 
+export type DeleteReportsResult = {
+  deleted: number;
+};
+
 export type ProjectDTO = {
   id: number;
   gitlabProjectId: number | null;
@@ -184,6 +188,12 @@ export async function updateProject(id: number, payload: ProjectBudgetPayload): 
 export async function deleteProject(id: number): Promise<void> {
   const res = await fetch(`${API_BASE}/api/projects/${id}`, { method: "DELETE" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function deleteAllReports(): Promise<DeleteReportsResult> {
+  const res = await fetch(`${API_BASE}/api/sync/reports`, { method: "DELETE" });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<DeleteReportsResult>(res);
 }
 
 

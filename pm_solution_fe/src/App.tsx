@@ -6,7 +6,7 @@ import ProjectsOverviewPage from './components/ProjectsOverviewPage';
 import ReportsOverviewPage from './components/ReportsOverviewPage';
 import ProjectReportPage from './components/ProjectReportPage';
 import InternsPage from './components/InternsPage';
-import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
+import { API_BASE, deleteAllReports, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, ProjectOverviewDTO, SyncSummary } from './api';
 
 type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL';
@@ -66,6 +66,7 @@ function App() {
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   // Keeps track of the project whose report detail is currently displayed.
   const [selectedReportProject, setSelectedReportProject] = useState<ProjectOverviewDTO | null>(null);
+  const [purgingReports, setPurgingReports] = useState(false);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(modules[0].key);
   const [activeSubmoduleKey, setActiveSubmoduleKey] = useState<string>(modules[0].submodules[0].key);
@@ -164,6 +165,27 @@ function App() {
     lastAction.current = doAll;
   }
 
+  async function handleDeleteAllReports() {
+    if (purgingReports) return;
+    const confirmed = window.confirm('Opravdu chcete smazat všechny reporty? Operaci nelze vrátit.');
+    if (!confirmed) return;
+    setPurgingReports(true);
+    try {
+      const response = await deleteAllReports();
+      showToast('success', `Smazáno ${response.deleted} reportů.`);
+    } catch (err) {
+      console.error('Nepodařilo se smazat reporty', err);
+      if (err && typeof err === 'object' && 'error' in err) {
+        const apiError = err as ErrorResponse;
+        showToast('error', apiError.error.message || 'Mazání reportů selhalo.');
+      } else {
+        showToast('error', 'Mazání reportů selhalo.');
+      }
+    } finally {
+      setPurgingReports(false);
+    }
+  }
+
   const inlineStatus = running ? (
     <div className="inline-status">
       <span className="spinner" />
@@ -241,13 +263,14 @@ function App() {
           </header>
 
           {isOnDemand ? (
-            <section className="panel">
-              <div className="panel__body">
-                <div className="toolbar">
-                  <label className="checkbox">
-                    <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
-                    <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
-                  </label>
+            <>
+              <section className="panel">
+                <div className="panel__body">
+                  <div className="toolbar">
+                    <label className="checkbox">
+                      <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
+                      <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
+                    </label>
                   <label className="checkbox">
                     <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
                     <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
@@ -279,7 +302,27 @@ function App() {
                   <small>API: {API_BASE}</small>
                 </div>
               </div>
-            </section>
+              </section>
+
+              <section className="panel panel--danger">
+                <div className="panel__body">
+                  <div className="danger-panel">
+                    <div>
+                      <h2>Údržba reportů</h2>
+                      <p>
+                        Trvale odstraní všechny záznamy z tabulky report. Použijte pouze pokud chcete databázi vyčistit
+                        před novým importem dat.
+                      </p>
+                    </div>
+                    <div className="danger-panel__actions">
+                      <button className="button--danger" onClick={handleDeleteAllReports} disabled={purgingReports}>
+                        {purgingReports ? 'Mažu…' : 'Smazat všechny reporty'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </>
           ) : isReportsProjectDetail && selectedReportProject ? (
             <ProjectReportPage project={selectedReportProject} onBack={() => setSelectedReportProject(null)} />
           ) : isProjectsOverview ? (

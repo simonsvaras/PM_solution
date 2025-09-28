@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -134,6 +135,10 @@ public class SyncController {
         public long durationMs;
     }
 
+    public static class DeleteReportsResponse {
+        public int deleted;
+    }
+
     @PostMapping("/projects/{projectId}/all")
     public AllResult syncAll(@PathVariable long projectId,
                              @RequestParam(defaultValue = "false") boolean full,
@@ -166,6 +171,13 @@ public class SyncController {
         ar.issues = issues;
         ar.durationMs = System.currentTimeMillis() - allStart;
         return ar;
+    }
+
+    @DeleteMapping("/reports")
+    public DeleteReportsResponse deleteAllReports() {
+        DeleteReportsResponse response = new DeleteReportsResponse();
+        response.deleted = reportSyncService.purgeAllReports();
+        return response;
     }
 
     // New global Issues sync (no project selection)
