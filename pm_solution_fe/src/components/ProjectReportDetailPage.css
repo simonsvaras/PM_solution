@@ -39,6 +39,18 @@
   align-items: stretch;
 }
 
+.projectReportDetail__summary {
+  display: flex;
+  flex: 1 1 320px;
+  gap: 16px;
+  align-items: stretch;
+  min-width: min(100%, 320px);
+}
+
+.projectReportDetail__summary .infoCard {
+  flex: 1 1 160px;
+}
+
 .projectReportDetail__controls {
   display: flex;
   flex-wrap: wrap;
@@ -267,6 +279,17 @@
   font-size: 0.85rem;
   color: var(--color-text-muted);
   margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .projectReportDetail__summary {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .projectReportDetail__summary .infoCard {
+    width: 100%;
+  }
 }
 
 @media (max-width: 1024px) {
