@@ -422,6 +422,31 @@ public class InternDao {
     }
 
     /**
+     * Replaces the full level history for the given intern.
+     */
+    public void replaceLevelHistory(long internId, List<LevelHistoryInput> entries) {
+        jdbc.update("DELETE FROM intern_level_history WHERE intern_id = ?", internId);
+        if (entries == null || entries.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate(
+                "INSERT INTO intern_level_history (intern_id, level_id, valid_from, valid_to) VALUES (?, ?, ?, ?)",
+                entries,
+                entries.size(),
+                (ps, entry) -> {
+                    ps.setLong(1, internId);
+                    ps.setLong(2, entry.levelId());
+                    ps.setObject(3, entry.validFrom());
+                    if (entry.validTo() == null) {
+                        ps.setNull(4, Types.DATE);
+                    } else {
+                        ps.setObject(4, entry.validTo());
+                    }
+                }
+        );
+    }
+
+    /**
      * Inserts a new record into intern_level_history for the supplied level.
      */
     public void insertLevelHistory(long internId, long levelId, LocalDate fromDate) {
@@ -446,6 +471,28 @@ public class InternDao {
                 newLevelStart,
                 newLevelStart.minusDays(1),
                 internId);
+    }
+
+    /**
+     * Loads level history rows for the given intern ordered by validity.
+     */
+    public List<LevelHistoryRow> findLevelHistory(long internId) {
+        return jdbc.query(
+                """
+                SELECT ilh.id,
+                       ilh.level_id,
+                       l.code   AS level_code,
+                       l.label  AS level_label,
+                       ilh.valid_from,
+                       ilh.valid_to
+                FROM intern_level_history ilh
+                JOIN level l ON l.id = ilh.level_id
+                WHERE ilh.intern_id = ?
+                ORDER BY ilh.valid_from ASC, ilh.id ASC
+                """,
+                LEVEL_HISTORY_MAPPER,
+                internId
+        );
     }
 
     private static String buildOrderClause(List<SortOrder> orders) {

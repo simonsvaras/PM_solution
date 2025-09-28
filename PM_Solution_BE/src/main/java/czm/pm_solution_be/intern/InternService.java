@@ -74,7 +74,7 @@ public class InternService {
                 .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
         ensureUsernameUnique(input.username(), existing.id());
 
-        LevelRow level = dao.findLevel(input.levelId())
+        LevelRow level = dao.findLevel(input.currentLevelId())
                 .orElseThrow(() -> ApiException.validation("Zvolená úroveň neexistuje.", "level_not_found"));
         List<GroupRow> groups = validateGroupIds(input.groupIds());
 
@@ -242,8 +242,7 @@ public class InternService {
         String firstName = normalizeName(request.firstName(), true);
         String lastName = normalizeName(request.lastName(), false);
         String username = normalizeUsername(request.username());
-        Long levelId = request.levelId();
-        if (levelId == null) {
+        if (false) {
             throw ApiException.validation("Úroveň je povinná.", "level_required");
         }
         List<Long> groupIds = request.groupIds() != null ? request.groupIds() : List.of();
@@ -484,6 +483,23 @@ public class InternService {
                 row.levelId(),
                 row.levelLabel(),
                 groupResponses);
+    }
+
+    private InternOverviewResponse toOverviewResponse(InternOverviewRow row, List<GroupRow> groups) {
+        List<InternGroupResponse> groupResponses = groups.stream()
+                .map(g -> new InternGroupResponse(g.id(), g.code(), g.label()))
+                .toList();
+        BigDecimal hours = BigDecimal.valueOf(row.totalSeconds())
+                .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+        return new InternOverviewResponse(
+                row.id(),
+                row.firstName(),
+                row.lastName(),
+                row.username(),
+                row.levelId(),
+                row.levelLabel(),
+                groupResponses,
+                hours);
     }
 
     private record NormalizedInput(String firstName,
