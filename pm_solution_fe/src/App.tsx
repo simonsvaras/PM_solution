@@ -6,6 +6,7 @@ import ProjectsOverviewPage from './components/ProjectsOverviewPage';
 import ReportsOverviewPage from './components/ReportsOverviewPage';
 import ProjectReportPage from './components/ProjectReportPage';
 import InternsPage from './components/InternsPage';
+import InternsOverviewPage from './components/InternsOverviewPage';
 import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, ProjectOverviewDTO, SyncSummary } from './api';
 
@@ -32,6 +33,7 @@ const modules: Module[] = [
     key: 'interns',
     name: 'Stážisti',
     submodules: [
+      { key: 'interns-overview', name: 'Přehled stážistů' },
       { key: 'interns-admin', name: 'Správa uživatelů' },
     ],
   },
@@ -85,6 +87,7 @@ function App() {
   const isOnDemand = activeSubmoduleKey === 'sync-on-demand';
   const isProjectsOverview = activeSubmoduleKey === 'projects-overview';
   const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
+  const isInternsOverview = activeSubmoduleKey === 'interns-overview';
   const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
   const isReportsOverview = activeSubmoduleKey === 'reports-overview';
   const isReportsProjectDetail = activeModuleKey === 'reports' && selectedReportProject !== null;
@@ -286,6 +289,8 @@ function App() {
             <ProjectsOverviewPage />
           ) : isProjectsAdmin ? (
             <ProjectsPage />
+          ) : isInternsOverview ? (
+            <InternsOverviewPage />
           ) : isInternsAdmin ? (
             <InternsPage />
           ) : isReportsOverview ? (

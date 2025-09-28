@@ -1,6 +1,8 @@
 package czm.pm_solution_be.intern;
 
 import czm.pm_solution_be.intern.InternDao.GroupRow;
+import czm.pm_solution_be.intern.InternDao.InternOverviewRow;
+import czm.pm_solution_be.intern.InternDao.InternProjectRow;
 import czm.pm_solution_be.intern.InternDao.InternRow;
 import czm.pm_solution_be.intern.InternDao.LevelRow;
 import czm.pm_solution_be.web.ApiException;
@@ -9,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -99,6 +103,42 @@ public class InternService {
                 .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(row.id()));
         return toResponse(row, groupMap.getOrDefault(row.id(), List.of()));
+    }
+
+    /**
+     * Returns a non-paginated overview including tracked hours for each intern.
+     */
+    public List<InternOverviewResponse> overview() {
+        List<InternOverviewRow> rows = dao.listOverview();
+        List<Long> ids = rows.stream().map(InternOverviewRow::id).toList();
+        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(ids);
+        return rows.stream()
+                .map(row -> toOverviewResponse(row, groupMap.getOrDefault(row.id(), List.of())))
+                .toList();
+    }
+
+    /**
+     * Returns a single intern overview enriched with project workload allocations.
+     */
+    public InternDetailResponse overviewDetail(long id) {
+        InternOverviewRow row = dao.findOverviewById(id)
+                .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
+        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(row.id()));
+        List<InternProjectRow> projects = dao.listProjectsForIntern(id);
+        List<InternProjectAllocationResponse> allocations = projects.stream()
+                .map(p -> new InternProjectAllocationResponse(p.projectId(), p.projectName(), p.workloadHours()))
+                .toList();
+        InternOverviewResponse base = toOverviewResponse(row, groupMap.getOrDefault(row.id(), List.of()));
+        return new InternDetailResponse(
+                base.id(),
+                base.firstName(),
+                base.lastName(),
+                base.username(),
+                base.levelId(),
+                base.levelLabel(),
+                base.groups(),
+                base.totalHours(),
+                allocations);
     }
 
     /**
@@ -349,6 +389,23 @@ public class InternService {
                 row.levelId(),
                 row.levelLabel(),
                 groupResponses);
+    }
+
+    private InternOverviewResponse toOverviewResponse(InternOverviewRow row, List<GroupRow> groups) {
+        List<InternGroupResponse> groupResponses = groups.stream()
+                .map(g -> new InternGroupResponse(g.id(), g.code(), g.label()))
+                .toList();
+        BigDecimal totalHours = BigDecimal.valueOf(row.totalSeconds())
+                .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+        return new InternOverviewResponse(
+                row.id(),
+                row.firstName(),
+                row.lastName(),
+                row.username(),
+                row.levelId(),
+                row.levelLabel(),
+                groupResponses,
+                totalHours);
     }
 
     private record NormalizedInput(String firstName, String lastName, String username, long levelId, List<Long> groupIds) {}

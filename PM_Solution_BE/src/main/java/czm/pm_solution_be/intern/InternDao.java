@@ -41,6 +41,14 @@ public class InternDao {
                                       String levelLabel,
                                       BigDecimal workloadHours,
                                       boolean assigned) {}
+    public record InternOverviewRow(long id,
+                                    String firstName,
+                                    String lastName,
+                                    String username,
+                                    long levelId,
+                                    String levelLabel,
+                                    long totalSeconds) {}
+    public record InternProjectRow(long projectId, String projectName, BigDecimal workloadHours) {}
     public record GroupRow(long id, int code, String label) {}
     public record LevelRow(long id, String code, String label) {}
     public record SortOrder(String column, boolean ascending) {}
@@ -70,6 +78,20 @@ public class InternDao {
             rs.getLong("id"),
             rs.getString("code"),
             rs.getString("label"));
+
+    private static final RowMapper<InternOverviewRow> OVERVIEW_MAPPER = (rs, rn) -> new InternOverviewRow(
+            rs.getLong("id"),
+            rs.getString("first_name"),
+            rs.getString("last_name"),
+            rs.getString("username"),
+            rs.getLong("level_id"),
+            rs.getString("level_label"),
+            rs.getLong("total_seconds"));
+
+    private static final RowMapper<InternProjectRow> PROJECT_MAPPER = (rs, rn) -> new InternProjectRow(
+            rs.getLong("project_id"),
+            rs.getString("project_name"),
+            rs.getBigDecimal("workload_hours"));
 
     public InternDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -193,6 +215,60 @@ public class InternDao {
                 listParams.toArray());
 
         return new PageResult(rows, total != null ? total : 0L);
+    }
+
+    /**
+     * Returns all interns together with their aggregated tracked time in seconds.
+     */
+    public List<InternOverviewRow> listOverview() {
+        return jdbc.query("""
+                SELECT i.id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.label AS level_label,
+                       COALESCE(ts.seconds_spent_total, 0) AS total_seconds
+                FROM intern i
+                JOIN level l ON l.id = i.level_id
+                LEFT JOIN intern_time_summary ts ON ts.intern_id = i.id
+                ORDER BY i.last_name, i.first_name, i.id
+                """, OVERVIEW_MAPPER);
+    }
+
+    /**
+     * Fetches a single intern for the overview including tracked time.
+     */
+    public Optional<InternOverviewRow> findOverviewById(long id) {
+        List<InternOverviewRow> rows = jdbc.query("""
+                SELECT i.id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.label AS level_label,
+                       COALESCE(ts.seconds_spent_total, 0) AS total_seconds
+                FROM intern i
+                JOIN level l ON l.id = i.level_id
+                LEFT JOIN intern_time_summary ts ON ts.intern_id = i.id
+                WHERE i.id = ?
+                """, OVERVIEW_MAPPER, id);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    /**
+     * Lists project allocations (workload hours) for the given intern.
+     */
+    public List<InternProjectRow> listProjectsForIntern(long internId) {
+        return jdbc.query("""
+                SELECT p.id   AS project_id,
+                       p.name AS project_name,
+                       ip.workload_hours
+                FROM intern_project ip
+                JOIN project p ON p.id = ip.project_id
+                WHERE ip.intern_id = ?
+                ORDER BY p.name
+                """, PROJECT_MAPPER, internId);
     }
 
     /**

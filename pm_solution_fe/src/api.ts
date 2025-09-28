@@ -99,6 +99,30 @@ export type InternGroupDTO = { id: number; code: number; label: string };
 export type LevelOption = { id: number; code: string; label: string };
 export type GroupOption = { id: number; code: number; label: string };
 export type InternListParams = { q?: string; username?: string; page?: number; size?: number; sort?: string };
+export type InternOverviewDTO = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  username: string;
+  level_id: number;
+  level_label: string;
+  groups: InternGroupDTO[];
+  total_hours: number | string;
+};
+export type InternOverview = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  levelId: number;
+  levelLabel: string;
+  groups: InternGroup[];
+  totalHours: number;
+};
+export type InternProjectAllocationDTO = { project_id: number; project_name: string; workload_hours: number | string | null };
+export type InternProjectAllocation = { projectId: number; projectName: string; workloadHours: number | null };
+export type InternDetailDTO = InternOverviewDTO & { projects: InternProjectAllocationDTO[] };
+export type InternDetail = InternOverview & { projects: InternProjectAllocation[] };
 
 export type ProjectInternAssignmentGroupDTO = { id: number; code: number; label: string };
 export type ProjectInternAssignmentDTO = {
@@ -135,6 +159,45 @@ function prepareInternBody(payload: InternPayload) {
     username: payload.username.trim(),
     level_id: payload.levelId,
     group_ids: payload.groupIds,
+  };
+}
+
+function parseNumber(value: number | string | null | undefined): number {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'number') return value;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
+
+function mapInternOverview(dto: InternOverviewDTO): InternOverview {
+  const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
+  const totalHoursRaw = parseNumber(dto.total_hours);
+  return {
+    id: dto.id,
+    firstName: dto.first_name,
+    lastName: dto.last_name,
+    username: dto.username,
+    levelId: dto.level_id,
+    levelLabel: dto.level_label,
+    groups,
+    totalHours: Number.isNaN(totalHoursRaw) ? 0 : totalHoursRaw,
+  };
+}
+
+function mapInternProjectAllocation(dto: InternProjectAllocationDTO): InternProjectAllocation {
+  const workload = parseNumber(dto.workload_hours);
+  return {
+    projectId: dto.project_id,
+    projectName: dto.project_name,
+    workloadHours: Number.isNaN(workload) ? null : workload,
+  };
+}
+
+function mapInternDetail(dto: InternDetailDTO): InternDetail {
+  const overview = mapInternOverview(dto);
+  return {
+    ...overview,
+    projects: (dto.projects ?? []).map(mapInternProjectAllocation),
   };
 }
 
@@ -372,6 +435,26 @@ export async function listInterns(params: InternListParams = {}): Promise<Intern
     totalElements: data.total_elements,
     totalPages: data.total_pages,
   };
+}
+
+/**
+ * Loads the full overview including total tracked hours for each intern.
+ */
+export async function listInternOverview(): Promise<InternOverview[]> {
+  const res = await fetch(`${API_BASE}/api/interns/overview`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternOverviewDTO[]>(res);
+  return data.map(mapInternOverview);
+}
+
+/**
+ * Loads a single intern overview enriched with project allocations.
+ */
+export async function getInternOverviewDetail(id: number): Promise<InternDetail> {
+  const res = await fetch(`${API_BASE}/api/interns/${id}/detail`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternDetailDTO>(res);
+  return mapInternDetail(data);
 }
 
 /**

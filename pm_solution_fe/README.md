@@ -27,6 +27,7 @@ Key modules
 - **Synchronizace** – triggers GitLab sync jobs, displays progress and result cards.
 - **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
 - **Stážisti** – full CRUD over interns. Radio buttons set the level, checkboxes assign any number of groups. Validation/messages mirror backend responses.
+- **Přehled stážistů** – card-based overview of every intern with total tracked hours and project workload breakdown accessible via modal detail.
 
 API usage
 ---------
