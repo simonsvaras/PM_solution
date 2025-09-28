@@ -8,11 +8,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -337,6 +340,7 @@ public class SyncDao {
                 .filter(username -> username != null && !username.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> existingUsernames = loadExistingInternUsernames(uniqueUsernames);
+        Map<String, BigDecimal> hourlyRates = loadInternHourlyRates(existingUsernames);
 
         List<ReportRow> candidates = new ArrayList<>();
         for (ReportRow row : rows) {
@@ -353,9 +357,16 @@ public class SyncDao {
         }
 
         for (ReportRow row : candidates) {
+            BigDecimal hourlyRate = hourlyRates.get(row.username());
+            if (hourlyRate == null) {
+                failed++;
+                log.warn("Chybí sazba pro uživatele {} – záznam nebyl uložen.", row.username());
+                continue;
+            }
+            BigDecimal cost = row.timeSpentHours().multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
             try {
-                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username) " +
-                                "VALUES (?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost) " +
+                                "VALUES (?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
                         ps -> {
                             ps.setLong(1, row.repositoryId());
                             if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
@@ -363,6 +374,7 @@ public class SyncDao {
                             ps.setInt(4, row.timeSpentSeconds());
                             ps.setBigDecimal(5, row.timeSpentHours());
                             ps.setString(6, row.username());
+                            ps.setBigDecimal(7, cost);
                         });
                 if (result > 0) inserted += result; else duplicates++;
             } catch (DataIntegrityViolationException ex) {
@@ -403,6 +415,27 @@ public class SyncDao {
                 .collect(Collectors.toSet());
     }
 
+    private Map<String, BigDecimal> loadInternHourlyRates(Set<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return Map.of();
+        }
+        StringJoiner placeholders = new StringJoiner(", ");
+        List<Object> params = new ArrayList<>();
+        for (String username : usernames) {
+            placeholders.add("?");
+            params.add(username);
+        }
+        String sql = "SELECT i.username, l.hourly_rate_czk " +
+                "FROM intern i " +
+                "JOIN level l ON l.id = i.level_id " +
+                "WHERE i.username IN (" + placeholders + ")";
+        Map<String, BigDecimal> rates = new HashMap<>();
+        jdbc.query(sql, params.toArray(), rs -> {
+            rates.put(rs.getString("username"), rs.getBigDecimal("hourly_rate_czk"));
+        });
+        return rates;
+    }
+
     public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
         jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE id = ?",
                 name,
@@ -421,7 +454,8 @@ public class SyncDao {
                                          String internUsername,
                                          String internFirstName,
                                          String internLastName,
-                                         BigDecimal hours) {}
+                                         BigDecimal hours,
+                                         BigDecimal cost) {}
 
     public List<ProjectReportDetailRow> listProjectReportDetail(long projectId,
                                                                 OffsetDateTime from,
@@ -435,7 +469,8 @@ public class SyncDao {
                 "i.username AS intern_username, " +
                 "i.first_name AS intern_first_name, " +
                 "i.last_name AS intern_last_name, " +
-                "SUM(r.time_spent_hours) AS hours " +
+                "SUM(r.time_spent_hours) AS hours, " +
+                "COALESCE(SUM(r.cost), 0) AS cost " +
                 "FROM report r " +
                 "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id " +
                 "JOIN repository repo ON repo.id = r.repository_id " +
@@ -468,7 +503,20 @@ public class SyncDao {
                 rs.getString("intern_username"),
                 rs.getString("intern_first_name"),
                 rs.getString("intern_last_name"),
-                rs.getBigDecimal("hours")
+                rs.getBigDecimal("hours"),
+                rs.getBigDecimal("cost")
         ), params.toArray());
+    }
+
+    public int recomputeReportCostsForIntern(long internId) {
+        String sql = """
+                UPDATE report r
+                SET cost = ROUND(l.hourly_rate_czk * r.time_spent_hours, 2)
+                FROM intern i
+                JOIN level l ON l.id = i.level_id
+                WHERE i.id = ?
+                  AND r.username = i.username
+                """;
+        return jdbc.update(sql, internId);
     }
 }

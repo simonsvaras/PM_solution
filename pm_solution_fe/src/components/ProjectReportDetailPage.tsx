@@ -20,11 +20,18 @@ function toIsoOrUndefined(value: string): string | undefined {
   return date.toISOString();
 }
 
-function formatHours(value?: number): string {
+function formatHours(value?: number | null): string {
   if (value === undefined || value === null || Number.isNaN(value)) {
     return '—';
   }
   return value.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatCost(value?: number | null): string {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return '—';
+  }
+  return value.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' });
 }
 
 export default function ProjectReportDetailPage({ project, onBack, onCloseDetail }: ProjectReportDetailPageProps) {
@@ -37,19 +44,28 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
 
   const totals = useMemo(() => {
     if (!report) {
-      return { perIntern: new Map<number, number>(), overall: 0 };
+      return {
+        perInternHours: new Map<number, number>(),
+        perInternCost: new Map<number, number>(),
+        overallHours: 0,
+        overallCost: 0,
+      };
     }
-    const perIntern = new Map<number, number>();
-    let overall = 0;
+    const perInternHours = new Map<number, number>();
+    const perInternCost = new Map<number, number>();
+    let overallHours = 0;
+    let overallCost = 0;
     for (const issue of report.issues) {
       for (const cell of issue.internHours) {
-        const current = perIntern.get(cell.internId) ?? 0;
-        const value = cell.hours ?? 0;
-        perIntern.set(cell.internId, current + value);
-        overall += value;
+        const hoursValue = cell.hours ?? 0;
+        const costValue = cell.cost ?? 0;
+        perInternHours.set(cell.internId, (perInternHours.get(cell.internId) ?? 0) + hoursValue);
+        perInternCost.set(cell.internId, (perInternCost.get(cell.internId) ?? 0) + costValue);
+        overallHours += hoursValue;
+        overallCost += costValue;
       }
     }
-    return { perIntern, overall };
+    return { perInternHours, perInternCost, overallHours, overallCost };
   }, [report]);
 
   async function handleLoad() {
@@ -82,6 +98,18 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
 
   const interns = report?.interns ?? [];
   const issues = report?.issues ?? [];
+
+  function renderCell(hours?: number | null, cost?: number | null) {
+    const formattedHours = formatHours(hours);
+    const formattedCost = formatCost(cost);
+    const displayHours = formattedHours === '—' ? formattedHours : `${formattedHours} h`;
+    return (
+      <div className="projectReportDetail__cell">
+        <span className="projectReportDetail__cellValue projectReportDetail__cellValue--hours">{displayHours}</span>
+        <span className="projectReportDetail__cellValue projectReportDetail__cellValue--cost">{formattedCost}</span>
+      </div>
+    );
+  }
 
   return (
     <section className="projectReportDetail" aria-label={`Detailní report projektu ${project.name}`}>
@@ -142,21 +170,31 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                     <th scope="col" key={intern.id}>
                       <span className="projectReportDetail__internName">{intern.firstName} {intern.lastName}</span>
                       <span className="projectReportDetail__internUsername">@{intern.username}</span>
+                      <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
                     </th>
                   ))}
                   <th scope="col" className="projectReportDetail__totalHeader">
-                    Celkem
+                    <span>Celkem</span>
+                    <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {issues.map(issue => {
                   const key = `${issue.repositoryId}-${issue.issueId ?? 'none'}-${issue.issueIid ?? 'none'}`;
-                  const hoursByIntern = new Map<number, number>();
+                  const valuesByIntern = new Map<number, { hours: number; cost: number }>();
                   for (const cell of issue.internHours) {
-                    hoursByIntern.set(cell.internId, cell.hours);
+                    valuesByIntern.set(cell.internId, {
+                      hours: cell.hours ?? 0,
+                      cost: cell.cost ?? 0,
+                    });
                   }
-                  const rowTotal = interns.reduce((acc, intern) => acc + (hoursByIntern.get(intern.id) ?? 0), 0);
+                  let rowTotalHours = 0;
+                  let rowTotalCost = 0;
+                  for (const value of valuesByIntern.values()) {
+                    rowTotalHours += value.hours;
+                    rowTotalCost += value.cost;
+                  }
                   const issueLabel = issue.issueIid ? `#${issue.issueIid}` : 'Bez čísla';
                   return (
                     <tr key={key}>
@@ -169,10 +207,11 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                           </span>
                         </div>
                       </th>
-                      {interns.map(intern => (
-                        <td key={intern.id}>{formatHours(hoursByIntern.get(intern.id))}</td>
-                      ))}
-                      <td className="projectReportDetail__totalCell">{formatHours(rowTotal)}</td>
+                      {interns.map(intern => {
+                        const value = valuesByIntern.get(intern.id);
+                        return <td key={intern.id}>{renderCell(value?.hours, value?.cost)}</td>;
+                      })}
+                      <td className="projectReportDetail__totalCell">{renderCell(rowTotalHours, rowTotalCost)}</td>
                     </tr>
                   );
                 })}
@@ -182,9 +221,13 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                   <tr>
                     <th scope="row">Celkem</th>
                     {interns.map(intern => (
-                      <td key={intern.id}>{formatHours(totals.perIntern.get(intern.id))}</td>
+                      <td key={intern.id}>
+                        {renderCell(totals.perInternHours.get(intern.id), totals.perInternCost.get(intern.id))}
+                      </td>
                     ))}
-                    <td className="projectReportDetail__totalCell">{formatHours(totals.overall)}</td>
+                    <td className="projectReportDetail__totalCell">
+                      {renderCell(totals.overallHours, totals.overallCost)}
+                    </td>
                   </tr>
                 </tfoot>
               ) : null}

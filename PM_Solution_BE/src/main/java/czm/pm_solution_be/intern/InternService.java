@@ -6,6 +6,7 @@ import czm.pm_solution_be.intern.InternDao.InternProjectRow;
 import czm.pm_solution_be.intern.InternDao.InternRow;
 import czm.pm_solution_be.intern.InternDao.LevelRow;
 import czm.pm_solution_be.intern.InternLevelHistoryResponse;
+import czm.pm_solution_be.sync.SyncDao;
 import czm.pm_solution_be.web.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,9 +39,11 @@ public class InternService {
     private static final int MAX_SIZE = 100;
 
     private final InternDao dao;
+    private final SyncDao syncDao;
 
-    public InternService(InternDao dao) {
+    public InternService(InternDao dao, SyncDao syncDao) {
         this.dao = dao;
+        this.syncDao = syncDao;
     }
 
     @Transactional
@@ -85,6 +88,8 @@ public class InternService {
             LocalDate today = LocalDate.now();
             dao.closeOpenLevelHistory(existing.id(), today);
             dao.insertLevelHistory(existing.id(), level.id(), today);
+            int recalculated = syncDao.recomputeReportCostsForIntern(existing.id());
+            log.info("Přepočítáno {} nákladů reportů pro stážistu {}", recalculated, updated.username());
         }
 
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(updated.id()));

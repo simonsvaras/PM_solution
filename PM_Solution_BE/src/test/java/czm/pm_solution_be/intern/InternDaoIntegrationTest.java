@@ -10,6 +10,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -47,15 +48,18 @@ class InternDaoIntegrationTest {
 
             long repositoryId = insertRepository(jdbcTemplate);
             BigDecimal hours = BigDecimal.valueOf(2).setScale(4);
+            BigDecimal hourlyRate = BigDecimal.valueOf(100);
+            BigDecimal cost = hours.multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
             Long reportId = jdbcTemplate.queryForObject(
-                    "INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username) VALUES (?,?,?,?,?,?) RETURNING id",
+                    "INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost) VALUES (?,?,?,?,?,?,?) RETURNING id",
                     Long.class,
                     repositoryId,
                     42L,
                     OffsetDateTime.now(),
                     7200,
                     hours,
-                    primaryIntern.username());
+                    primaryIntern.username(),
+                    cost);
 
             assertThat(reportId).isNotNull();
 

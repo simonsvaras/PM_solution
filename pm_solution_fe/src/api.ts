@@ -162,6 +162,7 @@ export type ProjectReportDetailIntern = {
 export type ProjectReportDetailIssueCell = {
   internId: number;
   hours: number;
+  cost: number | null;
 };
 
 export type ProjectReportDetailIssue = {
