@@ -177,6 +177,15 @@
   margin-top: 2px;
 }
 
+.projectReportDetail__headerNote {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
 .projectReportDetail__issueTitle {
   display: block;
   font-weight: 600;
@@ -193,5 +202,25 @@
 .projectReportDetail__totalCell {
   font-weight: 700;
   color: var(--color-text-primary);
+}
+
+.projectReportDetail__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.projectReportDetail__cellValue {
+  display: block;
+}
+
+.projectReportDetail__cellValue--hours {
+  color: var(--color-text-primary);
+}
+
+.projectReportDetail__cellValue--cost {
+  color: var(--color-accent-strong);
+  font-weight: 600;
 }
 

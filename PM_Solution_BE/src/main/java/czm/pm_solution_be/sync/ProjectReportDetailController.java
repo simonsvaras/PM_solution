@@ -26,7 +26,7 @@ public class ProjectReportDetailController {
 
     public record InternSummary(long id, String username, String firstName, String lastName) {}
 
-    public record IssueInternHours(long internId, BigDecimal hours) {}
+    public record IssueInternHours(long internId, BigDecimal hours, BigDecimal cost) {}
 
     public record IssueRow(long repositoryId,
                            String repositoryName,
@@ -67,7 +67,7 @@ public class ProjectReportDetailController {
                     row.issueIid(),
                     row.issueTitle()
             ));
-            builder.addHours(row.internId(), row.hours());
+            builder.addEntry(row.internId(), row.hours(), row.cost());
         }
 
         List<InternSummary> interns = new ArrayList<>(internMap.values());
@@ -89,6 +89,7 @@ public class ProjectReportDetailController {
         private final Long issueIid;
         private final String issueTitle;
         private final Map<Long, BigDecimal> hours = new LinkedHashMap<>();
+        private final Map<Long, BigDecimal> costs = new LinkedHashMap<>();
 
         IssueRowBuilder(long repositoryId, String repositoryName, Long issueId, Long issueIid, String issueTitle) {
             this.repositoryId = repositoryId;
@@ -98,16 +99,18 @@ public class ProjectReportDetailController {
             this.issueTitle = (issueTitle == null || issueTitle.isBlank()) ? "Bez názvu" : issueTitle;
         }
 
-        void addHours(long internId, BigDecimal value) {
-            if (value == null) {
-                return;
+        void addEntry(long internId, BigDecimal hoursValue, BigDecimal costValue) {
+            if (hoursValue != null) {
+                hours.merge(internId, hoursValue, BigDecimal::add);
             }
-            hours.merge(internId, value, BigDecimal::add);
+            if (costValue != null) {
+                costs.merge(internId, costValue, BigDecimal::add);
+            }
         }
 
         IssueRow build() {
             List<IssueInternHours> cells = hours.entrySet().stream()
-                    .map(entry -> new IssueInternHours(entry.getKey(), entry.getValue()))
+                    .map(entry -> new IssueInternHours(entry.getKey(), entry.getValue(), costs.get(entry.getKey())))
                     .toList();
             return new IssueRow(repositoryId, repositoryName, issueId, issueIid, issueTitle, cells);
         }
