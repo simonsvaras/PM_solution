@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @RestController
@@ -18,7 +19,8 @@ public class ProjectAdminController {
                              String name,
                              Integer budget,
                              LocalDate budgetFrom,
-                             LocalDate budgetTo) {}
+                             LocalDate budgetTo,
+                             BigDecimal reportedCost) {}
     public record CreateRequest(Long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
     public record UpdateRequest(String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
 
@@ -43,7 +45,7 @@ public class ProjectAdminController {
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.gitlabProjectId(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo()))
+                .map(p -> new ProjectDto(p.id(), p.gitlabProjectId(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
     }
 
@@ -87,7 +89,7 @@ public class ProjectAdminController {
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.gitlabProjectId(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo()))
-                .orElse(new ProjectDto(id, gitlabProjectId, name, budget, budgetFrom, budgetTo));
+                .map(p -> new ProjectDto(p.id(), p.gitlabProjectId(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
+                .orElse(new ProjectDto(id, gitlabProjectId, name, budget, budgetFrom, budgetTo, BigDecimal.ZERO));
     }
 }

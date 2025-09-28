@@ -12,6 +12,10 @@ export type ProjectCardProps = {
 
 export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, onManageTeam }: ProjectCardProps) {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('cs-CZ'), []);
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+    [],
+  );
 
   function formatDate(value: string | null | undefined) {
     if (!value) return null;
@@ -21,6 +25,7 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, 
   }
 
   const budgetLabel = project.budget != null ? `${numberFormatter.format(project.budget)} Kč` : 'Neuvedeno';
+  const reportedCostLabel = currencyFormatter.format(project.reportedCost ?? 0);
   const fromText = formatDate(project.budgetFrom);
   const toText = formatDate(project.budgetTo);
   const periodLabel = fromText || toText ? `${fromText ?? '—'} – ${toText ?? '—'}` : 'Bez omezení';
@@ -32,6 +37,7 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, 
         {typeof project.gitlabProjectId === 'number' && <div>GitLab ID: {project.gitlabProjectId}</div>}
         <div>Rozpočet: {budgetLabel}</div>
         <div>Období rozpočtu: {periodLabel}</div>
+        <div>Vykázané náklady: {reportedCostLabel}</div>
       </div>
       <div className="projectCard__actions">
         <button className="btn btn--danger" onClick={() => onDelete(project)}>Smazat</button>

@@ -54,6 +54,7 @@ export type ProjectDTO = {
   budget: number | null;
   budgetFrom: string | null;
   budgetTo: string | null;
+  reportedCost: number;
 };
 export type ProjectOverviewDTO = {
   id: number;
@@ -61,6 +62,7 @@ export type ProjectOverviewDTO = {
   budget: number | null;
   budgetFrom: string | null;
   budgetTo: string | null;
+  reportedCost: number;
   teamMembers: number;
   openIssues: number;
 };
