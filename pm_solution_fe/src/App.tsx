@@ -8,8 +8,8 @@ import ProjectReportPage from './components/ProjectReportPage';
 import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
-import { API_BASE, deleteAllReports, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
-import type { AllResult, ErrorResponse, ProjectOverviewDTO, SyncSummary } from './api';
+import { API_BASE, deleteReports, getProjects, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
+import type { AllResult, ErrorResponse, ProjectDTO, ProjectOverviewDTO, SyncSummary } from './api';
 
 type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL';
 
@@ -71,11 +71,45 @@ function App() {
   const [selectedReportProject, setSelectedReportProject] = useState<ProjectOverviewDTO | null>(null);
   const [showReportDetail, setShowReportDetail] = useState(false);
   const [purgingReports, setPurgingReports] = useState(false);
+  const [availableProjects, setAvailableProjects] = useState<ProjectDTO[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [projectLoadError, setProjectLoadError] = useState<string | null>(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(modules[0].key);
   const [activeSubmoduleKey, setActiveSubmoduleKey] = useState<string>(modules[0].submodules[0].key);
 
-  useEffect(() => { /* no-op */ }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingProjects(true);
+    getProjects()
+      .then(projects => {
+        if (cancelled) return;
+        setAvailableProjects(projects);
+        setProjectLoadError(null);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('Nepodařilo se načíst projekty', err);
+        if (err && typeof err === 'object' && 'error' in err) {
+          const apiError = err as ErrorResponse;
+          setProjectLoadError(apiError.error.message || 'Nepodařilo se načíst projekty.');
+        } else {
+          setProjectLoadError('Nepodařilo se načíst projekty.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingProjects(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedProjects = useMemo(
+    () => availableProjects.filter(project => selectedProjectIds.includes(project.id)),
+    [availableProjects, selectedProjectIds],
+  );
 
   const canRun = useMemo(() => running === null, [running]);
 
@@ -123,6 +157,16 @@ function App() {
   function handleExitReportProject() {
     setSelectedReportProject(null);
     setShowReportDetail(false);
+  }
+
+  function handleToggleMaintenanceProject(projectId: number) {
+    setSelectedProjectIds(prev =>
+      prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId],
+    );
+  }
+
+  function resetMaintenanceSelection() {
+    setSelectedProjectIds([]);
   }
 
   function showToast(type: 'success' | 'warning' | 'error', text: string) {
@@ -185,12 +229,33 @@ function App() {
 
   async function handleDeleteAllReports() {
     if (purgingReports) return;
-    const confirmed = window.confirm('Opravdu chcete smazat všechny reporty? Operaci nelze vrátit.');
+    const hasProjectSelection = selectedProjects.length > 0;
+    const previewNamesList = selectedProjects.slice(0, 3).map(project => `„${project.name}“`);
+    const previewNames = previewNamesList.join(', ');
+    const extraCount = selectedProjects.length > 3 ? selectedProjects.length - 3 : 0;
+    const projectSummary = hasProjectSelection
+      ? selectedProjects.length === 1
+        ? `projekt ${previewNames}`
+        : `${selectedProjects.length} vybrané projekty (${previewNames}${extraCount > 0 ? ', …' : ''})`
+      : '';
+    const confirmed = window.confirm(
+      hasProjectSelection
+        ? `Opravdu chcete smazat reporty pro ${projectSummary}? Operaci nelze vrátit.`
+        : 'Opravdu chcete smazat všechny reporty? Operaci nelze vrátit.',
+    );
     if (!confirmed) return;
     setPurgingReports(true);
     try {
-      const response = await deleteAllReports();
-      showToast('success', `Smazáno ${response.deleted} reportů.`);
+      const response = await deleteReports(hasProjectSelection ? selectedProjects.map(project => project.id) : undefined);
+      showToast(
+        'success',
+        hasProjectSelection
+          ? `Smazáno ${response.deleted} reportů pro vybrané projekty.`
+          : `Smazáno ${response.deleted} reportů.`,
+      );
+      if (hasProjectSelection) {
+        resetMaintenanceSelection();
+      }
     } catch (err) {
       console.error('Nepodařilo se smazat reporty', err);
       if (err && typeof err === 'object' && 'error' in err) {
@@ -215,6 +280,11 @@ function App() {
       </span>
     </div>
   ) : null;
+
+  const hasProjectSelection = selectedProjects.length > 0;
+  const maintenanceSelectionHint = hasProjectSelection
+    ? `Vybráno ${selectedProjects.length} projekt${selectedProjects.length === 1 ? '' : 'ů'}. Reporty se smažou pouze pro jejich přiřazené repozitáře.`
+    : 'Bez výběru se smažou reporty všech projektů. Výběrem omezíte mazání jen na konkrétní projekty.';
 
   const resCard = result ? (
     'durationMs' in result && 'fetched' in result ? (
@@ -335,9 +405,40 @@ function App() {
                         novým importem dat.
                       </p>
                     </div>
+                    <div className="danger-panel__options">
+                      <p className="danger-panel__helper">
+                        Vyberte projekty, pro které chcete reporty smazat. Pokud nic nevyberete, odstraní se reporty pro všechny
+                        projekty.
+                      </p>
+                      {loadingProjects ? (
+                        <p className="danger-panel__status">Načítám projekty…</p>
+                      ) : projectLoadError ? (
+                        <p className="danger-panel__error" role="alert">{projectLoadError}</p>
+                      ) : availableProjects.length === 0 ? (
+                        <p className="danger-panel__status">Zatím nejsou vytvořené žádné projekty.</p>
+                      ) : (
+                        <div className="danger-panel__projects" role="group" aria-label="Projekty pro mazání reportů">
+                          {availableProjects.map(project => (
+                            <label key={project.id} className="danger-panel__checkbox">
+                              <input
+                                type="checkbox"
+                                checked={selectedProjectIds.includes(project.id)}
+                                onChange={() => handleToggleMaintenanceProject(project.id)}
+                              />
+                              <span>{project.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <p className="danger-panel__hint">{maintenanceSelectionHint}</p>
+                    </div>
                     <div className="danger-panel__actions">
                       <button className="button--danger" onClick={handleDeleteAllReports} disabled={purgingReports}>
-                        {purgingReports ? 'Mažu…' : 'Smazat všechny reporty'}
+                        {purgingReports
+                          ? 'Mažu…'
+                          : hasProjectSelection
+                          ? 'Smazat reporty pro vybrané projekty'
+                          : 'Smazat všechny reporty'}
                       </button>
                     </div>
                   </div>

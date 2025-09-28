@@ -141,4 +141,14 @@ public class ReportSyncService {
     public int purgeAllReports() {
         return syncDao.deleteAllReports();
     }
+
+    /**
+     * Deletes persisted report rows that belong to repositories assigned to the provided projects.
+     *
+     * @param projectIds list of project identifiers (duplicates ignored)
+     * @return number of removed records
+     */
+    public int purgeReportsForProjects(List<Long> projectIds) {
+        return syncDao.deleteReportsForProjects(projectIds);
+    }
 }

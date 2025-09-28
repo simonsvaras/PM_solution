@@ -84,6 +84,58 @@
   gap: 12px;
 }
 
+.danger-panel__options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.danger-panel__helper,
+.danger-panel__status,
+.danger-panel__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.danger-panel__status {
+  font-style: italic;
+}
+
+.danger-panel__error {
+  margin: 0;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.danger-panel__projects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.danger-panel__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(254, 226, 226, 0.45);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.danger-panel__checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #b91c1c;
+}
+
+.danger-panel__hint {
+  margin-top: -4px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

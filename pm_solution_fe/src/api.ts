@@ -299,10 +299,24 @@ export async function deleteProject(id: number): Promise<void> {
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
 }
 
-export async function deleteAllReports(): Promise<DeleteReportsResult> {
-  const res = await fetch(`${API_BASE}/api/sync/reports`, { method: "DELETE" });
+export async function deleteReports(projectIds?: number[]): Promise<DeleteReportsResult> {
+  const params = new URLSearchParams();
+  if (Array.isArray(projectIds)) {
+    const uniqueIds = Array.from(
+      new Set(projectIds.filter(id => typeof id === "number" && Number.isFinite(id))),
+    );
+    for (const id of uniqueIds) {
+      params.append("projectId", String(id));
+    }
+  }
+  const query = params.toString();
+  const res = await fetch(`${API_BASE}/api/sync/reports${query ? `?${query}` : ""}`, { method: "DELETE" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<DeleteReportsResult>(res);
+}
+
+export async function deleteAllReports(): Promise<DeleteReportsResult> {
+  return deleteReports();
 }
 
 

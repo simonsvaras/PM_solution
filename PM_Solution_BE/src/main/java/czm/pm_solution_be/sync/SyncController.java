@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/sync")
@@ -174,9 +175,13 @@ public class SyncController {
     }
 
     @DeleteMapping("/reports")
-    public DeleteReportsResponse deleteAllReports() {
+    public DeleteReportsResponse deleteReports(@RequestParam(name = "projectId", required = false) List<Long> projectIds) {
         DeleteReportsResponse response = new DeleteReportsResponse();
-        response.deleted = reportSyncService.purgeAllReports();
+        if (projectIds == null || projectIds.isEmpty()) {
+            response.deleted = reportSyncService.purgeAllReports();
+        } else {
+            response.deleted = reportSyncService.purgeReportsForProjects(projectIds);
+        }
         return response;
     }
 

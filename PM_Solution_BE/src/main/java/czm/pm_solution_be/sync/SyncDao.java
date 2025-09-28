@@ -383,6 +383,29 @@ public class SyncDao {
     }
 
     /**
+     * Removes timelog entries linked to the repositories assigned to the provided project IDs.
+     *
+     * @param projectIds list of project identifiers (duplicates are ignored)
+     * @return number of deleted rows
+     */
+    public int deleteReportsForProjects(List<Long> projectIds) {
+        if (projectIds == null || projectIds.isEmpty()) {
+            return 0;
+        }
+        Set<Long> uniqueIds = new LinkedHashSet<>(projectIds);
+        StringJoiner placeholders = new StringJoiner(", ");
+        List<Object> params = new ArrayList<>();
+        for (Long id : uniqueIds) {
+            placeholders.add("?");
+            params.add(id);
+        }
+        String sql = "DELETE FROM report WHERE repository_id IN (" +
+                "SELECT ptr.repository_id FROM projects_to_repositorie ptr WHERE ptr.project_id IN (" + placeholders + ")" +
+                ")";
+        return jdbc.update(sql, params.toArray());
+    }
+
+    /**
      * Resolves which usernames already exist in the {@code intern} table.  Keeping the
      * lookup close to the data layer ensures we do not accidentally duplicate
      * validation logic in multiple services.

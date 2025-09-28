@@ -32,7 +32,7 @@ Key REST endpoints
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}` – aggregated timelog hours per issue/intern for the
   project's repositories within the optional time range.
-- `DELETE /api/sync/reports` – trvale odstraní všechny uložené výkazy (použijte pouze pro údržbu/čištění dat). Volání vrací `{ "deleted": <počet_záznamů> }`.
+- `DELETE /api/sync/reports?projectId=1&projectId=2` – trvale odstraní uložené výkazy. Bez parametrů smaže vše, s opakovaným `projectId` zlikviduje jen záznamy repozitářů přiřazených k vybraným projektům. Volání vrací `{ "deleted": <počet_záznamů> }`.
 
 ### Local project management
 - `GET /api/projects` – list local projects (id, gitlabProjectId, name, budget, budgetFrom, budgetTo).
