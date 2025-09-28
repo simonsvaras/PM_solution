@@ -47,7 +47,15 @@ export default function InternLevelHistoryModal({
     }
   }, [isOpen, levels]);
 
-  const sorted = useMemo(() => [...value].sort((a, b) => a.validFrom.localeCompare(b.validFrom)), [value]);
+  const sorted = useMemo(
+    () =>
+      [...value].sort((a, b) => {
+        const fromA = typeof a?.validFrom === 'string' ? a.validFrom : '';
+        const fromB = typeof b?.validFrom === 'string' ? b.validFrom : '';
+        return fromA.localeCompare(fromB);
+      }),
+    [value],
+  );
   const display = useMemo(() => [...sorted].reverse(), [sorted]);
 
   function resetForm() {
