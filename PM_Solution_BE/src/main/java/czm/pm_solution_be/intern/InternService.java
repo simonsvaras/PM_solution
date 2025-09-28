@@ -1,6 +1,8 @@
 package czm.pm_solution_be.intern;
 
 import czm.pm_solution_be.intern.InternDao.GroupRow;
+import czm.pm_solution_be.intern.InternDao.InternOverviewRow;
+import czm.pm_solution_be.intern.InternDao.InternProjectRow;
 import czm.pm_solution_be.intern.InternDao.InternRow;
 import czm.pm_solution_be.intern.InternDao.LevelRow;
 import czm.pm_solution_be.intern.InternLevelHistoryResponse;
@@ -10,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -70,17 +74,18 @@ public class InternService {
                 .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
         ensureUsernameUnique(input.username(), existing.id());
 
-        LevelRow currentLevel = input.levelsById().get(input.currentLevelId());
-        if (currentLevel == null) {
-            throw ApiException.validation("Zvolená úroveň neexistuje.", "level_not_found");
-        }
+        LevelRow level = dao.findLevel(input.levelId())
+                .orElseThrow(() -> ApiException.validation("Zvolená úroveň neexistuje.", "level_not_found"));
         List<GroupRow> groups = validateGroupIds(input.groupIds());
 
-        InternRow updated = dao.update(existing.id(), input.firstName(), input.lastName(), input.username(), currentLevel.id());
+        InternRow updated = dao.update(existing.id(), input.firstName(), input.lastName(), input.username(), level.id());
         dao.replaceInternGroups(updated.id(), input.groupIds());
-        dao.replaceLevelHistory(updated.id(), input.history().stream()
-                .map(entry -> new InternDao.LevelHistoryInput(entry.levelId(), entry.validFrom(), entry.validTo()))
-                .toList());
+
+        if (existing.levelId() != level.id()) {
+            LocalDate today = LocalDate.now();
+            dao.closeOpenLevelHistory(existing.id(), today);
+            dao.insertLevelHistory(existing.id(), level.id(), today);
+        }
 
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(updated.id()));
         log.info("Intern updated id={} username={} levelId={}", updated.id(), updated.username(), updated.levelId());
@@ -106,6 +111,42 @@ public class InternService {
                 .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(row.id()));
         return toResponse(row, groupMap.getOrDefault(row.id(), List.of()));
+    }
+
+    /**
+     * Returns a non-paginated overview including tracked hours for each intern.
+     */
+    public List<InternOverviewResponse> overview() {
+        List<InternOverviewRow> rows = dao.listOverview();
+        List<Long> ids = rows.stream().map(InternOverviewRow::id).toList();
+        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(ids);
+        return rows.stream()
+                .map(row -> toOverviewResponse(row, groupMap.getOrDefault(row.id(), List.of())))
+                .toList();
+    }
+
+    /**
+     * Returns a single intern overview enriched with project workload allocations.
+     */
+    public InternDetailResponse overviewDetail(long id) {
+        InternOverviewRow row = dao.findOverviewById(id)
+                .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
+        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(row.id()));
+        List<InternProjectRow> projects = dao.listProjectsForIntern(id);
+        List<InternProjectAllocationResponse> allocations = projects.stream()
+                .map(p -> new InternProjectAllocationResponse(p.projectId(), p.projectName(), p.workloadHours()))
+                .toList();
+        InternOverviewResponse base = toOverviewResponse(row, groupMap.getOrDefault(row.id(), List.of()));
+        return new InternDetailResponse(
+                base.id(),
+                base.firstName(),
+                base.lastName(),
+                base.username(),
+                base.levelId(),
+                base.levelLabel(),
+                base.groups(),
+                base.totalHours(),
+                allocations);
     }
 
     public List<InternLevelHistoryResponse> getLevelHistory(long internId) {
@@ -201,6 +242,10 @@ public class InternService {
         String firstName = normalizeName(request.firstName(), true);
         String lastName = normalizeName(request.lastName(), false);
         String username = normalizeUsername(request.username());
+        Long levelId = request.levelId();
+        if (levelId == null) {
+            throw ApiException.validation("Úroveň je povinná.", "level_required");
+        }
         List<Long> groupIds = request.groupIds() != null ? request.groupIds() : List.of();
         List<Long> sanitized = sanitizeGroupIds(groupIds);
         List<LevelAssignmentInput> history = normalizeLevelHistory(request.levelHistory());

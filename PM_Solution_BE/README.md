@@ -43,6 +43,8 @@ Key REST endpoints
 - `PUT /api/projects/{id}/interns` – replace intern assignments with payload `{ "interns": [{ "internId": 1, "workloadHours": 20.5 }] }` where `workloadHours` is nullable and represents hours allocated on the project.
 
 ### Intern registry
+- `GET /api/interns/overview` – non-paginated overview of all interns including aggregated tracked hours.
+- `GET /api/interns/{id}/detail` – overview for a single intern with project workload allocations.
 - `GET /api/levels` – list level reference data (id, code, label).
 - `GET /api/groups` – list intern groups (id, code, label).
 - `GET /api/interns` – paginated intern list (`q`, `username`, `page`, `size`, `sort`).

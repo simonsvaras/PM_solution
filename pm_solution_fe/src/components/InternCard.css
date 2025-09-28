@@ -1,0 +1,87 @@
+.internCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1.5rem;
+  border: 1px solid #d5d9e0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(31, 41, 55, 0.08);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.internCard:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.internCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(31, 41, 55, 0.16);
+  border-color: #b9c2cf;
+}
+
+.internCard__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.internCard__name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.internCard__username {
+  font-size: 0.95rem;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+.internCard__meta {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.internCard__metaItem dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 0.15rem;
+}
+
+.internCard__metaItem dd {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #1f2937;
+}
+
+.internCard__hours {
+  font-weight: 600;
+}
+
+.internCard__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+@media (max-width: 600px) {
+  .internCard {
+    padding: 1.25rem;
+  }
+
+  .internCard__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

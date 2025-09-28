@@ -50,6 +50,12 @@ public class InternController {
         service.delete(id);
     }
 
+    @GetMapping("/overview")
+    @Operation(summary = "Přehled stážistů", description = "Vrací všechny stážisty včetně celkového počtu odpracovaných hodin.")
+    public List<InternOverviewResponse> overview() {
+        return service.overview();
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Detail stážisty")
     public InternResponse get(@PathVariable long id) {
@@ -60,6 +66,12 @@ public class InternController {
     @Operation(summary = "Historie úrovní stážisty")
     public List<InternLevelHistoryResponse> history(@PathVariable long id) {
         return service.getLevelHistory(id);
+    }
+
+    @GetMapping("/{id}/detail")
+    @Operation(summary = "Přehled stážisty", description = "Vrací agregovaná data o stážistovi včetně projektů a úvazků.")
+    public InternDetailResponse overviewDetail(@PathVariable long id) {
+        return service.overviewDetail(id);
     }
 
     @GetMapping
