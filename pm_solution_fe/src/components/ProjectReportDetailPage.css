@@ -121,6 +121,7 @@
   padding: 8px 16px;
   font-size: 0.9rem;
   font-weight: 600;
+  color: var(--color-text-primary);
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease, border 120ms ease;
 }
@@ -129,6 +130,7 @@
 .projectReportDetail__internButton:focus-visible:not(:disabled) {
   border-color: var(--color-accent-strong);
   color: var(--color-accent-strong);
+  background: var(--color-surface);
 }
 
 .projectReportDetail__internButton:disabled {
