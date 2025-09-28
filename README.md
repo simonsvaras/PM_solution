@@ -31,6 +31,7 @@ The report module now provides an overview of all projects and a detailed page f
 
 - **Overview (`/reports`)** lists every project using `SimpleProjectCard` tiles. Selecting a tile opens the project report detail.
 - **Project detail** shows the number of open issues and exposes a "Synchronizovat výkazy" button. Users can either synchronise from the last stored timelog or supply a custom time range. The UI disables manual date inputs when "Synchronizovat data jen od poslední synchronizace" is ticked to prevent conflicting filters.
+- **On-demand maintenance** (Synchronizace → On-demand) now contains a red "Smazat všechny reporty" panel. The action requires a confirmation dialog and calls `DELETE /api/sync/reports`, which permanently removes every row from the `report` table. Use it to reset the database before a full re-import.
 
 Each synchronisation triggers the backend endpoint `POST /api/sync/projects/{projectId}/reports`. The request body is optional and accepts:
 
@@ -40,7 +41,7 @@ Each synchronisation triggers the backend endpoint `POST /api/sync/projects/{pro
 | `from` | ISO-8601 string | Optional lower bound for `spent_at` when `sinceLast` is `false`. |
 | `to` | ISO-8601 string | Optional upper bound for `spent_at`, defaults to the current time. |
 
-The backend deduplicates entries with an `ON CONFLICT` clause on `(repository_id, iid, username, spent_at, time_spent_seconds)` and reports usernames that do not exist in the `intern` table so the UI can inform operators.
+The backend deduplicates entries with an `ON CONFLICT` clause on `(repository_id, iid, username, spent_at, time_spent_seconds)` and reports usernames that do not exist in the `intern` table so the UI can inform operators. If an intern account is deleted, Flyway migration `V11__report_username_nullable.sql` keeps the referential integrity intact by allowing `report.username` to be set to `NULL` so the `ON DELETE SET NULL` rule can run before the maintenance purge.
 
 ### API reference
 

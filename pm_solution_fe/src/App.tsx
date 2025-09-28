@@ -8,7 +8,6 @@ import ProjectReportPage from './components/ProjectReportPage';
 import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
-import { API_BASE, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import { API_BASE, deleteAllReports, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, ProjectOverviewDTO, SyncSummary } from './api';
 
@@ -291,38 +290,60 @@ function App() {
                       <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
                       <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
                     </label>
-                  <label className="checkbox">
-                    <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
-                    <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
-                  </label>
-                  <label>
-                    <span>Since</span>
-                    <input
-                      type="text"
-                      placeholder="YYYY-MM-DDTHH:mm:ssZ"
-                      value={since}
-                      onChange={e => setSince(e.target.value)}
-                    />
-                  </label>
-                </div>
+                    <label className="checkbox">
+                      <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
+                      <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
+                    </label>
+                    <label>
+                      <span>Since</span>
+                      <input
+                        type="text"
+                        placeholder="YYYY-MM-DDTHH:mm:ssZ"
+                        value={since}
+                        onChange={e => setSince(e.target.value)}
+                      />
+                    </label>
+                  </div>
 
-                <div className="actions">
-                  <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>Sync Repositories</button>
-                  <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
-                  <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
-                </div>
+                  <div className="actions">
+                    <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>
+                      Sync Repositories
+                    </button>
+                    <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
+                    <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
+                  </div>
 
-                <div className="results">
-                  {inlineStatus}
-                  {resCard}
-                  {errCard}
-                </div>
+                  <div className="results">
+                    {inlineStatus}
+                    {resCard}
+                    {errCard}
+                  </div>
 
-                <div className="panel__footer">
-                  <small>API: {API_BASE}</small>
+                  <div className="panel__footer">
+                    <small>API: {API_BASE}</small>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+
+              <section className="panel panel--danger">
+                <div className="panel__body">
+                  <div className="danger-panel">
+                    <div>
+                      <h2>Údržba reportů</h2>
+                      <p>
+                        Trvale odstraní všechny záznamy z tabulky report. Použijte pouze pokud chcete databázi vyčistit před
+                        novým importem dat.
+                      </p>
+                    </div>
+                    <div className="danger-panel__actions">
+                      <button className="button--danger" onClick={handleDeleteAllReports} disabled={purgingReports}>
+                        {purgingReports ? 'Mažu…' : 'Smazat všechny reporty'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </>
           ) : isReportsProject && selectedReportProject ? (
             showReportDetail ? (
               <ProjectReportDetailPage
@@ -337,29 +358,12 @@ function App() {
                 onShowDetail={() => setShowReportDetail(true)}
               />
             )
-              </section>
-
-              <section className="panel panel--danger">
-                <div className="panel__body">
-                  <div className="danger-panel">
-                    <div>
-                      <h2>Údržba reportů</h2>
-                      <p>
-                        Trvale odstraní všechny záznamy z tabulky report. Použijte pouze pokud chcete databázi vyčistit
-                        před novým importem dat.
-                      </p>
-                    </div>
-                    <div className="danger-panel__actions">
-                      <button className="button--danger" onClick={handleDeleteAllReports} disabled={purgingReports}>
-                        {purgingReports ? 'Mažu…' : 'Smazat všechny reporty'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </>
           ) : isReportsProjectDetail && selectedReportProject ? (
-            <ProjectReportPage project={selectedReportProject} onBack={() => setSelectedReportProject(null)} />
+            <ProjectReportPage
+              project={selectedReportProject}
+              onBack={() => setSelectedReportProject(null)}
+              onShowDetail={() => setShowReportDetail(true)}
+            />
           ) : isProjectsOverview ? (
             <ProjectsOverviewPage />
           ) : isProjectsAdmin ? (
