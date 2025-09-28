@@ -36,6 +36,18 @@ function formatCost(value?: number | null): string {
   return value.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' });
 }
 
+function formatDayCount(value: number): string {
+  const rounded = Math.round(value);
+  const abs = Math.abs(rounded);
+  let suffix = 'dnů';
+  if (abs === 1) {
+    suffix = 'den';
+  } else if (abs >= 2 && abs <= 4) {
+    suffix = 'dny';
+  }
+  return `${abs} ${suffix}`;
+}
+
 function sortInterns(list: ProjectReportDetailIntern[]): ProjectReportDetailIntern[] {
   return [...list].sort((a, b) => {
     const lastName = a.lastName.localeCompare(b.lastName, 'cs');
@@ -46,13 +58,27 @@ function sortInterns(list: ProjectReportDetailIntern[]): ProjectReportDetailInte
   });
 }
 
+type ReportInternWithWorkload = ProjectReportDetailIntern & {
+  workloadHours?: number | null;
+};
+
 function mergeInternLists(
-  first: ProjectReportDetailIntern[],
-  second: ProjectReportDetailIntern[],
-): ProjectReportDetailIntern[] {
-  const map = new Map<number, ProjectReportDetailIntern>();
+  first: ReportInternWithWorkload[],
+  second: ReportInternWithWorkload[],
+): ReportInternWithWorkload[] {
+  const map = new Map<number, ReportInternWithWorkload>();
   for (const intern of [...first, ...second]) {
-    map.set(intern.id, intern);
+    const existing = map.get(intern.id);
+    if (existing) {
+      map.set(intern.id, {
+        ...existing,
+        ...intern,
+        workloadHours:
+          intern.workloadHours !== undefined ? intern.workloadHours : existing.workloadHours,
+      });
+    } else {
+      map.set(intern.id, { ...intern });
+    }
   }
   return sortInterns(Array.from(map.values()));
 }
@@ -71,7 +97,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
   const [validationError, setValidationError] = useState<string | null>(null);
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [report, setReport] = useState<ProjectReportDetailResponse | null>(null);
-  const [availableInterns, setAvailableInterns] = useState<ProjectReportDetailIntern[]>([]);
+  const [availableInterns, setAvailableInterns] = useState<ReportInternWithWorkload[]>([]);
   const [internsError, setInternsError] = useState<string | null>(null);
   const [selectedInternUsername, setSelectedInternUsername] = useState<string | null>(null);
   const storageKey = useMemo(() => `project-report-detail:${project.id}`, [project.id]);
@@ -124,6 +150,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
           username: intern.username,
           firstName: intern.firstName,
           lastName: intern.lastName,
+          workloadHours: intern.workloadHours,
         }));
         setAvailableInterns(prev => mergeInternLists(prev, mapped));
       })
@@ -248,6 +275,81 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     : '—';
 
   const overallCostDisplay = report ? formatCost(totals.overallCost) : '—';
+
+  const internWorkloadMap = useMemo(() => {
+    const map = new Map<number, number | null>();
+    for (const intern of availableInterns) {
+      if (intern.workloadHours !== undefined) {
+        map.set(intern.id, intern.workloadHours);
+      }
+    }
+    return map;
+  }, [availableInterns]);
+
+  const reportDurationDays = useMemo(() => {
+    if (!report) {
+      return null;
+    }
+    if (!fromValue || !toValue) {
+      return null;
+    }
+    const fromDate = new Date(fromValue);
+    const toDate = new Date(toValue);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return null;
+    }
+    const start = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+    const end = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+    const diff = end.getTime() - start.getTime();
+    if (diff < 0) {
+      return null;
+    }
+    const dayMs = 1000 * 60 * 60 * 24;
+    return Math.floor(diff / dayMs) + 1;
+  }, [report, fromValue, toValue]);
+
+  const chartData = useMemo(() => {
+    if (!report || reportDurationDays === null) {
+      return [] as {
+        internId: number;
+        label: string;
+        username: string;
+        actualHours: number;
+        expectedHours: number | null;
+      }[];
+    }
+    return visibleInterns.map(intern => {
+      const actualHours = totals.perInternHours.get(intern.id) ?? 0;
+      const workload = internWorkloadMap.get(intern.id);
+      const expectedHours =
+        workload !== undefined && workload !== null
+          ? (workload / 7) * reportDurationDays
+          : null;
+      return {
+        internId: intern.id,
+        label: `${intern.firstName} ${intern.lastName}`.trim(),
+        username: intern.username,
+        actualHours,
+        expectedHours,
+      };
+    });
+  }, [report, reportDurationDays, visibleInterns, totals.perInternHours, internWorkloadMap]);
+
+  const chartMaxValue = useMemo(() => {
+    return chartData.reduce((max, item) => {
+      const expected = item.expectedHours ?? 0;
+      return Math.max(max, item.actualHours, expected);
+    }, 0);
+  }, [chartData]);
+
+  const shouldShowChart = report && chartData.length > 0;
+
+  const chartHasExpectedData = useMemo(
+    () => chartData.some(item => item.expectedHours !== null),
+    [chartData],
+  );
+
+  const chartScale = chartMaxValue > 0 ? chartMaxValue : 1;
 
   function renderCell(hours?: number | null, cost?: number | null) {
     const formattedHours = formatHours(hours);
@@ -419,6 +521,97 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
             </div>
           )}
         </div>
+        {shouldShowChart ? (
+          <div
+            className="projectReportDetail__chartSection"
+            aria-label="Porovnání vykázaných hodin a plánovaného úvazku stážistů"
+          >
+            <div className="projectReportDetail__chartHeader">
+              <h2 className="projectReportDetail__chartTitle">Plnění úvazků</h2>
+              {reportDurationDays !== null ? (
+                <p className="projectReportDetail__chartNote">
+                  Úvazek je přepočten na {formatDayCount(reportDurationDays)} zvoleného období.
+                </p>
+              ) : null}
+            </div>
+            <div className="projectReportDetail__chartLegend" aria-hidden="true">
+              <span className="projectReportDetail__chartLegendItem">
+                <span className="projectReportDetail__chartLegendSwatch projectReportDetail__chartLegendSwatch--actual" />
+                Vykázané hodiny
+              </span>
+              {chartHasExpectedData ? (
+                <span className="projectReportDetail__chartLegendItem">
+                  <span className="projectReportDetail__chartLegendSwatch projectReportDetail__chartLegendSwatch--expected" />
+                  Plánovaný úvazek
+                </span>
+              ) : null}
+            </div>
+            {chartMaxValue === 0 ? (
+              <p className="projectReportDetail__chartPlaceholder">
+                Pro vybrané období nejsou dostupná data pro vykreslení grafu.
+              </p>
+            ) : (
+              <div className="projectReportDetail__chart" role="list">
+                {chartData.map(item => {
+                  const actualDisplay = formatHours(item.actualHours);
+                  const expectedDisplay =
+                    item.expectedHours !== null ? formatHours(item.expectedHours) : '—';
+                  const actualHeight = Math.max(0, (item.actualHours / chartScale) * 100);
+                  const expectedHeight =
+                    item.expectedHours !== null ? Math.max(0, (item.expectedHours / chartScale) * 100) : 0;
+                  const actualValueText = actualDisplay === '—' ? '0 h' : `${actualDisplay} h`;
+                  const expectedValueText =
+                    expectedDisplay === '—' ? '—' : `${expectedDisplay} h`;
+                  const itemLabel = `@${item.username}`;
+                  const ariaLabelParts = [
+                    `${item.label} (${itemLabel})`,
+                    `vykázáno ${actualValueText}`,
+                  ];
+                  if (chartHasExpectedData) {
+                    ariaLabelParts.push(
+                      expectedDisplay === '—'
+                        ? 'plánovaný úvazek není k dispozici'
+                        : `plánovaný úvazek ${expectedValueText}`,
+                    );
+                  }
+                  return (
+                    <div
+                      key={item.internId}
+                      className="projectReportDetail__chartItem"
+                      role="listitem"
+                      aria-label={ariaLabelParts.join(', ')}
+                    >
+                      <div className="projectReportDetail__chartBars" aria-hidden="true">
+                        <div className="projectReportDetail__chartBarWrapper">
+                          <div
+                            className="projectReportDetail__chartBar projectReportDetail__chartBar--actual"
+                            style={{ height: `${actualHeight}%` }}
+                          >
+                            <span className="projectReportDetail__chartBarValue">{actualValueText}</span>
+                          </div>
+                        </div>
+                        {chartHasExpectedData ? (
+                          <div className="projectReportDetail__chartBarWrapper">
+                            <div
+                              className="projectReportDetail__chartBar projectReportDetail__chartBar--expected"
+                              style={{ height: `${expectedHeight}%` }}
+                            >
+                              <span className="projectReportDetail__chartBarValue">{expectedValueText}</span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="projectReportDetail__chartLabel">
+                        <span className="projectReportDetail__chartLabelName">{item.label}</span>
+                        <span className="projectReportDetail__chartLabelUsername">{itemLabel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </section>
   );
