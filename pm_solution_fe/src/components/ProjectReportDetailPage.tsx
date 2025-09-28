@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import './ProjectReportDetailPage.css';
+import InfoCard from './InfoCard';
 import type {
   ErrorResponse,
   ProjectOverviewDTO,
@@ -239,6 +240,15 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     ? interns.filter(intern => intern.username === selectedInternUsername)
     : interns;
 
+  const overallHoursDisplay = report
+    ? (() => {
+        const formatted = formatHours(totals.overallHours);
+        return formatted === '—' ? formatted : `${formatted} h`;
+      })()
+    : '—';
+
+  const overallCostDisplay = report ? formatCost(totals.overallCost) : '—';
+
   function renderCell(hours?: number | null, cost?: number | null) {
     const formattedHours = formatHours(hours);
     const formattedCost = formatCost(cost);
@@ -305,6 +315,10 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
               })}
             </div>
           ) : null}
+        </div>
+        <div className="projectReportDetail__summary" aria-label="Souhrn období">
+          <InfoCard title="Celkové vykázané hodiny" value={overallHoursDisplay} />
+          <InfoCard title="Celkové náklady" value={overallCostDisplay} />
         </div>
       </header>
 
