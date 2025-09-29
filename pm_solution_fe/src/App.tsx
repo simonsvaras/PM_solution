@@ -328,6 +328,7 @@ function App() {
   const isReportsProjectSummary =
     isReportsProject && (reportView === 'summary' || reportView === null || reportView === undefined);
   const isReportsProjectDetail = isReportsProject && reportView !== null && reportView !== 'summary';
+  const shouldUseFullWidthContent = isReportsProjectDetail || isProjectsOverview;
 
   const headerEyebrow =
     isReportsProjectDetail && selectedReportProject ? selectedReportProject.name : activeModule?.name ?? '';
@@ -670,7 +671,7 @@ function App() {
         onSelect={handleNavigation}
       />
       <main className="app-content">
-        <div className={`app-content__inner${isReportsProjectDetail ? ' app-content__inner--full' : ''}`}>
+        <div className={`app-content__inner${shouldUseFullWidthContent ? ' app-content__inner--full' : ''}`}>
           <header className={`page-header${isReportsProjectDetail ? ' page-header--with-nav' : ''}`}>
             <div className="page-header__top">
               <div className="page-header__headline">

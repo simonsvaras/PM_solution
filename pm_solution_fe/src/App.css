@@ -64,7 +64,7 @@
 .page-header__nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
   align-self: flex-start;
 }
 
@@ -73,8 +73,12 @@
   background: rgba(30, 64, 175, 0.08);
   color: var(--color-accent-strong);
   font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 999px;
+  font-size: 0.95rem;
+  padding: 12px 24px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
