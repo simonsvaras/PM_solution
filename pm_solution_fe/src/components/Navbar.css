@@ -42,17 +42,17 @@
 }
 
 .navbar__moduleButton {
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 6px 8px;
+  border-radius: 12px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
   text-align: left;
-  transition: color 180ms ease, background 180ms ease, transform 150ms ease;
+  transition: color 180ms ease, background 180ms ease;
 }
 
 .navbar__module.is-active .navbar__moduleButton {
@@ -63,9 +63,8 @@
 .navbar__moduleButton:hover,
 .navbar__moduleButton:focus-visible {
   color: var(--color-accent-strong);
-  background: rgba(30, 58, 138, 0.12);
+  background: rgba(30, 58, 138, 0.08);
   outline: none;
-  transform: translateY(-1px);
 }
 
 .navbar__submodules {
@@ -89,18 +88,18 @@
   border: none;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   text-align: left;
-  padding: 10px 16px;
-  border-radius: 12px;
+  padding: 6px 12px;
+  border-radius: 10px;
   transition: background 180ms ease, color 180ms ease, padding-left 200ms ease;
 }
 
 .navbar__submoduleButton:hover,
 .navbar__submoduleButton:focus-visible {
   color: var(--color-accent-strong);
-  background: rgba(30, 58, 138, 0.16);
-  padding-left: 20px;
+  background: rgba(30, 58, 138, 0.12);
+  padding-left: 16px;
   outline: none;
 }
 
@@ -124,12 +123,10 @@
   }
 
   .navbar__moduleButton {
-    font-size: 0.82rem;
-    padding: 8px 10px;
+    font-size: 0.68rem;
   }
 
   .navbar__submoduleButton {
-    font-size: 0.88rem;
-    padding: 8px 12px;
+    font-size: 0.74rem;
   }
 }
