@@ -247,9 +247,11 @@ public class SyncDao {
                                                 String[] labels,
                                                 Integer timeEstimateSeconds,
                                                 Integer totalTimeSpentSeconds,
+                                                String milestoneTitle,
+                                                String milestoneState,
                                                 String dueDate,
                                                 OffsetDateTime updatedAt) {
-        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, due_date=?::date, updated_at=? WHERE gitlab_issue_id=?",
+        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, milestone_title=?, milestone_state=?, due_date=?::date, updated_at=? WHERE gitlab_issue_id=?",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setString(2, title);
@@ -260,13 +262,15 @@ public class SyncDao {
                     ps.setArray(7, labels == null ? null : ps.getConnection().createArrayOf("text", labels));
                     if (timeEstimateSeconds == null) ps.setNull(8, java.sql.Types.INTEGER); else ps.setInt(8, timeEstimateSeconds);
                     if (totalTimeSpentSeconds == null) ps.setNull(9, java.sql.Types.INTEGER); else ps.setInt(9, totalTimeSpentSeconds);
-                    ps.setString(10, dueDate);
-                    if (updatedAt == null) ps.setNull(11, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(11, updatedAt);
-                    ps.setLong(12, gitlabIssueId);
+                    ps.setString(10, milestoneTitle);
+                    ps.setString(11, milestoneState);
+                    ps.setString(12, dueDate);
+                    if (updatedAt == null) ps.setNull(13, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(13, updatedAt);
+                    ps.setLong(14, gitlabIssueId);
                 });
         if (updated > 0) return new UpsertResult<>(null, false);
 
-        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, due_date, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?::date,?)",
+        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?)",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setLong(2, gitlabIssueId);
@@ -279,8 +283,10 @@ public class SyncDao {
                     ps.setArray(9, labels == null ? null : ps.getConnection().createArrayOf("text", labels));
                     if (timeEstimateSeconds == null) ps.setNull(10, java.sql.Types.INTEGER); else ps.setInt(10, timeEstimateSeconds);
                     if (totalTimeSpentSeconds == null) ps.setNull(11, java.sql.Types.INTEGER); else ps.setInt(11, totalTimeSpentSeconds);
-                    ps.setString(12, dueDate);
-                    if (updatedAt == null) ps.setNull(13, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(13, updatedAt);
+                    ps.setString(12, milestoneTitle);
+                    ps.setString(13, milestoneState);
+                    ps.setString(14, dueDate);
+                    if (updatedAt == null) ps.setNull(15, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(15, updatedAt);
                 });
         return new UpsertResult<>(null, true);
     }

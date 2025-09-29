@@ -71,6 +71,8 @@ public class IssueSyncService {
                             labels,
                             is.timeStats != null ? is.timeStats.timeEstimate : null,
                             is.timeStats != null ? is.timeStats.totalTimeSpent : null,
+                            is.milestone != null ? is.milestone.title : null,
+                            is.milestone != null ? is.milestone.state : null,
                             is.dueDate,
                             is.updatedAt
                     );

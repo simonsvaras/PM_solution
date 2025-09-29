@@ -22,6 +22,7 @@ public class GitLabIssue {
     public List<Assignee> assignees;
     public List<String> labels;
     public Author author;
+    public Milestone milestone;
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TimeStats {
@@ -40,6 +41,12 @@ public class GitLabIssue {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Author {
         public String name;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Milestone {
+        public String title;
+        public String state;
     }
 }
 
