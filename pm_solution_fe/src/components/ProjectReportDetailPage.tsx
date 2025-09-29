@@ -349,6 +349,18 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     [chartData],
   );
 
+  const chartScale = chartMaxValue > 0 ? chartMaxValue : 1;
+  const MIN_BAR_HEIGHT_PERCENT = 12; // keep small non-zero values visible
+
+  function getBarHeight(value: number | null | undefined) {
+    if (!value || value <= 0) {
+      return 0;
+    }
+
+    const percent = (value / chartScale) * 100;
+    return Math.max(percent, MIN_BAR_HEIGHT_PERCENT);
+  }
+
   function renderCell(hours?: number | null, cost?: number | null) {
     const formattedHours = formatHours(hours);
     const formattedCost = formatCost(cost);
@@ -554,11 +566,8 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                   const actualDisplay = formatHours(item.actualHours);
                   const expectedDisplay =
                     item.expectedHours !== null ? formatHours(item.expectedHours) : '—';
-                  const itemMaxValue = Math.max(item.actualHours, item.expectedHours ?? 0, 0);
-                  const itemScale = itemMaxValue > 0 ? itemMaxValue : 1;
-                  const actualHeight = Math.max(0, (item.actualHours / itemScale) * 100);
-                  const expectedHeight =
-                    item.expectedHours !== null ? Math.max(0, (item.expectedHours / itemScale) * 100) : 0;
+                  const actualHeight = getBarHeight(item.actualHours);
+                  const expectedHeight = getBarHeight(item.expectedHours);
                   const actualValueText = actualDisplay === '—' ? '0 h' : `${actualDisplay} h`;
                   const expectedValueText =
                     expectedDisplay === '—' ? '—' : `${expectedDisplay} h`;
