@@ -40,6 +40,7 @@ public class InternDao {
                                       String levelCode,
                                       String levelLabel,
                                       BigDecimal workloadHours,
+                                      boolean includeInReportedCost,
                                       boolean assigned) {}
     public record InternOverviewRow(long id,
                                     String firstName,
@@ -48,7 +49,10 @@ public class InternDao {
                                     long levelId,
                                     String levelLabel,
                                     long totalSeconds) {}
-    public record InternProjectRow(long projectId, String projectName, BigDecimal workloadHours) {}
+    public record InternProjectRow(long projectId,
+                                   String projectName,
+                                   BigDecimal workloadHours,
+                                   boolean includeInReportedCost) {}
     public record GroupRow(long id, int code, String label) {}
     public record LevelRow(long id, String code, String label) {}
     public record LevelHistoryRow(long id, long levelId, String levelCode, String levelLabel, LocalDate validFrom,
@@ -57,7 +61,9 @@ public class InternDao {
     public record SortOrder(String column, boolean ascending) {}
     public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {}
     public record PageResult(List<InternRow> rows, long totalElements) {}
-    public record ProjectInternAllocation(long internId, BigDecimal workloadHours) {}
+    public record ProjectInternAllocation(long internId,
+                                          BigDecimal workloadHours,
+                                          boolean includeInReportedCost) {}
     public record ProjectTeamRow(long projectId,
                                  String projectName,
                                  long internId,
@@ -67,7 +73,8 @@ public class InternDao {
                                  long levelId,
                                  String levelCode,
                                  String levelLabel,
-                                 BigDecimal workloadHours) {}
+                                 BigDecimal workloadHours,
+                                 boolean includeInReportedCost) {}
 
     private static final RowMapper<InternRow> INTERN_MAPPER = new RowMapper<>() {
         @Override
@@ -112,7 +119,8 @@ public class InternDao {
     private static final RowMapper<InternProjectRow> PROJECT_MAPPER = (rs, rn) -> new InternProjectRow(
             rs.getLong("project_id"),
             rs.getString("project_name"),
-            rs.getBigDecimal("workload_hours"));
+            rs.getBigDecimal("workload_hours"),
+            rs.getBoolean("include_in_reported_cost"));
 
     public InternDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -284,7 +292,8 @@ public class InternDao {
         return jdbc.query("""
                 SELECT p.id   AS project_id,
                        p.name AS project_name,
-                       ip.workload_hours
+                       ip.workload_hours,
+                       ip.include_in_reported_cost
                 FROM intern_project ip
                 JOIN project p ON p.id = ip.project_id
                 WHERE ip.intern_id = ?
@@ -386,6 +395,7 @@ public class InternDao {
                        l.code AS level_code,
                        l.label AS level_label,
                        ip.workload_hours AS workload_hours,
+                       COALESCE(ip.include_in_reported_cost, TRUE) AS include_in_reported_cost,
                        CASE WHEN ip.project_id IS NULL THEN FALSE ELSE TRUE END AS assigned
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
@@ -410,6 +420,7 @@ public class InternDao {
                 rs.getString("level_code"),
                 rs.getString("level_label"),
                 rs.getBigDecimal("workload_hours"),
+                rs.getBoolean("include_in_reported_cost"),
                 rs.getBoolean("assigned")),
                 params.toArray());
     }
@@ -425,7 +436,8 @@ public class InternDao {
                        i.level_id,
                        l.code AS level_code,
                        l.label AS level_label,
-                       ip.workload_hours
+                       ip.workload_hours,
+                       ip.include_in_reported_cost
                 FROM project p
                 JOIN intern_project ip ON ip.project_id = p.id
                 JOIN intern i ON i.id = ip.intern_id
@@ -442,7 +454,8 @@ public class InternDao {
                 rs.getLong("level_id"),
                 rs.getString("level_code"),
                 rs.getString("level_label"),
-                rs.getBigDecimal("workload_hours")));
+                rs.getBigDecimal("workload_hours"),
+                rs.getBoolean("include_in_reported_cost")));
     }
 
     public void replaceProjectInterns(long projectId, List<ProjectInternAllocation> assignments) {
@@ -450,7 +463,7 @@ public class InternDao {
         if (assignments == null || assignments.isEmpty()) {
             return;
         }
-        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id, workload_hours) VALUES (?, ?, ?)", assignments, assignments.size(),
+        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)", assignments, assignments.size(),
                 (ps, assignment) -> {
                     ps.setLong(1, projectId);
                     ps.setLong(2, assignment.internId());
@@ -459,6 +472,7 @@ public class InternDao {
                     } else {
                         ps.setBigDecimal(3, assignment.workloadHours());
                     }
+                    ps.setBoolean(4, assignment.includeInReportedCost());
                 });
     }
 

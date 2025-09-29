@@ -26,7 +26,7 @@ Key modules
 -----------
 - **Synchronizace** – triggers GitLab sync jobs, displays progress/result cards a panel pro údržbu reportů. Lze vybrat konkrétní
   projekty, pro které se výkazy smažou (nebo ponechat výběr prázdný pro kompletní vyčištění před novou synchronizací).
-- **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal.
+- **Projekty / Správa projektů** – create, edit, delete projects and open the repository assignment modal. Modál „Správa týmu“ při přiřazení stážistů k projektu obsahuje zaškrtávací pole „Započítat výdaje do vykázaných nákladů projektu“, které ovlivňuje součet nákladů na detailu projektu.
 - **Stážisti** – full CRUD over interns. Samostatný modál "Nastavit úroveň" umožňuje spravovat historii úrovní včetně dat od-do a mazání položek. Skupiny se vybírají pomocí zaškrtávacích políček. Validace zobrazuje reakce backendu.
 - **Reporty / Přehled** – vyberte projekt, zobrazte souhrn otevřených issue a z tlačítka „Zobrazit detailní report“ otevřete
   kontingenční tabulku s hodinami podle issue × stážista za zvolené období. Detail běží na samostatné full-width stránce se

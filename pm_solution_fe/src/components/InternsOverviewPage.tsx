@@ -213,6 +213,7 @@ export default function InternsOverviewPage() {
                     <tr>
                       <th>Projekt</th>
                       <th>Úvazek</th>
+                      <th>Započítat náklady</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -220,6 +221,7 @@ export default function InternsOverviewPage() {
                       <tr key={project.projectId}>
                         <td>{project.projectName}</td>
                         <td>{formatHours(project.workloadHours)}</td>
+                        <td>{project.includeInReportedCost ? 'Ano' : 'Ne'}</td>
                       </tr>
                     ))}
                   </tbody>

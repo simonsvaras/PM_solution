@@ -134,8 +134,18 @@ export type InternOverview = {
   groups: InternGroup[];
   totalHours: number;
 };
-export type InternProjectAllocationDTO = { project_id: number; project_name: string; workload_hours: number | string | null };
-export type InternProjectAllocation = { projectId: number; projectName: string; workloadHours: number | null };
+export type InternProjectAllocationDTO = {
+  project_id: number;
+  project_name: string;
+  workload_hours: number | string | null;
+  include_in_reported_cost: boolean;
+};
+export type InternProjectAllocation = {
+  projectId: number;
+  projectName: string;
+  workloadHours: number | null;
+  includeInReportedCost: boolean;
+};
 export type InternDetailDTO = InternOverviewDTO & { projects: InternProjectAllocationDTO[] };
 export type InternDetail = InternOverview & { projects: InternProjectAllocation[] };
 
@@ -182,6 +192,7 @@ export type ProjectInternAssignmentDTO = {
   levelLabel: string;
   groups: ProjectInternAssignmentGroupDTO[];
   workloadHours: number | null;
+  includeInReportedCost: boolean;
   assigned: boolean;
 };
 
@@ -298,6 +309,7 @@ function mapInternProjectAllocation(dto: InternProjectAllocationDTO): InternProj
     projectId: dto.project_id,
     projectName: dto.project_name,
     workloadHours: Number.isNaN(workload) ? null : workload,
+    includeInReportedCost: dto.include_in_reported_cost,
   };
 }
 
@@ -429,7 +441,11 @@ export async function getProjectInterns(projectId: number, search?: string): Pro
   return parseJson<ProjectInternAssignmentDTO[]>(res);
 }
 
-export type ProjectInternUpdatePayload = { internId: number; workloadHours: number | null };
+export type ProjectInternUpdatePayload = {
+  internId: number;
+  workloadHours: number | null;
+  includeInReportedCost: boolean;
+};
 
 export async function updateProjectInterns(projectId: number, interns: ProjectInternUpdatePayload[]): Promise<void> {
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/interns`, {

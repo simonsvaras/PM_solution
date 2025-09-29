@@ -139,7 +139,11 @@ public class InternService {
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(row.id()));
         List<InternProjectRow> projects = dao.listProjectsForIntern(id);
         List<InternProjectAllocationResponse> allocations = projects.stream()
-                .map(p -> new InternProjectAllocationResponse(p.projectId(), p.projectName(), p.workloadHours()))
+                .map(p -> new InternProjectAllocationResponse(
+                        p.projectId(),
+                        p.projectName(),
+                        p.workloadHours(),
+                        p.includeInReportedCost()))
                 .toList();
         InternOverviewResponse base = toOverviewResponse(row, groupMap.getOrDefault(row.id(), List.of()));
         return new InternDetailResponse(

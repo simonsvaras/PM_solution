@@ -37,9 +37,12 @@ public class ProjectInternController {
                                       String levelLabel,
                                       List<InternGroupDto> groups,
                                       java.math.BigDecimal workloadHours,
+                                      boolean includeInReportedCost,
                                       boolean assigned) {}
 
-    public record UpdateInternAssignment(Long internId, java.math.BigDecimal workloadHours) {}
+    public record UpdateInternAssignment(Long internId,
+                                         java.math.BigDecimal workloadHours,
+                                         Boolean includeInReportedCost) {}
 
     public record UpdateInternsRequest(List<UpdateInternAssignment> interns) {}
 
@@ -61,6 +64,7 @@ public class ProjectInternController {
                         .map(g -> new InternGroupDto(g.id(), g.code(), g.label()))
                         .toList(),
                 row.workloadHours(),
+                row.includeInReportedCost(),
                 row.assigned()
         )).toList();
     }
@@ -71,7 +75,7 @@ public class ProjectInternController {
         if (req == null || req.interns() == null) {
             throw new IllegalArgumentException("interns je povinné pole.");
         }
-        Map<Long, java.math.BigDecimal> unique = new LinkedHashMap<>();
+        Map<Long, InternDao.ProjectInternAllocation> unique = new LinkedHashMap<>();
         for (UpdateInternAssignment assignment : req.interns()) {
             if (assignment == null || assignment.internId() == null) {
                 throw new IllegalArgumentException("internId je povinné pole.");
@@ -80,12 +84,11 @@ public class ProjectInternController {
             if (workload != null && workload.compareTo(java.math.BigDecimal.ZERO) < 0) {
                 throw new IllegalArgumentException("workloadHours nesmí být záporné.");
             }
-            unique.put(assignment.internId(), workload);
+            boolean includeCost = assignment.includeInReportedCost() == null || assignment.includeInReportedCost();
+            unique.put(assignment.internId(),
+                    new InternDao.ProjectInternAllocation(assignment.internId(), workload, includeCost));
         }
-        List<InternDao.ProjectInternAllocation> allocations = unique.entrySet().stream()
-                .map(e -> new InternDao.ProjectInternAllocation(e.getKey(), e.getValue()))
-                .toList();
-        internDao.replaceProjectInterns(projectId, allocations);
+        internDao.replaceProjectInterns(projectId, List.copyOf(unique.values()));
     }
 }
 
