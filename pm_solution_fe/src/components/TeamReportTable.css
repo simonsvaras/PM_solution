@@ -60,6 +60,17 @@
   color: var(--color-text-muted);
 }
 
+.teamReport__message {
+  margin: 0;
+  text-align: center;
+  padding: 24px 0;
+  color: var(--color-text-muted);
+}
+
+.teamReport__message--error {
+  color: #d1434b;
+}
+
 @media (max-width: 720px) {
   .teamReport__tableWrapper {
     padding-left: 16px;

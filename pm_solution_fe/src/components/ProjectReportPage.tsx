@@ -1,7 +1,8 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import './ProjectReportPage.css';
-import type { ProjectOverviewDTO, SyncSummary } from '../api';
-import { syncProjectReports, type ErrorResponse } from '../api';
+import TeamReportTable from './TeamReportTable';
+import type { ProjectOverviewDTO, SyncSummary, TeamReportTeam, ErrorResponse } from '../api';
+import { getReportTeams, syncProjectReports } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
 
 type ProjectReportPageProps = {
@@ -21,11 +22,84 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [team, setTeam] = useState<TeamReportTeam | null>(null);
+  const [teamStatus, setTeamStatus] = useState<'idle' | 'loading' | 'loaded'>('idle');
+  const [teamError, setTeamError] = useState<ErrorResponse | null>(null);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
     [],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    setTeamStatus('loading');
+    setTeamError(null);
+    setTeam(null);
+
+    getReportTeams()
+      .then(teams => {
+        if (cancelled) return;
+        const matchedTeam = teams.find(item => item.projectId === project.id) ?? null;
+        setTeam(matchedTeam);
+        setTeamStatus('loaded');
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setTeamError(err as ErrorResponse);
+        setTeamStatus('loaded');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  const teamTitle = team?.projectName ?? project.name;
+  const teamErrorMessage = teamError?.error?.message ?? 'Report týmu se nepodařilo načíst.';
+
+  const teamCard = (() => {
+    if (teamStatus !== 'loaded') {
+      return (
+        <article className="teamReport" aria-busy="true" aria-label={`Tým ${teamTitle}`}>
+          <header className="teamReport__header">
+            <h2>{teamTitle}</h2>
+          </header>
+          <div className="teamReport__tableWrapper">
+            <p className="teamReport__message">Načítám složení týmu…</p>
+          </div>
+        </article>
+      );
+    }
+
+    if (teamError) {
+      return (
+        <article className="teamReport" role="alert" aria-label={`Tým ${teamTitle}`}>
+          <header className="teamReport__header">
+            <h2>{teamTitle}</h2>
+          </header>
+          <div className="teamReport__tableWrapper">
+            <p className="teamReport__message teamReport__message--error">{teamErrorMessage}</p>
+          </div>
+        </article>
+      );
+    }
+
+    if (team) {
+      return <TeamReportTable team={team} />;
+    }
+
+    return (
+      <article className="teamReport" aria-label={`Tým ${teamTitle}`}>
+        <header className="teamReport__header">
+          <h2>{teamTitle}</h2>
+        </header>
+        <div className="teamReport__tableWrapper">
+          <p className="teamReport__message">V projektu nejsou přiřazení žádní stážisté.</p>
+        </div>
+      </article>
+    );
+  })();
 
   function toIsoOrUndefined(value: string): string | undefined {
     if (!value) return undefined;
@@ -80,86 +154,89 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
   }
 
   return (
-    <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
-      <div className="projectReport__toolbar">
-        <button type="button" className="projectReport__backButton" onClick={onBack}>
-          ← Zpět na projekty
-        </button>
-        <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
-          Zobrazit detailní report
-        </button>
-      </div>
-      <div className="projectReport__card projectReport__overviewCard">
-        <div className="projectReport__overviewHeader">
-          <h2>Otevřené issue</h2>
-          <p className="projectReport__metric">{project.openIssues}</p>
+    <div className="projectReportPage">
+      {teamCard}
+      <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
+        <div className="projectReport__toolbar">
+          <button type="button" className="projectReport__backButton" onClick={onBack}>
+            ← Zpět na projekty
+          </button>
+          <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
+            Zobrazit detailní report
+          </button>
         </div>
-        <BudgetBurnIndicator
-          budget={project.budget}
-          reportedCost={project.reportedCost}
-          currencyFormatter={currencyFormatter}
-        />
-      </div>
-      <div className="projectReport__card projectReport__syncCard">
-        <div className="projectReport__syncHeader">
-          <h2>Synchronizace výkazů</h2>
-          <p className="projectReport__syncDescription">
-            Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
-          </p>
-          <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
-        </div>
-        <label className="projectReport__checkbox">
-          <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
-          Synchronizovat data jen od poslední synchronizace
-        </label>
-        <div className="projectReport__range" aria-disabled={sinceLast}>
-          <label>
-            <span>Od</span>
-            <input
-              type="datetime-local"
-              value={fromValue}
-              onChange={event => setFromValue(event.target.value)}
-              disabled={sinceLast}
-            />
-          </label>
-          <label>
-            <span>Do</span>
-            <input
-              type="datetime-local"
-              value={toValue}
-              onChange={event => setToValue(event.target.value)}
-              disabled={sinceLast}
-            />
-          </label>
-        </div>
-        {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
-        {syncSummary ? (
-          <p className="projectReport__status projectReport__status--success">
-            Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
-            {syncSummary.durationMs} ms.
-          </p>
-        ) : null}
-        {syncSummary && syncSummary.missingUsernames.length > 0 ? (
-          <div className="projectReport__missing">
-            <p className="projectReport__missingTitle">
-              Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
-            </p>
-            <ul className="projectReport__missingList">
-              {syncSummary.missingUsernames.map(username => (
-                <li key={username}>{username}</li>
-              ))}
-            </ul>
+        <div className="projectReport__card projectReport__overviewCard">
+          <div className="projectReport__overviewHeader">
+            <h2>Otevřené issue</h2>
+            <p className="projectReport__metric">{project.openIssues}</p>
           </div>
-        ) : null}
-        <button
-          type="button"
-          className="projectReport__syncButton"
-          onClick={handleSync}
-          disabled={syncing}
-        >
-          {syncing ? 'Synchronizuji…' : 'Synchronizovat výkazy'}
-        </button>
-      </div>
-    </section>
+          <BudgetBurnIndicator
+            budget={project.budget}
+            reportedCost={project.reportedCost}
+            currencyFormatter={currencyFormatter}
+          />
+        </div>
+        <div className="projectReport__card projectReport__syncCard">
+          <div className="projectReport__syncHeader">
+            <h2>Synchronizace výkazů</h2>
+            <p className="projectReport__syncDescription">
+              Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
+            </p>
+            <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
+          </div>
+          <label className="projectReport__checkbox">
+            <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
+            Synchronizovat data jen od poslední synchronizace
+          </label>
+          <div className="projectReport__range" aria-disabled={sinceLast}>
+            <label>
+              <span>Od</span>
+              <input
+                type="datetime-local"
+                value={fromValue}
+                onChange={event => setFromValue(event.target.value)}
+                disabled={sinceLast}
+              />
+            </label>
+            <label>
+              <span>Do</span>
+              <input
+                type="datetime-local"
+                value={toValue}
+                onChange={event => setToValue(event.target.value)}
+                disabled={sinceLast}
+              />
+            </label>
+          </div>
+          {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
+          {syncSummary ? (
+            <p className="projectReport__status projectReport__status--success">
+              Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
+              {syncSummary.durationMs} ms.
+            </p>
+          ) : null}
+          {syncSummary && syncSummary.missingUsernames.length > 0 ? (
+            <div className="projectReport__missing">
+              <p className="projectReport__missingTitle">
+                Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
+              </p>
+              <ul className="projectReport__missingList">
+                {syncSummary.missingUsernames.map(username => (
+                  <li key={username}>{username}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="projectReport__syncButton"
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing ? 'Synchronizuji…' : 'Synchronizovat výkazy'}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
