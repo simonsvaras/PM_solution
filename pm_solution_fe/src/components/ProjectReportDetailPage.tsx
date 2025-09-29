@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import './ProjectReportDetailPage.css';
 import InfoCard from './InfoCard';
 import type {
@@ -350,6 +350,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
   );
 
   const MIN_BAR_HEIGHT_PERCENT = 12; // keep small non-zero values visible
+  const CHART_BAR_AREA_HEIGHT_PX = 200;
 
   function getBarHeight(value: number | null | undefined, scale: number) {
     if (!value || value <= 0) {
@@ -576,6 +577,16 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                   const expectedValueText =
                     expectedDisplay === '—' ? '—' : `${expectedDisplay} h`;
                   const itemLabel = `@${item.username}`;
+                  const chartBarsStyle = {
+                    '--chart-bars-height': `${CHART_BAR_AREA_HEIGHT_PX}px`,
+                    '--chart-bar-max-value': itemScale || 0,
+                  } as CSSProperties;
+                  const actualWrapperStyle = {
+                    '--chart-bar-height': actualHeight,
+                  } as CSSProperties;
+                  const expectedWrapperStyle = {
+                    '--chart-bar-height': expectedHeight,
+                  } as CSSProperties;
                   const ariaLabelParts = [
                     `${item.label} (${itemLabel})`,
                     `vykázáno ${actualValueText}`,
@@ -594,20 +605,28 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                       role="listitem"
                       aria-label={ariaLabelParts.join(', ')}
                     >
-                      <div className="projectReportDetail__chartBars" aria-hidden="true">
-                        <div className="projectReportDetail__chartBarWrapper">
+                      <div
+                        className="projectReportDetail__chartBars"
+                        aria-hidden="true"
+                        style={chartBarsStyle}
+                      >
+                        <div
+                          className="projectReportDetail__chartBarWrapper"
+                          style={actualWrapperStyle}
+                        >
                           <div
                             className="projectReportDetail__chartBar projectReportDetail__chartBar--actual"
-                            style={{ height: `${actualHeight}%` }}
                           >
                             <span className="projectReportDetail__chartBarValue">{actualValueText}</span>
                           </div>
                         </div>
                         {chartHasExpectedData ? (
-                          <div className="projectReportDetail__chartBarWrapper">
+                          <div
+                            className="projectReportDetail__chartBarWrapper"
+                            style={expectedWrapperStyle}
+                          >
                             <div
                               className="projectReportDetail__chartBar projectReportDetail__chartBar--expected"
-                              style={{ height: `${expectedHeight}%` }}
                             >
                               <span className="projectReportDetail__chartBarValue">{expectedValueText}</span>
                             </div>

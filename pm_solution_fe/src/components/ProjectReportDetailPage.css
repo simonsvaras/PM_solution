@@ -437,6 +437,7 @@
   gap: 12px;
   width: 100%;
   min-height: 160px;
+  height: var(--chart-bars-height, 200px);
 }
 
 .projectReportDetail__chartBarWrapper {
@@ -444,6 +445,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  height: calc(var(--chart-bar-height, 0) * 1%);
 }
 
 .projectReportDetail__chartBar {
@@ -457,6 +459,7 @@
   padding: 12px 8px 8px;
   box-sizing: border-box;
   transition: transform 120ms ease;
+  height: 100%;
 }
 
 .projectReportDetail__chartBar--actual {
