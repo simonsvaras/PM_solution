@@ -418,41 +418,43 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
               <span>Zobrazit částky</span>
             </label>
           </div>
-
-          {availableInterns.length > 0 ? (
-            <div className="projectReportDetail__internFilters" role="group" aria-label="Filtr stážistů">
-              <button
-                type="button"
-                className={`projectReportDetail__internButton${selectedInternUsername === null ? ' projectReportDetail__internButton--active' : ''}`}
-                onClick={() => handleInternFilterChange(null)}
-                disabled={loading}
-                aria-pressed={selectedInternUsername === null}
-              >
-                Všichni
-              </button>
-              {availableInterns.map(intern => {
-                const isActive = selectedInternUsername === intern.username;
-                return (
-                  <button
-                    type="button"
-                    key={intern.id}
-                    className={`projectReportDetail__internButton${isActive ? ' projectReportDetail__internButton--active' : ''}`}
-                    onClick={() => handleInternFilterChange(intern.username)}
-                    disabled={loading}
-                    aria-pressed={isActive}
-                  >
-                    @{intern.username}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
         </div>
         <div className="projectReportDetail__summary" aria-label="Souhrn období">
           <InfoCard title="Celkové vykázané hodiny" value={overallHoursDisplay} />
           <InfoCard title="Celkové náklady" value={overallCostDisplay} />
         </div>
       </header>
+
+      {availableInterns.length > 0 ? (
+        <div className="projectReportDetail__internFiltersWrapper">
+          <div className="projectReportDetail__internFilters" role="group" aria-label="Filtr stážistů">
+            <button
+              type="button"
+              className={`projectReportDetail__internButton${selectedInternUsername === null ? ' projectReportDetail__internButton--active' : ''}`}
+              onClick={() => handleInternFilterChange(null)}
+              disabled={loading}
+              aria-pressed={selectedInternUsername === null}
+            >
+              Všichni
+            </button>
+            {availableInterns.map(intern => {
+              const isActive = selectedInternUsername === intern.username;
+              return (
+                <button
+                  type="button"
+                  key={intern.id}
+                  className={`projectReportDetail__internButton${isActive ? ' projectReportDetail__internButton--active' : ''}`}
+                  onClick={() => handleInternFilterChange(intern.username)}
+                  disabled={loading}
+                  aria-pressed={isActive}
+                >
+                  @{intern.username}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="projectReportDetail__body">
         {internsError ? (
