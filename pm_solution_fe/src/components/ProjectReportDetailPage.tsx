@@ -349,8 +349,6 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     [chartData],
   );
 
-  const chartScale = chartMaxValue > 0 ? chartMaxValue : 1;
-
   function renderCell(hours?: number | null, cost?: number | null) {
     const formattedHours = formatHours(hours);
     const formattedCost = formatCost(cost);
@@ -556,9 +554,11 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                   const actualDisplay = formatHours(item.actualHours);
                   const expectedDisplay =
                     item.expectedHours !== null ? formatHours(item.expectedHours) : '—';
-                  const actualHeight = Math.max(0, (item.actualHours / chartScale) * 100);
+                  const itemMaxValue = Math.max(item.actualHours, item.expectedHours ?? 0, 0);
+                  const itemScale = itemMaxValue > 0 ? itemMaxValue : 1;
+                  const actualHeight = Math.max(0, (item.actualHours / itemScale) * 100);
                   const expectedHeight =
-                    item.expectedHours !== null ? Math.max(0, (item.expectedHours / chartScale) * 100) : 0;
+                    item.expectedHours !== null ? Math.max(0, (item.expectedHours / itemScale) * 100) : 0;
                   const actualValueText = actualDisplay === '—' ? '0 h' : `${actualDisplay} h`;
                   const expectedValueText =
                     expectedDisplay === '—' ? '—' : `${expectedDisplay} h`;
