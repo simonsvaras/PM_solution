@@ -8,6 +8,7 @@ import ProjectReportPage from './components/ProjectReportPage';
 import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
+import ReportsTeamsPage from './components/ReportsTeamsPage';
 import { API_BASE, deleteReports, getProjects, getProjectsOverview, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
 import type { AllResult, ErrorResponse, ProjectDTO, ProjectOverviewDTO, SyncSummary } from './api';
 
@@ -311,6 +312,7 @@ function App() {
   const isInternsOverview = activeSubmoduleKey === 'interns-overview';
   const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
   const isReportsOverview = activeSubmoduleKey === 'reports-overview';
+  const isReportsTeams = activeSubmoduleKey === 'reports-teams';
   const isReportsProject = activeModuleKey === 'reports' && selectedReportProject !== null;
   const isReportsProjectSummary = isReportsProject && !showReportDetail;
   const isReportsProjectDetail = isReportsProject && showReportDetail;
@@ -339,12 +341,15 @@ function App() {
     headerDescription = 'Vyberte projekt a zobrazte jeho detailní report.';
   } else if (isReportsProjectSummary) {
     headerDescription = 'Souhrn otevřených issue vybraného projektu.';
+  } else if (isReportsTeams) {
+    headerDescription = 'Zobrazte složení týmů a jejich úvazky na projektech.';
   } else if (
     !isOnDemand &&
     !isProjectsOverview &&
     !isProjectsAdmin &&
     !isInternsAdmin &&
-    !isReportsOverview
+    !isReportsOverview &&
+    !isReportsTeams
   ) {
     headerDescription = 'Tato sekce bude dostupná v dalších verzích aplikace.';
   }
@@ -750,6 +755,8 @@ function App() {
             <InternsPage />
           ) : isReportsOverview ? (
             <ReportsOverviewPage onSelectProject={handleSelectReportProject} />
+          ) : isReportsTeams ? (
+            <ReportsTeamsPage />
           ) : (
             <section className="panel panel--placeholder">
               <div className="panel__body">

@@ -131,6 +131,29 @@ export type InternProjectAllocation = { projectId: number; projectName: string; 
 export type InternDetailDTO = InternOverviewDTO & { projects: InternProjectAllocationDTO[] };
 export type InternDetail = InternOverview & { projects: InternProjectAllocation[] };
 
+export type TeamReportInternDTO = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  levelId: number;
+  levelLabel: string;
+  workloadHours: number | string | null;
+  groups: InternGroupDTO[];
+};
+export type TeamReportTeamDTO = { projectId: number; projectName: string; interns: TeamReportInternDTO[] };
+export type TeamReportIntern = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  levelId: number;
+  levelLabel: string;
+  workloadHours: number | null;
+  groups: InternGroup[];
+};
+export type TeamReportTeam = { projectId: number; projectName: string; interns: TeamReportIntern[] };
+
 export type InternLevelHistoryEntry = {
   id: number;
   levelId: number;
@@ -238,6 +261,29 @@ function mapInternOverview(dto: InternOverviewDTO): InternOverview {
   };
 }
 
+function mapTeamReportIntern(dto: TeamReportInternDTO): TeamReportIntern {
+  const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
+  const workloadRaw = parseNumber(dto.workloadHours);
+  return {
+    id: dto.id,
+    firstName: dto.firstName,
+    lastName: dto.lastName,
+    username: dto.username,
+    levelId: dto.levelId,
+    levelLabel: dto.levelLabel,
+    workloadHours: Number.isNaN(workloadRaw) ? null : workloadRaw,
+    groups,
+  };
+}
+
+function mapTeamReportTeam(dto: TeamReportTeamDTO): TeamReportTeam {
+  return {
+    projectId: dto.projectId,
+    projectName: dto.projectName,
+    interns: (dto.interns ?? []).map(mapTeamReportIntern),
+  };
+}
+
 function mapInternProjectAllocation(dto: InternProjectAllocationDTO): InternProjectAllocation {
   const workload = parseNumber(dto.workload_hours);
   return {
@@ -276,6 +322,13 @@ export async function getProjectsOverview(): Promise<ProjectOverviewDTO[]> {
   const res = await fetch(`${API_BASE}/api/projects/overview`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectOverviewDTO[]>(res);
+}
+
+export async function getReportTeams(): Promise<TeamReportTeam[]> {
+  const res = await fetch(`${API_BASE}/api/reports/teams`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<TeamReportTeamDTO[]>(res);
+  return data.map(mapTeamReportTeam);
 }
 
 export async function createProjectByName(payload: ProjectBudgetPayload): Promise<ProjectDTO> {

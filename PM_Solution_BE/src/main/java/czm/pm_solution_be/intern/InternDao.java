@@ -58,6 +58,16 @@ public class InternDao {
     public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {}
     public record PageResult(List<InternRow> rows, long totalElements) {}
     public record ProjectInternAllocation(long internId, BigDecimal workloadHours) {}
+    public record ProjectTeamRow(long projectId,
+                                 String projectName,
+                                 long internId,
+                                 String firstName,
+                                 String lastName,
+                                 String username,
+                                 long levelId,
+                                 String levelCode,
+                                 String levelLabel,
+                                 BigDecimal workloadHours) {}
 
     private static final RowMapper<InternRow> INTERN_MAPPER = new RowMapper<>() {
         @Override
@@ -402,6 +412,37 @@ public class InternDao {
                 rs.getBigDecimal("workload_hours"),
                 rs.getBoolean("assigned")),
                 params.toArray());
+    }
+
+    public List<ProjectTeamRow> listProjectTeams() {
+        String sql = """
+                SELECT p.id AS project_id,
+                       p.name AS project_name,
+                       i.id AS intern_id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.code AS level_code,
+                       l.label AS level_label,
+                       ip.workload_hours
+                FROM project p
+                JOIN intern_project ip ON ip.project_id = p.id
+                JOIN intern i ON i.id = ip.intern_id
+                JOIN level l ON l.id = i.level_id
+                ORDER BY p.name ASC, i.last_name ASC, i.first_name ASC, i.id ASC
+                """;
+        return jdbc.query(sql, (rs, rn) -> new ProjectTeamRow(
+                rs.getLong("project_id"),
+                rs.getString("project_name"),
+                rs.getLong("intern_id"),
+                rs.getString("first_name"),
+                rs.getString("last_name"),
+                rs.getString("username"),
+                rs.getLong("level_id"),
+                rs.getString("level_code"),
+                rs.getString("level_label"),
+                rs.getBigDecimal("workload_hours")));
     }
 
     public void replaceProjectInterns(long projectId, List<ProjectInternAllocation> assignments) {
