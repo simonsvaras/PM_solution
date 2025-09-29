@@ -17,6 +17,15 @@ function formatWorkload(value: number | null): string {
 
 export default function TeamReportTable({ team }: TeamReportTableProps) {
   const hasInterns = team.interns.length > 0;
+  const hasWorkloadData = team.interns.some(
+    intern => intern.workloadHours !== null && !Number.isNaN(intern.workloadHours),
+  );
+  const totalWorkload = hasWorkloadData
+    ? team.interns.reduce((sum, intern) => {
+        if (intern.workloadHours === null || Number.isNaN(intern.workloadHours)) return sum;
+        return sum + intern.workloadHours;
+      }, 0)
+    : null;
 
   return (
     <article className="teamReport" aria-label={`Tým ${team.projectName}`}>
@@ -35,18 +44,26 @@ export default function TeamReportTable({ team }: TeamReportTableProps) {
           </thead>
           <tbody>
             {hasInterns ? (
-              team.interns.map(intern => {
-                const fullName = `${intern.firstName} ${intern.lastName}`.trim();
-                const groups = intern.groups.map(group => group.label);
-                return (
-                  <tr key={intern.id}>
-                    <th scope="row">{fullName || intern.username}</th>
-                    <td>{intern.levelLabel}</td>
-                    <td>{formatGroups(groups)}</td>
-                    <td className="teamReport__numeric">{formatWorkload(intern.workloadHours)}</td>
-                  </tr>
-                );
-              })
+              <>
+                {team.interns.map(intern => {
+                  const fullName = `${intern.firstName} ${intern.lastName}`.trim();
+                  const groups = intern.groups.map(group => group.label);
+                  return (
+                    <tr key={intern.id}>
+                      <th scope="row">{fullName || intern.username}</th>
+                      <td>{intern.levelLabel}</td>
+                      <td>{formatGroups(groups)}</td>
+                      <td className="teamReport__numeric">{formatWorkload(intern.workloadHours)}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="teamReport__summary">
+                  <th scope="row" colSpan={3}>
+                    Celkem
+                  </th>
+                  <td className="teamReport__numeric">{formatWorkload(totalWorkload)}</td>
+                </tr>
+              </>
             ) : (
               <tr>
                 <td colSpan={4} className="teamReport__empty">V týmu nejsou přiřazení žádní stážisté.</td>
