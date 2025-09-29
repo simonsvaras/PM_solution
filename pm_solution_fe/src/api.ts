@@ -100,6 +100,14 @@ export type InternListResponseDTO = {
 export type InternGroup = { id: number; code: number; label: string };
 export type Intern = { id: number; firstName: string; lastName: string; username: string; levelId: number; levelLabel: string; groups: InternGroup[] };
 export type InternListResult = { content: Intern[]; page: number; size: number; totalElements: number; totalPages: number };
+export type InternLevelHistoryEntryDTO = {
+  id: number;
+  level_id: number;
+  level_code: string;
+  level_label: string;
+  valid_from: string;
+  valid_to: string | null;
+};
 export type InternLevelHistoryPayload = { levelId: number; validFrom: string; validTo: string | null };
 export type InternPayload = { firstName: string; lastName: string; username: string; groupIds: number[]; levelHistory: InternLevelHistoryPayload[] };
 export type InternGroupDTO = { id: number; code: number; label: string };
@@ -626,10 +634,22 @@ export async function updateIntern(id: number, payload: InternPayload): Promise<
   return mapIntern(data);
 }
 
+function mapInternLevelHistoryEntry(dto: InternLevelHistoryEntryDTO): InternLevelHistoryEntry {
+  return {
+    id: dto.id,
+    levelId: dto.level_id,
+    levelCode: dto.level_code,
+    levelLabel: dto.level_label,
+    validFrom: dto.valid_from,
+    validTo: dto.valid_to,
+  };
+}
+
 export async function getInternLevelHistory(id: number): Promise<InternLevelHistoryEntry[]> {
   const res = await fetch(`${API_BASE}/api/interns/${id}/levels/history`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
-  return parseJson<InternLevelHistoryEntry[]>(res);
+  const data = await parseJson<InternLevelHistoryEntryDTO[]>(res);
+  return data.map(mapInternLevelHistoryEntry);
 }
 
 /**
