@@ -7,8 +7,17 @@
 
 .internsOverview__summary {
   display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.internsOverview__summary > div {
+  display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1 1 280px;
 }
 
 .internsOverview__summary h2 {
@@ -21,6 +30,35 @@
   margin: 0;
   font-size: 1rem;
   color: #374151;
+}
+
+.internsOverview__searchLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1 1 260px;
+  max-width: 340px;
+}
+
+.internsOverview__searchLabelText {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.internsOverview__searchInput {
+  appearance: none;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.internsOverview__searchInput:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .internsOverview__grid {
@@ -46,6 +84,14 @@
 
 .internsOverview__error h2 {
   margin-top: 0;
+}
+
+.internsOverview__empty {
+  padding: 2rem;
+  text-align: center;
+  background: #f3f4f6;
+  border-radius: 12px;
+  color: #1f2937;
 }
 
 .internsOverview__modalContent {
@@ -107,8 +153,50 @@
   color: #1f2937;
 }
 
+.internsOverview__pagination {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.internsOverview__pagination p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.internsOverview__paginationButton {
+  appearance: none;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.internsOverview__paginationButton:disabled {
+  background: #93c5fd;
+  border-color: #93c5fd;
+  cursor: not-allowed;
+  color: #1e3a8a;
+}
+
+.internsOverview__paginationButton:not(:disabled):hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
 @media (max-width: 768px) {
   .internsOverview {
     padding: 1.5rem 1rem;
+  }
+
+  .internsOverview__summary {
+    gap: 1rem;
   }
 }

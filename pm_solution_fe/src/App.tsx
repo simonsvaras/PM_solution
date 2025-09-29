@@ -375,7 +375,7 @@ function App() {
     !isReportsOverview &&
     !isReportsTeams
   ) {
-    headerDescription = 'Tato sekce bude dostupná v dalších verzích aplikace.';
+    headerDescription = 'Vyberte modul z navigace a zpřístupněte si funkce, které potřebujete pro správu projektů a stážistů.';
   }
 
   const detailNavigationItems: { view: DetailSectionView; label: string }[] = [
