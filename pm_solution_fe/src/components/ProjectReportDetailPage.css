@@ -105,6 +105,26 @@
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
+.projectReportDetail__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.projectReportDetail__toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent-strong);
+}
+
+.projectReportDetail__toggle span {
+  font-size: 0.9rem;
+}
+
 .projectReportDetail__filters button:hover:not(:disabled),
 .projectReportDetail__filters button:focus-visible:not(:disabled) {
   transform: translateY(-1px);
@@ -333,6 +353,10 @@
   flex-direction: column;
   gap: 6px;
   align-items: flex-end;
+}
+
+.projectReportDetail__cell--hoursOnly {
+  gap: 0;
 }
 
 .projectReportDetail__cellValue {

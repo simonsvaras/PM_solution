@@ -88,6 +88,7 @@ type StoredReportState = {
   toValue: string;
   selectedInternUsername: string | null;
   report: ProjectReportDetailResponse | null;
+  showCosts: boolean;
 };
 
 export default function ProjectReportDetailPage({ project, onBack, onCloseDetail }: ProjectReportDetailPageProps) {
@@ -100,6 +101,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
   const [availableInterns, setAvailableInterns] = useState<ReportInternWithWorkload[]>([]);
   const [internsError, setInternsError] = useState<string | null>(null);
   const [selectedInternUsername, setSelectedInternUsername] = useState<string | null>(null);
+  const [showCosts, setShowCosts] = useState(true);
   const storageKey = useMemo(() => `project-report-detail:${project.id}`, [project.id]);
 
   useEffect(() => {
@@ -126,6 +128,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
       if (typeof stored.fromValue === 'string') setFromValue(stored.fromValue);
       if (typeof stored.toValue === 'string') setToValue(stored.toValue);
       setSelectedInternUsername(stored.selectedInternUsername ?? null);
+      if (typeof stored.showCosts === 'boolean') setShowCosts(stored.showCosts);
       if (stored.report) {
         const storedReport = stored.report;
         setReport(storedReport);
@@ -173,13 +176,14 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
       toValue,
       selectedInternUsername,
       report,
+      showCosts,
     };
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(stored));
     } catch (err) {
       console.warn('Nepodařilo se uložit stav detailu reportu', err);
     }
-  }, [storageKey, fromValue, toValue, selectedInternUsername, report]);
+  }, [storageKey, fromValue, toValue, selectedInternUsername, report, showCosts]);
 
   const totals = useMemo(() => {
     if (!report) {
@@ -370,12 +374,16 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
     const formattedCost = formatCost(cost);
     const displayHours = formattedHours === '—' ? formattedHours : `${formattedHours} h`;
     return (
-      <div className="projectReportDetail__cell">
+      <div className={`projectReportDetail__cell${showCosts ? '' : ' projectReportDetail__cell--hoursOnly'}`}>
         <span className="projectReportDetail__cellValue projectReportDetail__cellValue--hours">{displayHours}</span>
-        <span className="projectReportDetail__cellValue projectReportDetail__cellValue--cost">{formattedCost}</span>
+        {showCosts ? (
+          <span className="projectReportDetail__cellValue projectReportDetail__cellValue--cost">{formattedCost}</span>
+        ) : null}
       </div>
     );
   }
+
+  const tableHeaderNote = showCosts ? 'Hodiny / Náklady' : 'Hodiny';
 
   return (
     <section className="projectReportDetail" aria-label={`Detailní report projektu ${project.name}`}>
@@ -401,6 +409,14 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
             <button type="button" onClick={handleLoad} disabled={loading}>
               {loading ? 'Načítám…' : 'Načíst'}
             </button>
+            <label className="projectReportDetail__toggle">
+              <input
+                type="checkbox"
+                checked={showCosts}
+                onChange={event => setShowCosts(event.target.checked)}
+              />
+              <span>Zobrazit částky</span>
+            </label>
           </div>
 
           {availableInterns.length > 0 ? (
@@ -470,12 +486,12 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                       <th scope="col" key={intern.id}>
                         <span className="projectReportDetail__internName">{intern.firstName} {intern.lastName}</span>
                         <span className="projectReportDetail__internUsername">@{intern.username}</span>
-                        <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
+                        <span className="projectReportDetail__headerNote">{tableHeaderNote}</span>
                       </th>
                     ))}
                     <th scope="col" className="projectReportDetail__totalHeader">
                       <span>Celkem</span>
-                      <span className="projectReportDetail__headerNote">Hodiny / Náklady</span>
+                      <span className="projectReportDetail__headerNote">{tableHeaderNote}</span>
                     </th>
                   </tr>
                 </thead>
