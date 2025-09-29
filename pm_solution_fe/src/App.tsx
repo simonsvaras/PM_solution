@@ -6,6 +6,8 @@ import ProjectsOverviewPage from './components/ProjectsOverviewPage';
 import ReportsOverviewPage from './components/ReportsOverviewPage';
 import ProjectReportPage from './components/ProjectReportPage';
 import ProjectReportDetailPage from './components/ProjectReportDetailPage';
+import ProjectReportInternDetailPage from './components/ProjectReportInternDetailPage';
+import ProjectReportProjectDetailPage from './components/ProjectReportProjectDetailPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
@@ -57,7 +59,13 @@ const modules: Module[] = [
   },
 ];
 
-type ReportDetailView = 'summary' | 'detail';
+type ReportDetailView = 'summary' | 'detail' | 'detail-intern' | 'detail-project';
+
+type DetailSectionView = Exclude<ReportDetailView, 'summary'>;
+
+function isReportDetailView(value: string | null): value is ReportDetailView {
+  return value === 'summary' || value === 'detail' || value === 'detail-intern' || value === 'detail-project';
+}
 
 type ParsedRoute = {
   moduleKey?: string | null;
@@ -81,7 +89,7 @@ function parseRoute(search: string): ParsedRoute {
   const viewParam = params.get('view');
   const parsedId = projectIdParam !== null ? Number.parseInt(projectIdParam, 10) : null;
   const projectId = Number.isNaN(parsedId) ? null : parsedId;
-  const view = viewParam === 'detail' || viewParam === 'summary' ? (viewParam as ReportDetailView) : null;
+  const view = isReportDetailView(viewParam) ? viewParam : null;
   return { moduleKey, submoduleKey, projectId, view };
 }
 
@@ -101,13 +109,16 @@ function normalizeRoute(route: ParsedRoute): NormalizedRoute {
   const projectId = isReportsOverview && typeof route.projectId === 'number' && !Number.isNaN(route.projectId)
     ? route.projectId
     : null;
-  const view: ReportDetailView | null = isReportsOverview
-    ? route.view === 'detail'
-      ? 'detail'
-      : projectId !== null
-      ? 'summary'
-      : null
-    : null;
+  let view: ReportDetailView | null = null;
+  if (isReportsOverview) {
+    if (projectId === null) {
+      view = null;
+    } else if (route.view && route.view !== 'summary') {
+      view = route.view;
+    } else {
+      view = 'summary';
+    }
+  }
 
   return {
     moduleKey: moduleDef.key,
@@ -158,7 +169,7 @@ function App() {
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   // Keeps track of the project whose report detail is currently displayed.
   const [selectedReportProject, setSelectedReportProject] = useState<ProjectOverviewDTO | null>(null);
-  const [showReportDetail, setShowReportDetail] = useState(initialRoute.view === 'detail');
+  const [reportView, setReportView] = useState<ReportDetailView | null>(initialRoute.view);
   const [purgingReports, setPurgingReports] = useState(false);
   const [availableProjects, setAvailableProjects] = useState<ProjectDTO[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -237,7 +248,7 @@ function App() {
           setSelectedReportProject(found);
         } else {
           setSelectedReportProject(null);
-          setShowReportDetail(false);
+          setReportView(null);
           pushRoute(
             normalizeRoute({
               moduleKey: activeModuleKey,
@@ -251,7 +262,7 @@ function App() {
       } catch (err) {
         console.error('Nepodařilo se načíst přehled projektu pro report', err);
         setSelectedReportProject(null);
-        setShowReportDetail(false);
+        setReportView(null);
       } finally {
         if (!ignore) {
           setPendingReportProjectId(null);
@@ -278,7 +289,7 @@ function App() {
       const nextRoute = normalizeRoute(parseRoute(window.location.search));
       setActiveModuleKey(nextRoute.moduleKey);
       setActiveSubmoduleKey(nextRoute.submoduleKey);
-      setShowReportDetail(nextRoute.view === 'detail');
+      setReportView(nextRoute.view);
       setPendingReportProjectId(nextRoute.projectId);
       if (nextRoute.projectId === null) {
         setSelectedReportProject(null);
@@ -314,21 +325,34 @@ function App() {
   const isReportsOverview = activeSubmoduleKey === 'reports-overview';
   const isReportsTeams = activeSubmoduleKey === 'reports-teams';
   const isReportsProject = activeModuleKey === 'reports' && selectedReportProject !== null;
-  const isReportsProjectSummary = isReportsProject && !showReportDetail;
-  const isReportsProjectDetail = isReportsProject && showReportDetail;
+  const isReportsProjectSummary =
+    isReportsProject && (reportView === 'summary' || reportView === null || reportView === undefined);
+  const isReportsProjectDetail = isReportsProject && reportView !== null && reportView !== 'summary';
 
   const headerEyebrow =
     isReportsProjectDetail && selectedReportProject ? selectedReportProject.name : activeModule?.name ?? '';
   let headerTitle = activeSubmodule?.name ?? activeModule?.name ?? '';
   if (isReportsProjectDetail) {
-    headerTitle = 'Detailní report';
+    if (reportView === 'detail') {
+      headerTitle = 'Detailní report';
+    } else if (reportView === 'detail-intern') {
+      headerTitle = 'Detail stážisty';
+    } else if (reportView === 'detail-project') {
+      headerTitle = 'Detail projektu';
+    }
   } else if (selectedReportProject) {
     headerTitle = selectedReportProject.name;
   }
   let headerDescription = '';
   if (isReportsProjectDetail) {
-    headerDescription =
-      'Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.';
+    if (reportView === 'detail') {
+      headerDescription =
+        'Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.';
+    } else if (reportView === 'detail-intern') {
+      headerDescription = 'Stránka detailu stážisty je ve vývoji.';
+    } else if (reportView === 'detail-project') {
+      headerDescription = 'Stránka detailu projektu je ve vývoji.';
+    }
   } else if (isOnDemand) {
     headerDescription = 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.';
   } else if (isProjectsOverview) {
@@ -354,6 +378,31 @@ function App() {
     headerDescription = 'Tato sekce bude dostupná v dalších verzích aplikace.';
   }
 
+  const detailNavigationItems: { view: DetailSectionView; label: string }[] = [
+    { view: 'detail', label: 'Obecný report' },
+    { view: 'detail-intern', label: 'Detail stážisty' },
+    { view: 'detail-project', label: 'Detail projektu' },
+  ];
+
+  const detailNavigation = isReportsProjectDetail ? (
+    <nav className="page-header__nav" aria-label="Navigace detailního reportu">
+      {detailNavigationItems.map(item => {
+        const isActive = reportView === item.view;
+        return (
+          <button
+            key={item.view}
+            type="button"
+            className={`page-header__navButton${isActive ? ' page-header__navButton--active' : ''}`}
+            onClick={() => handleSetReportView(item.view)}
+            aria-pressed={isActive}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </nav>
+  ) : null;
+
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     const moduleDef = modules.find(module => module.key === moduleKey) ?? modules[0];
     const fallbackSubmoduleKey = moduleDef.submodules[0]?.key ?? modules[0].submodules[0].key;
@@ -366,18 +415,18 @@ function App() {
     setActiveSubmoduleKey(nextSubmoduleKey);
 
     let nextProjectId = selectedReportProject?.id ?? pendingReportProjectId;
-    let nextView: ReportDetailView | null = showReportDetail
-      ? 'detail'
-      : nextProjectId !== null
-      ? 'summary'
-      : null;
+    let nextView: ReportDetailView | null = reportView;
 
     if (moduleDef.key !== 'reports' || nextSubmoduleKey !== 'reports-overview') {
       nextProjectId = null;
       nextView = null;
       setSelectedReportProject(null);
-      setShowReportDetail(false);
+      setReportView(null);
       setPendingReportProjectId(null);
+    } else if (nextProjectId === null) {
+      nextView = null;
+    } else if (nextView === null) {
+      nextView = 'summary';
     }
 
     pushRoute(
@@ -394,7 +443,7 @@ function App() {
     setActiveModuleKey('reports');
     setActiveSubmoduleKey('reports-overview');
     setSelectedReportProject(project);
-    setShowReportDetail(false);
+    setReportView('summary');
     setPendingReportProjectId(project.id);
     setReportProjectsCache(prev => {
       const next = new Map(prev);
@@ -413,7 +462,7 @@ function App() {
 
   function handleExitReportProject() {
     setSelectedReportProject(null);
-    setShowReportDetail(false);
+    setReportView(null);
     setPendingReportProjectId(null);
     pushRoute(
       normalizeRoute({
@@ -425,32 +474,29 @@ function App() {
     );
   }
 
-  function handleShowReportDetail() {
+  function handleSetReportView(next: ReportDetailView) {
     if (!selectedReportProject) return;
-    setShowReportDetail(true);
+    if (reportView === next) return;
+    setReportView(next);
     setPendingReportProjectId(selectedReportProject.id);
     pushRoute(
       normalizeRoute({
         moduleKey: 'reports',
         submoduleKey: 'reports-overview',
         projectId: selectedReportProject.id,
-        view: 'detail',
+        view: next,
       }),
     );
   }
 
+  function handleShowReportDetail() {
+    if (!selectedReportProject) return;
+    handleSetReportView('detail');
+  }
+
   function handleHideReportDetail() {
     if (!selectedReportProject) return;
-    setShowReportDetail(false);
-    setPendingReportProjectId(selectedReportProject.id);
-    pushRoute(
-      normalizeRoute({
-        moduleKey: 'reports',
-        submoduleKey: 'reports-overview',
-        projectId: selectedReportProject.id,
-        view: 'summary',
-      }),
-    );
+    handleSetReportView('summary');
   }
 
   function handleToggleMaintenanceProject(projectId: number) {
@@ -625,10 +671,17 @@ function App() {
       />
       <main className="app-content">
         <div className={`app-content__inner${isReportsProjectDetail ? ' app-content__inner--full' : ''}`}>
-          <header className="page-header">
-            <p className="page-header__eyebrow">{headerEyebrow}</p>
-            <h1>{headerTitle}</h1>
-            <p className="page-header__description">{headerDescription}</p>
+          <header className={`page-header${isReportsProjectDetail ? ' page-header--with-nav' : ''}`}>
+            <div className="page-header__top">
+              <div className="page-header__headline">
+                {headerEyebrow ? <p className="page-header__eyebrow">{headerEyebrow}</p> : null}
+                <h1>{headerTitle}</h1>
+              </div>
+              {detailNavigation}
+            </div>
+            {headerDescription ? (
+              <p className="page-header__description">{headerDescription}</p>
+            ) : null}
           </header>
 
           {isOnDemand ? (
@@ -726,12 +779,26 @@ function App() {
               </section>
             </>
           ) : isReportsProject && selectedReportProject ? (
-            showReportDetail ? (
-              <ProjectReportDetailPage
-                project={selectedReportProject}
-                onBack={handleExitReportProject}
-                onCloseDetail={handleHideReportDetail}
-              />
+            reportView && reportView !== 'summary' ? (
+              reportView === 'detail' ? (
+                <ProjectReportDetailPage
+                  project={selectedReportProject}
+                  onBack={handleExitReportProject}
+                  onCloseDetail={handleHideReportDetail}
+                />
+              ) : reportView === 'detail-intern' ? (
+                <ProjectReportInternDetailPage
+                  project={selectedReportProject}
+                  onBack={handleExitReportProject}
+                  onCloseDetail={handleHideReportDetail}
+                />
+              ) : (
+                <ProjectReportProjectDetailPage
+                  project={selectedReportProject}
+                  onBack={handleExitReportProject}
+                  onCloseDetail={handleHideReportDetail}
+                />
+              )
             ) : (
               <ProjectReportPage
                 project={selectedReportProject}
@@ -739,12 +806,6 @@ function App() {
                 onShowDetail={handleShowReportDetail}
               />
             )
-          ) : isReportsProjectDetail && selectedReportProject ? (
-            <ProjectReportPage
-              project={selectedReportProject}
-              onBack={handleExitReportProject}
-              onShowDetail={handleShowReportDetail}
-            />
           ) : isProjectsOverview ? (
             <ProjectsOverviewPage />
           ) : isProjectsAdmin ? (
