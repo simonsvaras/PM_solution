@@ -43,15 +43,19 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
     setSaveError(null);
     getProjectInterns(project.id, debouncedSearch)
       .then(result => {
-        setInterns(result);
+        const normalised = result.map(item => ({
+          ...item,
+          includeInReportedCost: item.includeInReportedCost !== false,
+        }));
+        setInterns(normalised);
         setInternCache(prev => {
           const next = new Map(prev);
-          result.forEach(item => next.set(item.id, item));
+          normalised.forEach(item => next.set(item.id, item));
           return next;
         });
         if (!initialised.current) {
           const preset = new Set<number>();
-          result.forEach(entry => { if (entry.assigned) preset.add(entry.id); });
+          normalised.forEach(entry => { if (entry.assigned) preset.add(entry.id); });
           setSelected(preset);
           initialised.current = true;
         }
@@ -184,6 +188,18 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
     });
   }
 
+  function updateIncludeInCost(id: number, include: boolean) {
+    setInternCache(prev => {
+      const existing = prev.get(id);
+      if (!existing) return prev;
+      const next = new Map(prev);
+      const updated: ProjectInternAssignmentDTO = { ...existing, includeInReportedCost: include };
+      next.set(id, updated);
+      setInterns(prevList => prevList.map(item => (item.id === id ? updated : item)));
+      return next;
+    });
+  }
+
   async function handleSave() {
     if (!project) return;
     setSaving(true);
@@ -197,7 +213,12 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
     try {
       const payload: ProjectInternUpdatePayload[] = Array.from(selected).map(id => {
         const entry = internCache.get(id);
-        return { internId: id, workloadHours: entry?.workloadHours ?? null };
+        const include = entry?.includeInReportedCost !== false;
+        return {
+          internId: id,
+          workloadHours: entry?.workloadHours ?? null,
+          includeInReportedCost: include,
+        };
       });
       await updateProjectInterns(project.id, payload);
       onSaved();
@@ -253,22 +274,32 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
                     <span className="teamAssignedItem__name">{intern.firstName} {intern.lastName} ({intern.username})</span>
                     {renderSubtitle(intern)}
                   </div>
-                  <div className="teamAssignedItem__workload">
-                    <label htmlFor={`workload-${intern.id}`} className="teamAssignedItem__workloadLabel">Úvazek na projektu</label>
-                    <input
-                      id={`workload-${intern.id}`}
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={intern.workloadHours ?? ''}
-                      onChange={e => updateWorkload(intern.id, e.target.value)}
-                      placeholder="Úvazek (h)"
-                      className={invalidWorkloads.has(intern.id) ? 'invalid' : ''}
-                    />
-                    <span className="teamAssignedItem__workloadUnit">h</span>
-                    {invalidWorkloads.has(intern.id) && (
-                      <div className="errorText">Zadejte nezáporné číslo.</div>
-                    )}
+                  <div className="teamAssignedItem__controls">
+                    <div className="teamAssignedItem__workload">
+                      <label htmlFor={`workload-${intern.id}`} className="teamAssignedItem__workloadLabel">Úvazek na projektu</label>
+                      <input
+                        id={`workload-${intern.id}`}
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={intern.workloadHours ?? ''}
+                        onChange={e => updateWorkload(intern.id, e.target.value)}
+                        placeholder="Úvazek (h)"
+                        className={invalidWorkloads.has(intern.id) ? 'invalid' : ''}
+                      />
+                      <span className="teamAssignedItem__workloadUnit">h</span>
+                      {invalidWorkloads.has(intern.id) && (
+                        <div className="errorText">Zadejte nezáporné číslo.</div>
+                      )}
+                    </div>
+                    <label className="teamAssignedItem__include">
+                      <input
+                        type="checkbox"
+                        checked={intern.includeInReportedCost}
+                        onChange={event => updateIncludeInCost(intern.id, event.target.checked)}
+                      />
+                      <span>Započítat výdaje do vykázaných nákladů projektu</span>
+                    </label>
                   </div>
                   <button
                     type="button"

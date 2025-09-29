@@ -30,7 +30,7 @@
 
 .teamAssignedItem {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
@@ -43,6 +43,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.teamAssignedItem__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 200px;
 }
 
 .teamAssignedItem__workload {
@@ -74,6 +82,25 @@
 .teamAssignedItem__workloadUnit {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+.teamAssignedItem__include {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.teamAssignedItem__include input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent-strong);
+}
+
+.teamAssignedItem__include span {
+  line-height: 1.2;
 }
 
 .teamAssignedItem__name {
