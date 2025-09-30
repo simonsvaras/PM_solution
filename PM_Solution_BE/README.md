@@ -81,7 +81,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V5__intern_level_group_updates.sql` – converts `group.code` to integer, adds `intern.level_id`, backfills `intern_level_history` and leaves `level_id` `NOT NULL`. Ensure at least one level exists before running.
 - `V6__project_budget_and_intern_workload.sql` – adds project budget columns (`budget`, `budget_from`, `budget_to`) and workload (`workload_hours`) for the `intern_project` junction table.
 - `V7__rename_uvazek_to_workload_hours.sql` – renames the intern workload column to `workload_hours` for clarity.
-- `V15__intern_project_reported_cost_flag.sql` – adds `intern_project.include_in_reported_cost`, wiring the flag into the cached project `reported_cost` calculation and refreshing triggers.
+- `V17__intern_project_reported_cost_flag.sql` – adds `intern_project.include_in_reported_cost`, wiring the flag into the cached project `reported_cost` calculation and refreshing triggers.
 - `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 - `V11__report_username_nullable.sql` – opětovně aplikuje `ALTER TABLE report ALTER COLUMN username DROP NOT NULL;` pro instance, které migrovaly z verze bez předchozí opravy.
 

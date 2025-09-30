@@ -1,4 +1,4 @@
--- V15__intern_project_reported_cost_flag.sql
+-- V17__intern_project_reported_cost_flag.sql
 -- Adds a toggle to control whether an intern's spending counts towards the
 -- cached reported cost total of a project and hooks the flag into refresh logic.
 
