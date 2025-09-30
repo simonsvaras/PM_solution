@@ -10,9 +10,26 @@
   transition: margin-left 180ms ease;
 }
 
+.app-content--projectsOverview {
+  margin: 0 auto;
+  margin-left: 0;
+  max-width: calc(80% + var(--navbar-width));
+  padding-left: calc(var(--navbar-width) + clamp(32px, 6vw, 72px));
+}
+
 .app-content__inner {
   max-width: 960px;
   margin: 0 auto;
+}
+
+.app-content__inner--projectsOverview {
+  max-width: 100%;
+  width: 100%;
+}
+
+.app-content__inner--internsOverview {
+  max-width: none;
+  width: 60%;
 }
 
 .page-header {

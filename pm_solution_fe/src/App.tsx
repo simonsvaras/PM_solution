@@ -131,6 +131,19 @@ function App() {
   const isReportsProjectSummary = isReportsProject && !showReportDetail;
   const isReportsProjectDetail = isReportsProject && showReportDetail;
 
+  const appContentClassName = ['app-content'];
+  if (isProjectsOverview) {
+    appContentClassName.push('app-content--projectsOverview');
+  }
+
+  const appContentInnerClassName = ['app-content__inner'];
+  if (isProjectsOverview) {
+    appContentInnerClassName.push('app-content__inner--projectsOverview');
+  }
+  if (isInternsOverview) {
+    appContentInnerClassName.push('app-content__inner--internsOverview');
+  }
+
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     setActiveModuleKey(moduleKey);
     if (submoduleKey) {
@@ -329,8 +342,8 @@ function App() {
         activeSubmoduleKey={activeSubmoduleKey}
         onSelect={handleNavigation}
       />
-      <main className="app-content">
-        <div className="app-content__inner">
+      <main className={appContentClassName.join(' ')}>
+        <div className={appContentInnerClassName.join(' ')}>
           <header className="page-header">
             <p className="page-header__eyebrow">{activeModule?.name}</p>
             <h1>{selectedReportProject ? selectedReportProject.name : activeSubmodule?.name}</h1>

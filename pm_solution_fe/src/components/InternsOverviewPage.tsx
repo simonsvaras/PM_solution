@@ -80,13 +80,12 @@ export default function InternsOverviewPage() {
   } else {
     content = (
       <>
-        <header className="internsOverview__summary">
-          <h2>Přehled stážistů</h2>
+        <div className="internsOverview__summary">
           <p>
             Celkem evidováno <strong>{interns.length}</strong> stážistů, kteří dohromady vykázali{' '}
             <strong>{formatHours(totalTrackedHours)}</strong>.
           </p>
-        </header>
+        </div>
         <div className="internsOverview__grid" role="list">
           {interns.map(intern => (
             <div key={intern.id} role="listitem">

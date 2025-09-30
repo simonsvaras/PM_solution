@@ -74,7 +74,7 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
   }
 
   return (
-    <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
+    <div className="projectReportPage">
       <div className="projectReport__toolbar">
         <button type="button" className="projectReport__backButton" onClick={onBack}>
           ← Zpět na projekty
@@ -83,70 +83,72 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
           Zobrazit detailní report
         </button>
       </div>
-      <div className="projectReport__card">
-        <h2>Otevřené issue</h2>
-        <p className="projectReport__metric">{project.openIssues}</p>
-      </div>
-      <div className="projectReport__card projectReport__syncCard">
-        <div className="projectReport__syncHeader">
-          <h2>Synchronizace výkazů</h2>
-          <p className="projectReport__syncDescription">
-            Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
-          </p>
-          <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
+      <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
+        <div className="projectReport__card">
+          <h2>Otevřené issue</h2>
+          <p className="projectReport__metric">{project.openIssues}</p>
         </div>
-        <label className="projectReport__checkbox">
-          <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
-          Synchronizovat data jen od poslední synchronizace
-        </label>
-        <div className="projectReport__range" aria-disabled={sinceLast}>
-          <label>
-            <span>Od</span>
-            <input
-              type="datetime-local"
-              value={fromValue}
-              onChange={event => setFromValue(event.target.value)}
-              disabled={sinceLast}
-            />
-          </label>
-          <label>
-            <span>Do</span>
-            <input
-              type="datetime-local"
-              value={toValue}
-              onChange={event => setToValue(event.target.value)}
-              disabled={sinceLast}
-            />
-          </label>
-        </div>
-        {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
-        {syncSummary ? (
-          <p className="projectReport__status projectReport__status--success">
-            Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
-            {syncSummary.durationMs} ms.
-          </p>
-        ) : null}
-        {syncSummary && syncSummary.missingUsernames.length > 0 ? (
-          <div className="projectReport__missing">
-            <p className="projectReport__missingTitle">
-              Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
+        <div className="projectReport__card projectReport__syncCard">
+          <div className="projectReport__syncHeader">
+            <h2>Synchronizace výkazů</h2>
+            <p className="projectReport__syncDescription">
+              Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
             </p>
-            <ul className="projectReport__missingList">
-              {syncSummary.missingUsernames.map(username => (
-                <li key={username}>{username}</li>
-              ))}
-            </ul>
+            <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
           </div>
-        ) : null}
-        <button
-          type="button"
-          className="projectReport__syncButton"
-          onClick={handleSync}
-          disabled={syncing}
-        >
-          {syncing ? 'Synchronizuji…' : 'Synchronizovat výkazy'}
-        </button>
-      </div>
-    </section>
+          <label className="projectReport__checkbox">
+            <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
+            Synchronizovat data jen od poslední synchronizace
+          </label>
+          <div className="projectReport__range" aria-disabled={sinceLast}>
+            <label>
+              <span>Od</span>
+              <input
+                type="datetime-local"
+                value={fromValue}
+                onChange={event => setFromValue(event.target.value)}
+                disabled={sinceLast}
+              />
+            </label>
+            <label>
+              <span>Do</span>
+              <input
+                type="datetime-local"
+                value={toValue}
+                onChange={event => setToValue(event.target.value)}
+                disabled={sinceLast}
+              />
+            </label>
+          </div>
+          {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
+          {syncSummary ? (
+            <p className="projectReport__status projectReport__status--success">
+              Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
+              {syncSummary.durationMs} ms.
+            </p>
+          ) : null}
+          {syncSummary && syncSummary.missingUsernames.length > 0 ? (
+            <div className="projectReport__missing">
+              <p className="projectReport__missingTitle">
+                Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
+              </p>
+              <ul className="projectReport__missingList">
+                {syncSummary.missingUsernames.map(username => (
+                  <li key={username}>{username}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="projectReport__syncButton"
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing ? 'Synchronizuji…' : 'Synchronizovat výkazy'}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
