@@ -11,6 +11,7 @@ import ProjectReportProjectDetailPage from './components/ProjectReportProjectDet
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
+import SyncReportsOverviewPage from './components/SyncReportsOverviewPage';
 import {
   API_BASE,
   deleteReports,
@@ -37,6 +38,7 @@ const modules: Module[] = [
     name: 'Synchronizace',
     submodules: [
       { key: 'sync-on-demand', name: 'On-demand' },
+      { key: 'sync-report-overview', name: 'Přehled reportů' },
       { key: 'sync-history', name: 'Historie' },
     ],
   },
@@ -350,7 +352,8 @@ function App() {
     () => activeModule?.submodules.find(submodule => submodule.key === activeSubmoduleKey),
     [activeModule, activeSubmoduleKey],
   );
-  const isOnDemand = activeSubmoduleKey === 'sync-on-demand';
+  const isOnDemand = activeModuleKey === 'sync' && activeSubmoduleKey === 'sync-on-demand';
+  const isSyncReportsOverview = activeModuleKey === 'sync' && activeSubmoduleKey === 'sync-report-overview';
   const isProjectsOverview = activeSubmoduleKey === 'projects-overview';
   const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
   const isInternsOverview = activeSubmoduleKey === 'interns-overview';
@@ -406,6 +409,8 @@ function App() {
     headerDescription = 'Vytvářejte a spravujte projekty v aplikaci.';
   } else if (isInternsAdmin) {
     headerDescription = 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.';
+  } else if (isSyncReportsOverview) {
+    headerDescription = 'Prohlédněte si jednotlivé výkazy podle zvoleného období.';
   } else if (isReportsOverview && !isReportsProject) {
     headerDescription = 'Vyberte projekt a zobrazte jeho detailní report.';
   } else if (isReportsProjectSummary) {
@@ -861,6 +866,8 @@ function App() {
                 </div>
               </section>
             </>
+          ) : isSyncReportsOverview ? (
+            <SyncReportsOverviewPage />
           ) : isReportsProject && selectedReportProject ? (
             reportView && reportView !== 'summary' ? (
               reportView === 'detail' ? (
