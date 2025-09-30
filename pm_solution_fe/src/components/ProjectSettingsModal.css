@@ -1,12 +1,24 @@
+.projectSettingsModal {
+  width: 60vw;
+  max-width: 60vw;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+
 .projectSettingsModal .modal__body--settings {
   display: flex;
   flex-direction: column;
   padding: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .projectSettings {
   display: flex;
-  min-height: 540px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .projectSettings__nav {
@@ -46,6 +58,7 @@
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .projectSettings__section {
@@ -63,5 +76,7 @@
 }
 
 .modal--wide.projectSettingsModal {
-  max-width: 1024px;
+  width: 60vw;
+  max-width: 60vw;
+  max-height: 60vh;
 }
