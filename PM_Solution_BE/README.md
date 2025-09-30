@@ -30,6 +30,7 @@ Key REST endpoints
 - `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
 - `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
+- `POST /api/sync/reports` – synchronises timelogs for all known repositories. Accepts optional JSON body `{ "from": "2024-01-01T00:00:00Z", "to": "2024-01-31T23:59:59Z", "sinceLast": false }` to limit the time window or continue from the last stored entry.
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}` – aggregated timelog hours per issue/intern for the
   project's repositories within the optional time range.
 - `DELETE /api/sync/reports?projectId=1&projectId=2` – trvale odstraní uložené výkazy. Bez parametrů smaže vše, s opakovaným `projectId` zlikviduje jen záznamy repozitářů přiřazených k vybraným projektům. Volání vrací `{ "deleted": <počet_záznamů> }`.
@@ -81,6 +82,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V7__rename_uvazek_to_workload_hours.sql` – renames the intern workload column to `workload_hours` for clarity.
 - `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 - `V11__report_username_nullable.sql` – opětovně aplikuje `ALTER TABLE report ALTER COLUMN username DROP NOT NULL;` pro instance, které migrovaly z verze bez předchozí opravy.
+- `V14__report_raw_username.sql` – přejmenuje FK sloupec na `intern_username`, přidá samostatné `username` pro GitLab přezdívky a umožní ukládat výkazy bez existujícího stážisty.
 
 Logging & observability
 -----------------------

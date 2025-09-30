@@ -80,8 +80,8 @@ public class SyncController {
         return s;
     }
 
-    @Schema(description = "Parametry pro synchronizaci reportů projektu.")
-    public static class ProjectReportSyncRequest {
+    @Schema(description = "Parametry pro synchronizaci reportů.")
+    public static class ReportSyncRequest {
         @Schema(description = "Pokud je true, vezme se jako počáteční datum poslední uložený záznam.", defaultValue = "false")
         public boolean sinceLast;
         @Schema(description = "Volitelný časový začátek synchronizace ve formátu ISO-8601.")
@@ -104,9 +104,9 @@ public class SyncController {
                                           @io.swagger.v3.oas.annotations.parameters.RequestBody(
                                                   required = false,
                                                   description = "Nastavení rozsahu synchronizace.",
-                                                  content = @Content(schema = @Schema(implementation = ProjectReportSyncRequest.class))
+                                                  content = @Content(schema = @Schema(implementation = ReportSyncRequest.class))
                                           )
-                                          @RequestBody(required = false) ProjectReportSyncRequest request) {
+                                          @RequestBody(required = false) ReportSyncRequest request) {
         long start = System.currentTimeMillis();
         boolean sinceLast = request != null && request.sinceLast;
         OffsetDateTime from = request != null ? request.from : null;
@@ -116,6 +116,34 @@ public class SyncController {
             from = null;
         }
         SyncSummary summary = reportSyncService.syncProjectReports(projectId, from, to, sinceLast);
+        summary.durationMs = System.currentTimeMillis() - start;
+        return summary;
+    }
+
+    @Operation(
+            summary = "Synchronizuje výkazy pro všechny známé repozitáře",
+            description = "Načte timelog záznamy pro všechny repozitáře evidované v aplikaci a uloží je do tabulky report."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Souhrn průběhu synchronizace."),
+            @ApiResponse(responseCode = "400", description = "V databázi nejsou evidované repozitáře nebo vstup neprošel validací."),
+            @ApiResponse(responseCode = "500", description = "Neočekávaná chyba při komunikaci s GitLabem."),
+    })
+    @PostMapping("/reports")
+    public SyncSummary syncAllReports(@io.swagger.v3.oas.annotations.parameters.RequestBody(
+                                              required = false,
+                                              description = "Nastavení rozsahu synchronizace.",
+                                              content = @Content(schema = @Schema(implementation = ReportSyncRequest.class))
+                                      )
+                                      @RequestBody(required = false) ReportSyncRequest request) {
+        long start = System.currentTimeMillis();
+        boolean sinceLast = request != null && request.sinceLast;
+        OffsetDateTime from = request != null ? request.from : null;
+        OffsetDateTime to = request != null ? request.to : null;
+        if (sinceLast) {
+            from = null;
+        }
+        SyncSummary summary = reportSyncService.syncAllReports(from, to, sinceLast);
         summary.durationMs = System.currentTimeMillis() - start;
         return summary;
     }

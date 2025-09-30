@@ -205,6 +205,17 @@ public class SyncDao {
         ), projectId);
     }
 
+    public List<ProjectRepositoryLink> listAllRepositories() {
+        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
+                "FROM repository r " +
+                "ORDER BY r.name";
+        return jdbc.query(sql, (rs, rn) -> new ProjectRepositoryLink(
+                rs.getLong("repository_id"),
+                (Long) rs.getObject("gitlab_repo_id"),
+                rs.getString("name")
+        ));
+    }
+
     @Transactional
     public void replaceProjectRepositories(long projectId, List<Long> repositoryIds) {
         jdbc.update("DELETE FROM projects_to_repositorie WHERE project_id = ?", projectId);
@@ -342,46 +353,46 @@ public class SyncDao {
         Set<String> existingUsernames = loadExistingInternUsernames(uniqueUsernames);
         Map<String, List<HourlyRateSlice>> hourlyRateTimeline = loadInternHourlyRateTimeline(existingUsernames);
 
-        List<ReportRow> candidates = new ArrayList<>();
         for (ReportRow row : rows) {
-            if (!existingUsernames.contains(row.username())) {
-                failed++;
-                missingUsernames.add(row.username());
-                continue;
-            }
-            candidates.add(row);
-        }
+            String username = row.username();
+            boolean internExists = username != null && existingUsernames.contains(username);
+            BigDecimal cost = null;
+            String internUsername = null;
 
-        if (candidates.isEmpty()) {
-            return new ReportInsertStats(0, 0, failed, List.copyOf(missingUsernames));
-        }
-
-        for (ReportRow row : candidates) {
-            List<HourlyRateSlice> slices = hourlyRateTimeline.get(row.username());
-            if (slices == null || slices.isEmpty()) {
-                failed++;
-                log.warn("Chybí historie sazeb pro uživatele {} – záznam nebyl uložen.", row.username());
-                continue;
+            if (internExists) {
+                List<HourlyRateSlice> slices = hourlyRateTimeline.get(username);
+                if (slices == null || slices.isEmpty()) {
+                    failed++;
+                    log.warn("Chybí historie sazeb pro uživatele {} – záznam nebyl uložen.", username);
+                    continue;
+                }
+                LocalDate spentDate = row.spentAt().toLocalDate();
+                BigDecimal hourlyRate = resolveHourlyRate(slices, spentDate);
+                if (hourlyRate == null) {
+                    failed++;
+                    log.warn("Nenalezena sazba pro uživatele {} k datu {} – záznam nebyl uložen.", username, spentDate);
+                    continue;
+                }
+                cost = row.timeSpentHours().multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
+                internUsername = username;
+            } else {
+                missingUsernames.add(username);
             }
-            LocalDate spentDate = row.spentAt().toLocalDate();
-            BigDecimal hourlyRate = resolveHourlyRate(slices, spentDate);
-            if (hourlyRate == null) {
-                failed++;
-                log.warn("Nenalezena sazba pro uživatele {} k datu {} – záznam nebyl uložen.", row.username(), spentDate);
-                continue;
-            }
-            BigDecimal cost = row.timeSpentHours().multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
+            final String rawUsername = row.username();
+            final String finalInternUsername = internUsername;
+            final BigDecimal finalCost = cost;
             try {
-                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost) " +
-                                "VALUES (?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, intern_username, cost) " +
+                                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
                         ps -> {
                             ps.setLong(1, row.repositoryId());
                             if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
                             ps.setObject(3, row.spentAt());
                             ps.setInt(4, row.timeSpentSeconds());
                             ps.setBigDecimal(5, row.timeSpentHours());
-                            ps.setString(6, row.username());
-                            ps.setBigDecimal(7, cost);
+                            ps.setString(6, rawUsername);
+                            ps.setObject(7, finalInternUsername, java.sql.Types.VARCHAR);
+                            ps.setObject(8, finalCost, java.sql.Types.NUMERIC);
                         });
                 if (result > 0) inserted += result; else duplicates++;
             } catch (DataIntegrityViolationException ex) {
@@ -529,7 +540,7 @@ public class SyncDao {
                 "FROM report r " +
                 "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id " +
                 "JOIN repository repo ON repo.id = r.repository_id " +
-                "JOIN intern i ON i.username = r.username " +
+                "JOIN intern i ON i.username = r.intern_username " +
                 "LEFT JOIN issue iss ON iss.repository_id = r.repository_id AND iss.iid = r.iid " +
                 "WHERE ptr.project_id = ?");
 
@@ -571,7 +582,7 @@ public class SyncDao {
                 JOIN intern_level_history h ON h.intern_id = i.id
                 JOIN level l ON l.id = h.level_id
                 WHERE i.id = ?
-                  AND r.username = i.username
+                  AND r.intern_username = i.username
                   AND r.spent_at::date >= h.valid_from
                   AND (h.valid_to IS NULL OR r.spent_at::date <= h.valid_to)
                 """;
