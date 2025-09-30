@@ -378,6 +378,9 @@ function App() {
   if (isInternsOverview) {
     appContentInnerClassNames.push('app-content__inner--interns-overview');
   }
+  if (isReportsOverview && !isReportsProjectDetail) {
+    appContentInnerClassNames.push('app-content__inner--reports-overview');
+  }
 
   const headerEyebrow =
     isReportsProjectDetail && selectedReportProject ? selectedReportProject.name : activeModule?.name ?? '';
