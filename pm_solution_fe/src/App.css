@@ -2,17 +2,29 @@
   min-height: 100vh;
   background: var(--color-background);
   color: var(--color-text-primary);
+  padding-left: var(--navbar-width);
 }
 
 .app-content {
-  margin-left: var(--navbar-width);
   padding: clamp(32px, 6vw, 72px);
-  transition: margin-left 180ms ease;
+  width: 100%;
+  margin: 0;
+  transition: padding 180ms ease;
 }
 
 .app-content__inner {
   max-width: 960px;
   margin: 0 auto;
+}
+
+.app-content--projectsOverview {
+  max-width: 80%;
+  margin-inline: auto;
+}
+
+.app-content__inner--internsOverview {
+  max-width: none;
+  width: 60%;
 }
 
 .page-header {
@@ -267,8 +279,11 @@
 }
 
 @media (max-width: 960px) {
+  .app-shell {
+    padding-left: clamp(68px, 14vw, 96px);
+  }
+
   .app-content {
-    margin-left: clamp(68px, 14vw, 96px);
     padding: clamp(24px, 8vw, 48px);
   }
 
@@ -284,8 +299,11 @@
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    padding-left: clamp(60px, 18vw, 84px);
+  }
+
   .app-content {
-    margin-left: clamp(60px, 18vw, 84px);
     padding: clamp(20px, 10vw, 36px);
   }
 

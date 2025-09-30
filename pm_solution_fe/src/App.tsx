@@ -321,6 +321,12 @@ function App() {
     </div>
   ) : null;
 
+  const appContentClassName = ['app-content'];
+  if (isProjectsOverview) appContentClassName.push('app-content--projectsOverview');
+
+  const appContentInnerClassName = ['app-content__inner'];
+  if (isInternsOverview) appContentInnerClassName.push('app-content__inner--internsOverview');
+
   return (
     <div className="app-shell">
       <Navbar
@@ -329,8 +335,8 @@ function App() {
         activeSubmoduleKey={activeSubmoduleKey}
         onSelect={handleNavigation}
       />
-      <main className="app-content">
-        <div className="app-content__inner">
+      <main className={appContentClassName.join(' ')}>
+        <div className={appContentInnerClassName.join(' ')}>
           <header className="page-header">
             <p className="page-header__eyebrow">{activeModule?.name}</p>
             <h1>{selectedReportProject ? selectedReportProject.name : activeSubmodule?.name}</h1>

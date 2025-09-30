@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import './InternsOverviewPage.css';
 import InternCard from './InternCard';
 import Modal from './Modal';
@@ -42,11 +42,6 @@ export default function InternsOverviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const totalTrackedHours = useMemo(
-    () => interns.reduce((acc, intern) => acc + (Number.isFinite(intern.totalHours) ? intern.totalHours : 0), 0),
-    [interns],
-  );
-
   function openDetail(intern: InternOverview) {
     setSelected(intern);
     setDetail(null);
@@ -79,22 +74,13 @@ export default function InternsOverviewPage() {
     content = <p className="internsOverview__status">Zatím nejsou založení žádní stážisti.</p>;
   } else {
     content = (
-      <>
-        <header className="internsOverview__summary">
-          <h2>Přehled stážistů</h2>
-          <p>
-            Celkem evidováno <strong>{interns.length}</strong> stážistů, kteří dohromady vykázali{' '}
-            <strong>{formatHours(totalTrackedHours)}</strong>.
-          </p>
-        </header>
-        <div className="internsOverview__grid" role="list">
-          {interns.map(intern => (
-            <div key={intern.id} role="listitem">
-              <InternCard intern={intern} onOpenDetail={openDetail} />
-            </div>
-          ))}
-        </div>
-      </>
+      <div className="internsOverview__grid" role="list">
+        {interns.map(intern => (
+          <div key={intern.id} role="listitem">
+            <InternCard intern={intern} onOpenDetail={openDetail} />
+          </div>
+        ))}
+      </div>
     );
   }
 
