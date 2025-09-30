@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Types;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -173,6 +174,17 @@ public class SyncDao {
     public record RepositoryAssignment(Long id, Long gitlabRepoId, String name, String nameWithNamespace, boolean assigned) {}
 
     public record ProjectRepositoryLink(long repositoryId, Long gitlabRepoId, String name) {}
+
+    public List<ProjectRepositoryLink> listAllRepositoriesForSync() {
+        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
+                "FROM repository r " +
+                "ORDER BY r.name";
+        return jdbc.query(sql, (rs, rn) -> new ProjectRepositoryLink(
+                rs.getLong("repository_id"),
+                (Long) rs.getObject("gitlab_repo_id"),
+                rs.getString("name")
+        ));
+    }
 
     public List<RepositoryAssignment> listRepositoriesWithAssignment(long projectId, String search) {
         StringBuilder sql = new StringBuilder("SELECT r.id, r.gitlab_repo_id, r.name, r.name_with_namespace, " +
@@ -359,17 +371,14 @@ public class SyncDao {
         Map<String, List<HourlyRateSlice>> hourlyRateTimeline = loadInternHourlyRateTimeline(existingUsernames);
 
         List<ReportRow> candidates = new ArrayList<>();
+        List<ReportRow> orphanCandidates = new ArrayList<>();
         for (ReportRow row : rows) {
             if (!existingUsernames.contains(row.username())) {
-                failed++;
                 missingUsernames.add(row.username());
-                continue;
+                orphanCandidates.add(row);
+            } else {
+                candidates.add(row);
             }
-            candidates.add(row);
-        }
-
-        if (candidates.isEmpty()) {
-            return new ReportInsertStats(0, 0, failed, List.copyOf(missingUsernames));
         }
 
         for (ReportRow row : candidates) {
@@ -388,8 +397,8 @@ public class SyncDao {
             }
             BigDecimal cost = row.timeSpentHours().multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
             try {
-                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost) " +
-                                "VALUES (?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username, spent_at, time_spent_seconds) DO NOTHING",
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost, unregistered_username) " +
+                                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username_fallback, spent_at, time_spent_seconds) DO NOTHING",
                         ps -> {
                             ps.setLong(1, row.repositoryId());
                             if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
@@ -398,11 +407,36 @@ public class SyncDao {
                             ps.setBigDecimal(5, row.timeSpentHours());
                             ps.setString(6, row.username());
                             ps.setBigDecimal(7, cost);
+                            ps.setNull(8, Types.VARCHAR);
                         });
                 if (result > 0) inserted += result; else duplicates++;
             } catch (DataIntegrityViolationException ex) {
                 failed++;
                 log.warn("Nepodařilo se vložit report pro repo {}: {}", row.repositoryId(), ex.getMessage());
+            }
+        }
+        for (ReportRow row : orphanCandidates) {
+            try {
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost, unregistered_username) " +
+                                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username_fallback, spent_at, time_spent_seconds) DO NOTHING",
+                        ps -> {
+                            ps.setLong(1, row.repositoryId());
+                            if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
+                            ps.setObject(3, row.spentAt());
+                            ps.setInt(4, row.timeSpentSeconds());
+                            ps.setBigDecimal(5, row.timeSpentHours());
+                            ps.setNull(6, Types.VARCHAR);
+                            ps.setNull(7, Types.NUMERIC);
+                            ps.setString(8, row.username());
+                        });
+                if (result > 0) {
+                    inserted += result;
+                } else {
+                    duplicates++;
+                }
+            } catch (DataIntegrityViolationException ex) {
+                failed++;
+                log.warn("Nepodařilo se vložit report pro repo {} (uživatel {}): {}", row.repositoryId(), row.username(), ex.getMessage());
             }
         }
         return new ReportInsertStats(inserted, duplicates, failed, List.copyOf(missingUsernames));

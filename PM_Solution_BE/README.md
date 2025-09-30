@@ -30,6 +30,8 @@ Key REST endpoints
 - `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
 - `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
+- `POST /api/sync/projects/{projectId}/reports` – sync report entries for the repositories assigned to the project (optional `from`, `to`, `sinceLast`).
+- `POST /api/sync/reports` – sync report entries for all repositories (optional `from`, `to`, `sinceLast`).
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}&internUsername={username?}` – aggregated timelog hours per
   issue/intern for the project's repositories within the optional time range. Passing `internUsername` narrows the aggregation to a
   single intern while still returning the complete list of assigned members for UI filters.
@@ -82,6 +84,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V6__project_budget_and_intern_workload.sql` – adds project budget columns (`budget`, `budget_from`, `budget_to`) and workload (`workload_hours`) for the `intern_project` junction table.
 - `V7__rename_uvazek_to_workload_hours.sql` – renames the intern workload column to `workload_hours` for clarity.
 - `V17__intern_project_reported_cost_flag.sql` – adds `intern_project.include_in_reported_cost`, wiring the flag into the cached project `reported_cost` calculation and refreshing triggers.
+- `V18__report_unregistered_usernames.sql` – umožní ukládat výkazy uživatelů, kteří ještě nejsou vedeni v tabulce `intern`, a udržet je mimo výpočet nákladů.
 - `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 - `V11__report_username_nullable.sql` – opětovně aplikuje `ALTER TABLE report ALTER COLUMN username DROP NOT NULL;` pro instance, které migrovaly z verze bez předchozí opravy.
 
