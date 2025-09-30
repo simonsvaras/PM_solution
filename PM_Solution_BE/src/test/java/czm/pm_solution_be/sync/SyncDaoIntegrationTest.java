@@ -93,6 +93,53 @@ class SyncDaoIntegrationTest {
     }
 
     @Test
+    void insertReportsStoresUnregisteredUsernameWithoutCost() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+
+            long repositoryId = insertRepository(jdbcTemplate);
+
+            SyncDao.ReportInsertStats stats = syncDao.insertReports(List.of(
+                    new SyncDao.ReportRow(
+                            repositoryId,
+                            101L,
+                            OffsetDateTime.parse("2025-06-01T10:00:00Z"),
+                            1800,
+                            BigDecimal.valueOf(0.5).setScale(4, RoundingMode.UNNECESSARY),
+                            "ghost-user")
+            ));
+
+            assertThat(stats.inserted()).isEqualTo(1);
+            assertThat(stats.duplicates()).isZero();
+            assertThat(stats.failed()).isZero();
+            assertThat(stats.missingUsernames()).containsExactly("ghost-user");
+
+            Map<String, Object> row = jdbcTemplate.queryForMap("SELECT username, unregistered_username, cost FROM report");
+            assertThat(row.get("username")).isNull();
+            assertThat(row.get("unregistered_username")).isEqualTo("ghost-user");
+            assertThat(row.get("cost")).isNull();
+        }
+    }
+
+    @Test
     void recomputeReportCostsForInternUsesHistoricalRates() {
         Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
 

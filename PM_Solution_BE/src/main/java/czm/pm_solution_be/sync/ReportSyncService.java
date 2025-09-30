@@ -45,6 +45,21 @@ public class ReportSyncService {
         if (repositories.isEmpty()) {
             throw new IllegalArgumentException("Projekt nemá přiřazené žádné repozitáře");
         }
+        return syncReportsAcrossRepositories(repositories, from, to, sinceLast);
+    }
+
+    public SyncSummary syncAllReports(OffsetDateTime from, OffsetDateTime to, boolean sinceLast) {
+        List<SyncDao.ProjectRepositoryLink> repositories = syncDao.listAllRepositoriesForSync();
+        if (repositories.isEmpty()) {
+            return new SyncSummary();
+        }
+        return syncReportsAcrossRepositories(repositories, from, to, sinceLast);
+    }
+
+    private SyncSummary syncReportsAcrossRepositories(List<SyncDao.ProjectRepositoryLink> repositories,
+                                                      OffsetDateTime from,
+                                                      OffsetDateTime to,
+                                                      boolean sinceLast) {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime effectiveTo = to != null ? to : now;
         SyncSummary summary = new SyncSummary();

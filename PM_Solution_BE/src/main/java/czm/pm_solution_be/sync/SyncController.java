@@ -90,6 +90,16 @@ public class SyncController {
         public OffsetDateTime to;
     }
 
+    @Schema(description = "Parametry pro globální synchronizaci reportů napříč všemi repozitáři.")
+    public static class GlobalReportSyncRequest {
+        @Schema(description = "Pokud je true, vezme se jako počáteční datum poslední uložený záznam každého repozitáře.", defaultValue = "false")
+        public boolean sinceLast;
+        @Schema(description = "Volitelný časový začátek synchronizace ve formátu ISO-8601.")
+        public OffsetDateTime from;
+        @Schema(description = "Volitelné časové ukončení synchronizace ve formátu ISO-8601.")
+        public OffsetDateTime to;
+    }
+
     @Operation(
             summary = "Synchronizuje výkazy pro zadaný projekt",
             description = "Načte timelog záznamy ze všech repozitářů přiřazených k projektu a uloží je do tabulky report."
@@ -116,6 +126,34 @@ public class SyncController {
             from = null;
         }
         SyncSummary summary = reportSyncService.syncProjectReports(projectId, from, to, sinceLast);
+        summary.durationMs = System.currentTimeMillis() - start;
+        return summary;
+    }
+
+    @Operation(
+            summary = "Synchronizuje výkazy napříč všemi repozitáři",
+            description = "Načte timelog záznamy pro všechny dostupné repozitáře a uloží je do tabulky report."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Souhrn průběhu synchronizace."),
+            @ApiResponse(responseCode = "400", description = "Vstupní parametry neprošly validací."),
+            @ApiResponse(responseCode = "500", description = "Neočekávaná chyba při komunikaci s GitLabem."),
+    })
+    @PostMapping("/reports")
+    public SyncSummary syncAllReports(@io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            description = "Nastavení rozsahu synchronizace.",
+            content = @Content(schema = @Schema(implementation = GlobalReportSyncRequest.class))
+    )
+                                          @RequestBody(required = false) GlobalReportSyncRequest request) {
+        long start = System.currentTimeMillis();
+        boolean sinceLast = request != null && request.sinceLast;
+        OffsetDateTime from = request != null ? request.from : null;
+        OffsetDateTime to = request != null ? request.to : null;
+        if (sinceLast) {
+            from = null;
+        }
+        SyncSummary summary = reportSyncService.syncAllReports(from, to, sinceLast);
         summary.durationMs = System.currentTimeMillis() - start;
         return summary;
     }
