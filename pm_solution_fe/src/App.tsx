@@ -45,6 +45,7 @@ const modules: Module[] = [
     name: 'Projekty',
     submodules: [
       { key: 'projects-overview', name: 'Přehled projektů' },
+      { key: 'projects-teams', name: 'Týmy' },
       { key: 'projects-admin', name: 'Správa projektů' },
     ],
   },
@@ -61,7 +62,6 @@ const modules: Module[] = [
     name: 'Reporty',
     submodules: [
       { key: 'reports-overview', name: 'Přehled' },
-      { key: 'reports-teams', name: 'Týmy' },
     ],
   },
   {
@@ -356,7 +356,7 @@ function App() {
   const isInternsOverview = activeSubmoduleKey === 'interns-overview';
   const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
   const isReportsOverview = activeSubmoduleKey === 'reports-overview';
-  const isReportsTeams = activeSubmoduleKey === 'reports-teams';
+  const isProjectsTeams = activeSubmoduleKey === 'projects-teams';
   const isReportsProject = activeModuleKey === 'reports' && selectedReportProject !== null;
   const isReportsProjectSummary =
     isReportsProject && (reportView === 'summary' || reportView === null || reportView === undefined);
@@ -410,7 +410,7 @@ function App() {
     headerDescription = 'Vyberte projekt a zobrazte jeho detailní report.';
   } else if (isReportsProjectSummary) {
     headerDescription = 'Souhrn otevřených issue vybraného projektu.';
-  } else if (isReportsTeams) {
+  } else if (isProjectsTeams) {
     headerDescription = 'Zobrazte složení týmů a jejich úvazky na projektech.';
   } else if (
     !isOnDemand &&
@@ -418,7 +418,7 @@ function App() {
     !isProjectsAdmin &&
     !isInternsAdmin &&
     !isReportsOverview &&
-    !isReportsTeams
+    !isProjectsTeams
   ) {
     headerDescription = 'Vyberte modul z navigace a zpřístupněte si funkce, které potřebujete pro správu projektů a stážistů.';
   }
@@ -899,7 +899,7 @@ function App() {
             <InternsPage />
           ) : isReportsOverview ? (
             <ReportsOverviewPage onSelectProject={handleSelectReportProject} />
-          ) : isReportsTeams ? (
+          ) : isProjectsTeams ? (
             <ReportsTeamsPage />
           ) : (
             <section className="panel panel--placeholder">
