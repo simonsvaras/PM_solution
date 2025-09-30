@@ -15,10 +15,15 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
   );
 
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
+  const reportsOverviewLink = `?module=reports&submodule=reports-overview&projectId=${project.id}`;
+
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
       <header className="projectInfoCard__header">
         <h2>{project.name}</h2>
+        <a className="projectInfoCard__detailLink" href={reportsOverviewLink}>
+          Zobrazit detail
+        </a>
       </header>
       <dl className="projectInfoCard__stats">
         <div className="projectInfoCard__stat">
