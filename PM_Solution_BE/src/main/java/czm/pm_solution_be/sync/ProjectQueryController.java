@@ -15,7 +15,8 @@ public class ProjectQueryController {
     public ProjectQueryController(SyncDao dao) { this.dao = dao; }
 
     public record ProjectDto(Long id,
-                             Long gitlabProjectId,
+                             Long namespaceId,
+                             String namespaceName,
                              String name,
                              Integer budget,
                              java.time.LocalDate budgetFrom,
@@ -34,7 +35,7 @@ public class ProjectQueryController {
     @GetMapping
     public List<ProjectDto> list() {
         return dao.listProjects().stream()
-                .map(r -> new ProjectDto(r.id(), r.gitlabProjectId(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.reportedCost()))
+                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.reportedCost()))
                 .toList();
     }
 

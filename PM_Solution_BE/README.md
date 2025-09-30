@@ -38,9 +38,10 @@ Key REST endpoints
 - `DELETE /api/sync/reports?projectId=1&projectId=2` – trvale odstraní uložené výkazy. Bez parametrů smaže vše, s opakovaným `projectId` zlikviduje jen záznamy repozitářů přiřazených k vybraným projektům. Volání vrací `{ "deleted": <počet_záznamů> }`.
 
 ### Local project management
-- `GET /api/projects` – list local projects (id, gitlabProjectId, name, budget, budgetFrom, budgetTo).
-- `POST /api/projects` – create/link a local project.
-- `PUT /api/projects/{id}` – update name + optional `budget`, `budget_from`, `budget_to` (dates in ISO form, `budget` ≥ 0).
+- `GET /api/projects` – list local projects (id, namespaceId, namespaceName, name, budget, budgetFrom, budgetTo).
+- `POST /api/projects` – create/link a local project via namespace mapping (expects `namespaceId` + optional `namespaceName`).
+- `PUT /api/projects/{id}` – update name + optional `budget`, `budget_from`, `budget_to`, `namespace_id`, `namespace_name` (dates in ISO form, `budget` ≥ 0).
+- `GET /api/namespaces` – list unique GitLab namespaces discovered through repository sync (`namespaceId`, `namespaceName`).
 - `DELETE /api/projects/{id}` – remove a project.
 - `GET /api/projects/{id}/repositories` / `PUT /api/projects/{id}/repositories` – manage repository assignments.
 - `GET /api/projects/{id}/interns` – list assignable interns including `workloadHours` for already assigned members.
@@ -85,6 +86,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V7__rename_uvazek_to_workload_hours.sql` – renames the intern workload column to `workload_hours` for clarity.
 - `V17__intern_project_reported_cost_flag.sql` – adds `intern_project.include_in_reported_cost`, wiring the flag into the cached project `reported_cost` calculation and refreshing triggers.
 - `V18__report_unregistered_usernames.sql` – umožní ukládat výkazy uživatelů, kteří ještě nejsou vedeni v tabulce `intern`, a udržet je mimo výpočet nákladů.
+- `V19__project_namespace.sql` – přejmenuje `project.gitlab_project_id` na `namespace_id`, přidá `namespace_name` a udrží jedinečnost namespace ID.
 - `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 - `V11__report_username_nullable.sql` – opětovně aplikuje `ALTER TABLE report ALTER COLUMN username DROP NOT NULL;` pro instance, které migrovaly z verze bez předchozí opravy.
 

@@ -41,31 +41,48 @@ public class SyncDao {
         }
     }
 
-    public Long createProjectByName(String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
+    public Long createProjectByName(String name,
+                                    Integer budget,
+                                    LocalDate budgetFrom,
+                                    LocalDate budgetTo,
+                                    Long namespaceId,
+                                    String namespaceName) {
         return jdbc.queryForObject(
-                "INSERT INTO project (name, budget, budget_from, budget_to) VALUES (?, ?, ?, ?) RETURNING id",
+                "INSERT INTO project (name, budget, budget_from, budget_to, namespace_id, namespace_name) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
                 Long.class,
-                name,
-                budget,
-                budgetFrom,
-                budgetTo);
-    }
-
-    public UpsertResult<Long> upsertProject(long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
-        int updated = jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE gitlab_project_id = ?",
                 name,
                 budget,
                 budgetFrom,
                 budgetTo,
-                gitlabProjectId);
-        if (updated > 0) {
-            Long id = jdbc.queryForObject("SELECT id FROM project WHERE gitlab_project_id = ?", Long.class, gitlabProjectId);
-            return new UpsertResult<>(id, false);
+                namespaceId,
+                namespaceName);
+    }
+
+    public UpsertResult<Long> upsertProject(Long namespaceId,
+                                            String namespaceName,
+                                            String name,
+                                            Integer budget,
+                                            LocalDate budgetFrom,
+                                            LocalDate budgetTo) {
+        int updated = 0;
+        if (namespaceId != null) {
+            updated = jdbc.update("UPDATE project SET name = ?, namespace_name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE namespace_id = ?",
+                    name,
+                    namespaceName,
+                    budget,
+                    budgetFrom,
+                    budgetTo,
+                    namespaceId);
+            if (updated > 0) {
+                Long id = jdbc.queryForObject("SELECT id FROM project WHERE namespace_id = ?", Long.class, namespaceId);
+                return new UpsertResult<>(id, false);
+            }
         }
         Long id = jdbc.queryForObject(
-                "INSERT INTO project (gitlab_project_id, name, budget, budget_from, budget_to) VALUES (?, ?, ?, ?, ?) RETURNING id",
+                "INSERT INTO project (namespace_id, namespace_name, name, budget, budget_from, budget_to) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
                 Long.class,
-                gitlabProjectId,
+                namespaceId,
+                namespaceName,
                 name,
                 budget,
                 budgetFrom,
@@ -73,13 +90,14 @@ public class SyncDao {
         return new UpsertResult<>(id, true);
     }
 
-    public Optional<Long> findProjectIdByGitLabId(long gitlabProjectId) {
-        List<Long> ids = jdbc.query("SELECT id FROM project WHERE gitlab_project_id = ?", (rs, rn) -> rs.getLong(1), gitlabProjectId);
+    public Optional<Long> findProjectIdByNamespaceId(long namespaceId) {
+        List<Long> ids = jdbc.query("SELECT id FROM project WHERE namespace_id = ?", (rs, rn) -> rs.getLong(1), namespaceId);
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 
     public record ProjectRow(Long id,
-                             Long gitlabProjectId,
+                             Long namespaceId,
+                             String namespaceName,
                              String name,
                              Integer budget,
                              LocalDate budgetFrom,
@@ -94,10 +112,11 @@ public class SyncDao {
                                      Integer teamMembers,
                                      Integer openIssues) {}
     public List<ProjectRow> listProjects() {
-        return jdbc.query("SELECT id, gitlab_project_id, name, budget, budget_from, budget_to, reported_cost FROM project ORDER BY name",
+        return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
                         rs.getLong("id"),
-                        (Long) rs.getObject("gitlab_project_id"),
+                        (Long) rs.getObject("namespace_id"),
+                        rs.getString("namespace_name"),
                         rs.getString("name"),
                         (Integer) rs.getObject("budget"),
                         rs.getObject("budget_from", LocalDate.class),
@@ -541,13 +560,38 @@ public class SyncDao {
         }
     }
 
-    public void updateProject(long id, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {
-        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE id = ?",
+    public void updateProject(long id,
+                              String name,
+                              Integer budget,
+                              LocalDate budgetFrom,
+                              LocalDate budgetTo,
+                              Long namespaceId,
+                              String namespaceName) {
+        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ?, namespace_id = ?, namespace_name = ? WHERE id = ?",
                 name,
                 budget,
                 budgetFrom,
                 budgetTo,
+                namespaceId,
+                namespaceName,
                 id);
+    }
+
+    public record NamespaceRow(Long namespaceId, String namespaceName) {}
+
+    public List<NamespaceRow> listRepositoryNamespaces() {
+        String sql = """
+                SELECT namespace_name,
+                       MIN(namespace_id) AS namespace_id
+                FROM repository
+                WHERE namespace_name IS NOT NULL
+                GROUP BY namespace_name
+                ORDER BY namespace_name
+                """;
+        return jdbc.query(sql, (rs, rn) -> new NamespaceRow(
+                (Long) rs.getObject("namespace_id"),
+                rs.getString("namespace_name")
+        ));
     }
 
     public record ProjectInternRow(long id, String username, String firstName, String lastName) {}

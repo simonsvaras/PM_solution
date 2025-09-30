@@ -29,12 +29,15 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, 
   const fromText = formatDate(project.budgetFrom);
   const toText = formatDate(project.budgetTo);
   const periodLabel = fromText || toText ? `${fromText ?? '—'} – ${toText ?? '—'}` : 'Bez omezení';
+  const namespaceLabel = project.namespaceName
+    ? `${project.namespaceName}${typeof project.namespaceId === 'number' ? ` (ID ${project.namespaceId})` : ''}`
+    : 'Neuvedeno';
 
   return (
     <div className="projectCard" aria-label={`Projekt ${project.name}`}>
       <h3 className="projectCard__title">{project.name}</h3>
       <div className="projectCard__meta">
-        {typeof project.gitlabProjectId === 'number' && <div>GitLab ID: {project.gitlabProjectId}</div>}
+        <div>Namespace: {namespaceLabel}</div>
         <div>Rozpočet: {budgetLabel}</div>
         <div>Období rozpočtu: {periodLabel}</div>
         <div>Vykázané náklady: {reportedCostLabel}</div>

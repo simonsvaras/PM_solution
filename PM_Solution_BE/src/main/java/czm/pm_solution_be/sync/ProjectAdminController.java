@@ -15,23 +15,34 @@ public class ProjectAdminController {
     public ProjectAdminController(SyncDao dao) { this.dao = dao; }
 
     public record ProjectDto(Long id,
-                             Long gitlabProjectId,
+                             Long namespaceId,
+                             String namespaceName,
                              String name,
                              Integer budget,
                              LocalDate budgetFrom,
                              LocalDate budgetTo,
                              BigDecimal reportedCost) {}
-    public record CreateRequest(Long gitlabProjectId, String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
-    public record UpdateRequest(String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
+    public record CreateRequest(Long namespaceId,
+                                String namespaceName,
+                                String name,
+                                Integer budget,
+                                LocalDate budgetFrom,
+                                LocalDate budgetTo) {}
+    public record UpdateRequest(String name,
+                                 Integer budget,
+                                 LocalDate budgetFrom,
+                                 LocalDate budgetTo,
+                                 Long namespaceId,
+                                 String namespaceName) {}
 
     @PostMapping
     public ResponseEntity<ProjectDto> create(@RequestBody CreateRequest req) {
-        if (req == null || req.gitlabProjectId == null || req.name == null || req.name.isBlank()) {
-            throw new IllegalArgumentException("gitlabProjectId a name jsou povinné");
+        if (req == null || req.namespaceId == null || req.name == null || req.name.isBlank()) {
+            throw new IllegalArgumentException("namespaceId a name jsou povinné");
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
-        SyncDao.UpsertResult<Long> res = dao.upsertProject(req.gitlabProjectId, req.name, req.budget(), req.budgetFrom(), req.budgetTo());
-        ProjectDto body = findProjectOrFallback(res.id, req.gitlabProjectId, req.name, req.budget(), req.budgetFrom(), req.budgetTo());
+        SyncDao.UpsertResult<Long> res = dao.upsertProject(req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo());
+        ProjectDto body = findProjectOrFallback(res.id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo());
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -41,15 +52,20 @@ public class ProjectAdminController {
             throw new IllegalArgumentException("name je povinné");
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
-        dao.updateProject(id, req.name, req.budget(), req.budgetFrom(), req.budgetTo());
+        dao.updateProject(id, req.name, req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName());
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.gitlabProjectId(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
+                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
     }
 
-    public record CreateByNameRequest(String name, Integer budget, LocalDate budgetFrom, LocalDate budgetTo) {}
+    public record CreateByNameRequest(String name,
+                                      Integer budget,
+                                      LocalDate budgetFrom,
+                                      LocalDate budgetTo,
+                                      Long namespaceId,
+                                      String namespaceName) {}
 
     @PostMapping("/by-name")
     public ResponseEntity<ProjectDto> createByName(@RequestBody CreateByNameRequest req) {
@@ -57,8 +73,8 @@ public class ProjectAdminController {
             throw new IllegalArgumentException("name je povinné");
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
-        Long id = dao.createProjectByName(req.name, req.budget(), req.budgetFrom(), req.budgetTo());
-        ProjectDto body = findProjectOrFallback(id, null, req.name, req.budget(), req.budgetFrom(), req.budgetTo());
+        Long id = dao.createProjectByName(req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName());
+        ProjectDto body = findProjectOrFallback(id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo());
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -78,7 +94,8 @@ public class ProjectAdminController {
     }
 
     private ProjectDto findProjectOrFallback(Long id,
-                                             Long gitlabProjectId,
+                                             Long namespaceId,
+                                             String namespaceName,
                                              String name,
                                              Integer budget,
                                              LocalDate budgetFrom,
@@ -89,7 +106,7 @@ public class ProjectAdminController {
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.gitlabProjectId(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
-                .orElse(new ProjectDto(id, gitlabProjectId, name, budget, budgetFrom, budgetTo, BigDecimal.ZERO));
+                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
+                .orElse(new ProjectDto(id, namespaceId, namespaceName, name, budget, budgetFrom, budgetTo, BigDecimal.ZERO));
     }
 }

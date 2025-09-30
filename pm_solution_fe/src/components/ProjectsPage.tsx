@@ -8,10 +8,12 @@ import {
   createProjectByName,
   deleteProject,
   getProjects,
+  getRepositoryNamespaces,
   updateProject,
   type ErrorResponse,
   type ProjectDTO,
   type ProjectBudgetPayload,
+  type ProjectNamespaceOption,
 } from '../api';
 
 /**
@@ -46,6 +48,11 @@ export default function ProjectsPage() {
   const [editing, setEditing] = useState<ProjectDTO | null>(null);
   const [manageProject, setManageProject] = useState<ProjectDTO | null>(null);
   const [manageTeamProject, setManageTeamProject] = useState<ProjectDTO | null>(null);
+  const [namespaceOptions, setNamespaceOptions] = useState<ProjectNamespaceOption[]>([]);
+  const [namespaceLoading, setNamespaceLoading] = useState(false);
+  const [namespaceError, setNamespaceError] = useState<string | null>(null);
+  const [selectedNamespaceName, setSelectedNamespaceName] = useState<string | null>(null);
+  const [selectedNamespaceId, setSelectedNamespaceId] = useState<number | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -62,11 +69,36 @@ export default function ProjectsPage() {
 
   useEffect(() => { reload(); }, []);
 
+  useEffect(() => {
+    async function loadNamespaces() {
+      setNamespaceLoading(true);
+      setNamespaceError(null);
+      try {
+        const list = await getRepositoryNamespaces();
+        setNamespaceOptions(list);
+      } catch (e) {
+        const err = e as ErrorResponse;
+        setNamespaceError(err?.error?.message ?? 'Nepodařilo se načíst namespaces.');
+      } finally {
+        setNamespaceLoading(false);
+      }
+    }
+    void loadNamespaces();
+  }, []);
+
   const sorted = useMemo(() => (projects || []).slice().sort((a, b) => a.name.localeCompare(b.name)), [projects]);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
     [],
   );
+  const effectiveNamespaceOptions = useMemo(() => {
+    if (!selectedNamespaceName) return namespaceOptions;
+    const exists = namespaceOptions.some(opt => opt.namespaceName === selectedNamespaceName);
+    if (exists) return namespaceOptions;
+    return [...namespaceOptions, { namespaceId: selectedNamespaceId, namespaceName: selectedNamespaceName }].sort((a, b) =>
+      a.namespaceName.localeCompare(b.namespaceName, 'cs'),
+    );
+  }, [namespaceOptions, selectedNamespaceId, selectedNamespaceName]);
 
   // Open modal for creating a fresh project
   function openModal() {
@@ -81,6 +113,8 @@ export default function ProjectsPage() {
     setCreateError(null);
     setJustCreated(null);
     setEditing(null);
+    setSelectedNamespaceId(null);
+    setSelectedNamespaceName(null);
   }
 
   async function onCreate() {
@@ -113,6 +147,8 @@ export default function ProjectsPage() {
       budget: parsedBudget,
       budgetFrom: normalizedFrom,
       budgetTo: normalizedTo,
+      namespaceId: selectedNamespaceName ? selectedNamespaceId ?? null : null,
+      namespaceName: selectedNamespaceName ?? null,
     };
 
     setCreating(true);
@@ -159,6 +195,8 @@ export default function ProjectsPage() {
     setBudgetError(null);
     setBudgetRangeError(null);
     setCreateError(null);
+    setSelectedNamespaceId(p.namespaceId ?? null);
+    setSelectedNamespaceName(p.namespaceName ?? null);
   }
 
   function onManageRepos(p: ProjectDTO) {
@@ -182,6 +220,13 @@ export default function ProjectsPage() {
               <b>Projekt vytvořen</b>
               <p>
                 ID: {justCreated.id} • Název: <b>{justCreated.name}</b>
+                <br />
+                Namespace: {justCreated.namespaceName ? (
+                  <>
+                    <b>{justCreated.namespaceName}</b>
+                    {typeof justCreated.namespaceId === 'number' ? ` (ID ${justCreated.namespaceId})` : ''}
+                  </>
+                ) : '—'}
                 <br />
                 Rozpočet: {justCreated.budget !== null ? `${justCreated.budget.toLocaleString('cs-CZ')} Kč` : 'neuveden'}
                 <br />
@@ -256,6 +301,34 @@ export default function ProjectsPage() {
             </div>
           </div>
           {budgetRangeError && <div className="errorText">{budgetRangeError}</div>}
+          <div className="field">
+            <label htmlFor="project-namespace">Namespace (volitelné)</label>
+            <select
+              id="project-namespace"
+              value={selectedNamespaceName ?? ''}
+              onChange={e => {
+                const value = e.target.value;
+                if (!value) {
+                  setSelectedNamespaceId(null);
+                  setSelectedNamespaceName(null);
+                  return;
+                }
+                const option = namespaceOptions.find(opt => opt.namespaceName === value) ?? null;
+                setSelectedNamespaceId(option?.namespaceId ?? selectedNamespaceId ?? null);
+                setSelectedNamespaceName(value);
+              }}
+              disabled={namespaceLoading}
+            >
+              <option value="">Bez namespace</option>
+              {effectiveNamespaceOptions.map(opt => (
+                <option key={opt.namespaceName} value={opt.namespaceName}>
+                  {opt.namespaceName}
+                </option>
+              ))}
+            </select>
+            {namespaceLoading && <div className="inline-status"><span className="spinner" /> Načítám namespaces…</div>}
+            {namespaceError && <div className="errorText">{namespaceError}</div>}
+          </div>
           {createError && (
             <div className="errorText">
               {createError.error.message} (kód: {createError.error.code})

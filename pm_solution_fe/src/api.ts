@@ -55,7 +55,8 @@ export type DeleteReportsResult = {
 
 export type ProjectDTO = {
   id: number;
-  gitlabProjectId: number | null;
+  namespaceId: number | null;
+  namespaceName: string | null;
   name: string;
   budget: number | null;
   budgetFrom: string | null;
@@ -77,6 +78,12 @@ export type ProjectBudgetPayload = {
   budget?: number | null;
   budgetFrom?: string | null;
   budgetTo?: string | null;
+  namespaceId?: number | null;
+  namespaceName?: string | null;
+};
+export type ProjectNamespaceOption = {
+  namespaceId: number | null;
+  namespaceName: string;
 };
 export type RepositoryAssignmentDTO = {
   id: number;
@@ -342,6 +349,12 @@ export async function getProjects(): Promise<ProjectDTO[]> {
   const res = await fetch(`${API_BASE}/api/projects`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO[]>(res);
+}
+
+export async function getRepositoryNamespaces(): Promise<ProjectNamespaceOption[]> {
+  const res = await fetch(`${API_BASE}/api/namespaces`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectNamespaceOption[]>(res);
 }
 
 export async function getProjectsOverview(): Promise<ProjectOverviewDTO[]> {
