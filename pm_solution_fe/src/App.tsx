@@ -11,10 +11,25 @@ import ProjectReportProjectDetailPage from './components/ProjectReportProjectDet
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
-import { API_BASE, deleteReports, getProjects, getProjectsOverview, syncAllGlobal, syncIssuesAll, syncRepositories } from './api';
+import {
+  API_BASE,
+  deleteReports,
+  getProjects,
+  getProjectsOverview,
+  syncAllGlobal,
+  syncIssuesAll,
+  syncRepositories,
+  syncReportsAll,
+} from './api';
+import {
+  REPORTING_PERIOD_END_DAY,
+  REPORTING_PERIOD_START_DAY,
+  datetimeLocalToIso,
+  getDefaultReportingPeriod,
+} from './config/reportingPeriod';
 import type { AllResult, ErrorResponse, ProjectDTO, ProjectOverviewDTO, SyncSummary } from './api';
 
-type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL';
+type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL' | 'REPORTS';
 
 const modules: Module[] = [
   {
@@ -160,6 +175,9 @@ function App() {
   const [deltaOnly, setDeltaOnly] = useState(true);
   const [assignedOnly, setAssignedOnly] = useState(false);
   const [since, setSince] = useState<string>('');
+  const defaultReportingPeriod = useMemo(() => getDefaultReportingPeriod(), []);
+  const [reportsFrom, setReportsFrom] = useState(defaultReportingPeriod.from);
+  const [reportsTo, setReportsTo] = useState(defaultReportingPeriod.to);
 
   const [running, setRunning] = useState<ActionKind | null>(null);
   const [result, setResult] = useState<SyncSummary | AllResult | null>(null);
@@ -308,6 +326,21 @@ function App() {
   );
 
   const canRun = useMemo(() => running === null, [running]);
+  const isReportRangeValid = useMemo(() => {
+    if (!reportsFrom || !reportsTo) {
+      return false;
+    }
+    const fromDate = new Date(reportsFrom);
+    const toDate = new Date(reportsTo);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return false;
+    }
+    return fromDate <= toDate;
+  }, [reportsFrom, reportsTo]);
+  const reportRangeMessage = isReportRangeValid
+    ? `Výchozí období: ${REPORTING_PERIOD_START_DAY}. – ${REPORTING_PERIOD_END_DAY}. den v měsíci (hodnoty můžete dle potřeby upravit).`
+    : 'Zkontrolujte platnost data „od“ a „do“ (datum od nesmí být později než datum do).';
+  const reportRangeHintClassName = `toolbar__hint${isReportRangeValid ? '' : ' toolbar__hint--error'}`;
 
   const activeModule = useMemo(
     () => modules.find(module => module.key === activeModuleKey),
@@ -568,6 +601,21 @@ function App() {
     lastAction.current = doAll;
   }
 
+  async function doReports() {
+    if (!isReportRangeValid) {
+      showToast('warning', 'Neplatné datum od/do. Upravte rozsah a zkuste to znovu.');
+      return;
+    }
+    await run('REPORTS', async () => {
+      const res = await syncReportsAll({
+        from: datetimeLocalToIso(reportsFrom),
+        to: datetimeLocalToIso(reportsTo),
+      });
+      setResult(res);
+    });
+    lastAction.current = doReports;
+  }
+
   async function handleDeleteAllReports() {
     if (purgingReports) return;
     const hasProjectSelection = selectedProjects.length > 0;
@@ -698,24 +746,47 @@ function App() {
                       <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
                       <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
                     </label>
-                    <label>
-                      <span>Since</span>
-                      <input
-                        type="text"
-                        placeholder="YYYY-MM-DDTHH:mm:ssZ"
-                        value={since}
-                        onChange={e => setSince(e.target.value)}
-                      />
-                    </label>
-                  </div>
+                  <label>
+                    <span>Since</span>
+                    <input
+                      type="text"
+                      placeholder="YYYY-MM-DDTHH:mm:ssZ"
+                      value={since}
+                      onChange={e => setSince(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Reporty od</span>
+                    <input
+                      type="datetime-local"
+                      value={reportsFrom}
+                      onChange={e => setReportsFrom(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Reporty do</span>
+                    <input
+                      type="datetime-local"
+                      value={reportsTo}
+                      onChange={e => setReportsTo(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <p className={reportRangeHintClassName}>{reportRangeMessage}</p>
 
-                  <div className="actions">
-                    <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>
-                      Sync Repositories
-                    </button>
-                    <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
-                    <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
-                  </div>
+                <div className="actions">
+                  <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>
+                    Sync Repositories
+                  </button>
+                  <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
+                  <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
+                  <button
+                    onClick={doReports}
+                    disabled={running === 'REPORTS' || running === 'ALL' || !isReportRangeValid}
+                  >
+                    Synchronizovat reporty
+                  </button>
+                </div>
 
                   <div className="results">
                     {inlineStatus}

@@ -13,6 +13,11 @@ Prerequisites
 - Node.js 18+
 - Backend running on `http://localhost:8081` (adjust via `VITE_API_BASE_URL` in `.env`).
 
+Configuration
+-------------
+- `VITE_REPORTING_PERIOD_START_DAY` (default `18`) and `VITE_REPORTING_PERIOD_END_DAY` (default `17`) určují, jaké datumy „od“ a
+  „do“ se předvyplní pro synchronizaci reportů na stránce On-demand.
+
 Scripts
 -------
 ```bash
