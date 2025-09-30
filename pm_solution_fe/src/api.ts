@@ -17,6 +17,12 @@ export type ProjectReportSyncPayload = {
   to?: string;
 };
 
+export type GlobalReportSyncPayload = {
+  sinceLast?: boolean;
+  from?: string;
+  to?: string;
+};
+
 export type ErrorBody = {
   code: string;
   message: string;
@@ -523,6 +529,17 @@ export async function syncAllGlobal(full: boolean, assignedOnly: boolean, since?
   const res = await fetch(`${API_BASE}/api/sync/all?${qs.toString()}`, { method: "POST" });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<AllResult>(res);
+}
+
+export async function syncReportsAll(payload: GlobalReportSyncPayload = {}): Promise<SyncSummary> {
+  const hasBody = Object.keys(payload).length > 0;
+  const res = await fetch(`${API_BASE}/api/sync/reports`, {
+    method: "POST",
+    headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+    body: hasBody ? JSON.stringify(payload) : undefined,
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<SyncSummary>(res);
 }
 
 // ----- Async jobs (issues) -----

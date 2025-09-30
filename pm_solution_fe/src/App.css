@@ -284,6 +284,18 @@
   min-width: 220px;
 }
 
+.toolbar__hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.toolbar__hint--error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
