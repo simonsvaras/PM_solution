@@ -754,62 +754,75 @@ function App() {
           {isOnDemand ? (
             <>
               <section className="panel">
-                <div className="panel__body">
-                  <div className="toolbar">
-                    <label className="checkbox">
-                      <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
-                      <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
-                    </label>
-                    <label className="checkbox">
-                      <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
-                      <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
-                    </label>
-                  <label>
-                    <span>Since</span>
-                    <input
-                      type="text"
-                      placeholder="YYYY-MM-DDTHH:mm:ssZ"
-                      value={since}
-                      onChange={e => setSince(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>Reporty od</span>
-                    <input
-                      type="datetime-local"
-                      value={reportsFrom}
-                      onChange={e => setReportsFrom(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>Reporty do</span>
-                    <input
-                      type="datetime-local"
-                      value={reportsTo}
-                      onChange={e => setReportsTo(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <p className={reportRangeHintClassName}>{reportRangeMessage}</p>
+                <div className="panel__body panel__body--on-demand">
+                  <div className="on-demand-layout">
+                    <div className="on-demand-layout__filters">
+                      <h2 className="on-demand-layout__title">Nastavení synchronizace</h2>
+                      <div className="on-demand-layout__toggles">
+                        <label className="checkbox">
+                          <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
+                          <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
+                        </label>
+                        <label className="checkbox">
+                          <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
+                          <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
+                        </label>
+                      </div>
+                      <div className="on-demand-layout__fields">
+                        <label className="on-demand-layout__field">
+                          <span>Since</span>
+                          <input
+                            type="text"
+                            placeholder="YYYY-MM-DDTHH:mm:ssZ"
+                            value={since}
+                            onChange={e => setSince(e.target.value)}
+                          />
+                        </label>
+                        <label className="on-demand-layout__field">
+                          <span>Reporty od</span>
+                          <input
+                            type="datetime-local"
+                            value={reportsFrom}
+                            onChange={e => setReportsFrom(e.target.value)}
+                          />
+                        </label>
+                        <label className="on-demand-layout__field">
+                          <span>Reporty do</span>
+                          <input
+                            type="datetime-local"
+                            value={reportsTo}
+                            onChange={e => setReportsTo(e.target.value)}
+                          />
+                        </label>
+                      </div>
+                      <p className={reportRangeHintClassName}>{reportRangeMessage}</p>
+                    </div>
 
-                <div className="actions">
-                  <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>
-                    Sync Repositories
-                  </button>
-                  <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
-                  <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
-                  <button
-                    onClick={doReports}
-                    disabled={running === 'REPORTS' || running === 'ALL' || !isReportRangeValid}
-                  >
-                    Synchronizovat reporty
-                  </button>
-                </div>
+                    <div className="on-demand-layout__actions">
+                      <h2 className="on-demand-layout__title">Spustit synchronizaci</h2>
+                      <div className="actions">
+                        <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>
+                          Sync Repositories
+                        </button>
+                        <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
+                        <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
+                        <button
+                          onClick={doReports}
+                          disabled={running === 'REPORTS' || running === 'ALL' || !isReportRangeValid}
+                        >
+                          Synchronizovat reporty
+                        </button>
+                      </div>
+                    </div>
 
-                  <div className="results">
-                    {inlineStatus}
-                    {resCard}
-                    {errCard}
+                    <div className="on-demand-layout__results">
+                      <h2 className="on-demand-layout__title">Stav a výsledky</h2>
+                      <div className="results">
+                        {inlineStatus}
+                        {resCard}
+                        {errCard}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="panel__footer">
