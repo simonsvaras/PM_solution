@@ -176,6 +176,10 @@
   gap: 24px;
 }
 
+.panel__body--on-demand {
+  gap: clamp(24px, 4vw, 40px);
+}
+
 .panel__footer {
   border-top: 1px solid var(--color-border);
   padding-top: 16px;
@@ -263,6 +267,7 @@
 }
 
 .toolbar label,
+.on-demand-layout__field,
 .checkbox {
   display: flex;
   align-items: center;
@@ -274,7 +279,8 @@
   font-size: 0.9rem;
 }
 
-.toolbar label span {
+.toolbar label span,
+.on-demand-layout__field span {
   font-weight: 600;
   color: var(--color-text-primary);
 }
@@ -295,7 +301,13 @@
 .toolbar input[type='search'],
 .toolbar input[type='number'],
 .toolbar input[type='datetime-local'],
-.toolbar input:not([type]) {
+.toolbar input:not([type]),
+.on-demand-layout__field select,
+.on-demand-layout__field input[type='text'],
+.on-demand-layout__field input[type='search'],
+.on-demand-layout__field input[type='number'],
+.on-demand-layout__field input[type='datetime-local'],
+.on-demand-layout__field input:not([type]) {
   min-width: 220px;
 }
 
@@ -355,6 +367,89 @@
 
 .card-summary__actions {
   margin-top: 12px;
+}
+
+.on-demand-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.on-demand-layout__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.on-demand-layout__filters,
+.on-demand-layout__actions,
+.on-demand-layout__results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.on-demand-layout__toggles {
+  display: grid;
+  gap: 12px;
+}
+
+.on-demand-layout__fields {
+  display: grid;
+  gap: 12px;
+}
+
+.on-demand-layout__results .results,
+.on-demand-layout__actions .actions {
+  margin-top: 4px;
+}
+
+@media (min-width: 640px) {
+  .on-demand-layout__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .panel__body--on-demand {
+    gap: 32px;
+  }
+
+  .on-demand-layout {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-areas:
+      'filters actions'
+      'filters results';
+    align-items: start;
+  }
+
+  .on-demand-layout__filters {
+    grid-area: filters;
+  }
+
+  .on-demand-layout__actions {
+    grid-area: actions;
+  }
+
+  .on-demand-layout__results {
+    grid-area: results;
+  }
+
+  .on-demand-layout__fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  .on-demand-layout__field {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .on-demand-layout__field input,
+  .on-demand-layout__field select {
+    width: 100%;
+  }
 }
 
 .spinner {
