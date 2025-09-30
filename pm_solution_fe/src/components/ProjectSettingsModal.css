@@ -1,0 +1,67 @@
+.projectSettingsModal .modal__body--settings {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.projectSettings {
+  display: flex;
+  min-height: 540px;
+}
+
+.projectSettings__nav {
+  flex: 0 0 220px;
+  border-right: 1px solid #e0e0e0;
+  background-color: #fafafa;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  gap: 4px;
+}
+
+.projectSettings__navItem {
+  text-align: left;
+  padding: 12px 24px;
+  border: none;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #444;
+}
+
+.projectSettings__navItem:hover,
+.projectSettings__navItem:focus {
+  background-color: #ececec;
+  outline: none;
+}
+
+.projectSettings__navItem--active {
+  font-weight: 600;
+  color: #1a1a1a;
+  border-left: 4px solid #0062ff;
+  background-color: #e8f0ff;
+}
+
+.projectSettings__content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.projectSettings__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+}
+
+.projectSettings__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.modal--wide.projectSettingsModal {
+  max-width: 1024px;
+}

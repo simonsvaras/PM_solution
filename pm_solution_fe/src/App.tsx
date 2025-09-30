@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import Navbar, { type Module } from './components/Navbar';
 import ProjectsPage from './components/ProjectsPage';
@@ -515,6 +515,16 @@ function App() {
     );
   }
 
+  const handleReportProjectUpdated = useCallback((next: ProjectOverviewDTO) => {
+    setSelectedReportProject(prev => (prev && prev.id === next.id ? { ...prev, ...next } : prev));
+    setReportProjectsCache(prev => {
+      const map = new Map(prev);
+      const existing = map.get(next.id);
+      map.set(next.id, existing ? { ...existing, ...next } : next);
+      return map;
+    });
+  }, []);
+
   function handleExitReportProject() {
     setSelectedReportProject(null);
     setReportView(null);
@@ -912,6 +922,7 @@ function App() {
                 project={selectedReportProject}
                 onBack={handleExitReportProject}
                 onShowDetail={handleShowReportDetail}
+                onProjectUpdated={handleReportProjectUpdated}
               />
             )
           ) : isProjectsOverview ? (

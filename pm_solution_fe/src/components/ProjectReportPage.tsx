@@ -4,18 +4,20 @@ import TeamReportTable from './TeamReportTable';
 import type { ProjectOverviewDTO, SyncSummary, TeamReportTeam, ErrorResponse } from '../api';
 import { getReportTeams, syncProjectReports } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
+import ProjectSettingsModal from './ProjectSettingsModal';
 
 type ProjectReportPageProps = {
   project: ProjectOverviewDTO;
   onBack: () => void;
   onShowDetail: () => void;
+  onProjectUpdated: (next: ProjectOverviewDTO) => void;
 };
 
 /**
  * Page displaying project level metrics together with the controls for triggering
  * report synchronisation.
  */
-export default function ProjectReportPage({ project, onBack, onShowDetail }: ProjectReportPageProps) {
+export default function ProjectReportPage({ project, onBack, onShowDetail, onProjectUpdated }: ProjectReportPageProps) {
   const [sinceLast, setSinceLast] = useState(true);
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
@@ -25,6 +27,13 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
   const [team, setTeam] = useState<TeamReportTeam | null>(null);
   const [teamStatus, setTeamStatus] = useState<'idle' | 'loading' | 'loaded'>('idle');
   const [teamError, setTeamError] = useState<ErrorResponse | null>(null);
+  const [teamReloadToken, setTeamReloadToken] = useState(0);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentProject, setCurrentProject] = useState<ProjectOverviewDTO>(project);
+
+  useEffect(() => {
+    setCurrentProject(project);
+  }, [project]);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
@@ -43,6 +52,13 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
         const matchedTeam = teams.find(item => item.projectId === project.id) ?? null;
         setTeam(matchedTeam);
         setTeamStatus('loaded');
+        if (matchedTeam) {
+          setCurrentProject(prev =>
+            prev.id === project.id
+              ? { ...prev, teamMembers: matchedTeam.interns.length }
+              : prev,
+          );
+        }
       })
       .catch(err => {
         if (cancelled) return;
@@ -53,9 +69,9 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
     return () => {
       cancelled = true;
     };
-  }, [project.id]);
+  }, [project.id, teamReloadToken]);
 
-  const teamTitle = team?.projectName ?? project.name;
+  const teamTitle = team?.projectName ?? currentProject.name;
   const teamErrorMessage = teamError?.error?.message ?? 'Report týmu se nepodařilo načíst.';
 
   const teamCard = (() => {
@@ -153,27 +169,45 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
     }
   }
 
+  function handleProjectSettingsSaved(next: ProjectOverviewDTO) {
+    setCurrentProject(next);
+    onProjectUpdated(next);
+  }
+
+  function handleTeamUpdated() {
+    setTeamReloadToken(token => token + 1);
+  }
+
   return (
     <>
       <div className="projectReport__toolbar">
         <button type="button" className="projectReport__backButton" onClick={onBack}>
           ← Zpět na projekty
         </button>
-        <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
-          Zobrazit detailní report
-        </button>
+        <div className="projectReport__toolbarActions">
+          <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
+            Zobrazit detailní report
+          </button>
+          <button
+            type="button"
+            className="projectReport__settingsButton"
+            onClick={() => setIsSettingsOpen(true)}
+          >
+            Nastavení projektu
+          </button>
+        </div>
       </div>
       <div className="projectReportPage">
         {teamCard}
-        <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
+        <section className="projectReport" aria-label={`Report projektu ${currentProject.name}`}>
         <div className="projectReport__card projectReport__overviewCard">
           <div className="projectReport__overviewHeader">
             <h2>Otevřené issue</h2>
-            <p className="projectReport__metric">{project.openIssues}</p>
+            <p className="projectReport__metric">{currentProject.openIssues}</p>
           </div>
           <BudgetBurnIndicator
-            budget={project.budget}
-            reportedCost={project.reportedCost}
+            budget={currentProject.budget}
+            reportedCost={currentProject.reportedCost}
             currencyFormatter={currencyFormatter}
           />
         </div>
@@ -238,6 +272,13 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
           </button>
         </div>
       </section>
+      <ProjectSettingsModal
+        project={currentProject}
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onProjectUpdated={handleProjectSettingsSaved}
+        onTeamUpdated={handleTeamUpdated}
+      />
     </div>
     </>
   );
