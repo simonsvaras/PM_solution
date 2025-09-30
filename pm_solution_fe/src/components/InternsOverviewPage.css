@@ -20,12 +20,6 @@
   flex: 1 1 280px;
 }
 
-.internsOverview__summary h2 {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 600;
-}
-
 .internsOverview__summary p {
   margin: 0;
   font-size: 1rem;
@@ -163,44 +157,6 @@
 .internsOverview__projects td {
   font-size: 0.95rem;
   color: #1f2937;
-}
-
-.internsOverview__pagination {
-  margin-top: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-}
-
-.internsOverview__pagination p {
-  margin: 0;
-  font-size: 0.95rem;
-  color: #374151;
-}
-
-.internsOverview__paginationButton {
-  appearance: none;
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: #fff;
-  padding: 0.5rem 1.25rem;
-  border-radius: 999px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.internsOverview__paginationButton:disabled {
-  background: #93c5fd;
-  border-color: #93c5fd;
-  cursor: not-allowed;
-  color: #1e3a8a;
-}
-
-.internsOverview__paginationButton:not(:disabled):hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
 }
 
 @media (max-width: 768px) {

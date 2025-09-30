@@ -33,9 +33,6 @@ export default function InternsOverviewPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
-
-  const pageSize = 4;
 
   useEffect(() => {
     setLoading(true);
@@ -60,13 +57,7 @@ export default function InternsOverviewPage() {
     });
   }, [interns, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredInterns.length / pageSize));
-  const currentPage = Math.min(page, totalPages - 1);
-  const paginatedInterns = filteredInterns.slice(currentPage * pageSize, currentPage * pageSize + pageSize);
-
-  useEffect(() => {
-    setPage(0);
-  }, [search, interns.length]);
+  const visibleInterns = filteredInterns;
 
   function openDetail(intern: InternOverview) {
     setSelected(intern);
@@ -111,21 +102,22 @@ export default function InternsOverviewPage() {
       <>
         <header className="internsOverview__summary">
           <div>
-            <h2>Souhrn stážistů</h2>
             <p>
               Celkem evidováno <strong>{interns.length}</strong> stážistů, kteří dohromady vykázali{' '}
               <strong>{formatHours(totalTrackedHours)}</strong>.
             </p>
-            {search ? (
-              <p>
-                Zobrazuje se <strong>{paginatedInterns.length}</strong> z{' '}
-                <strong>{filteredInterns.length}</strong> vyfiltrovaných stážistů.
-              </p>
-            ) : (
-              <p>
-                Zobrazuje se <strong>{paginatedInterns.length}</strong> z <strong>{interns.length}</strong> stážistů na této stránce.
-              </p>
-            )}
+            <p>
+              {search ? (
+                <>
+                  Zobrazuje se <strong>{visibleInterns.length}</strong> z <strong>{interns.length}</strong> stážistů odpovídajících
+                  filtru.
+                </>
+              ) : (
+                <>
+                  Zobrazuje se <strong>{visibleInterns.length}</strong> stážistů.
+                </>
+              )}
+            </p>
           </div>
           <label className="internsOverview__searchLabel">
             <span className="internsOverview__searchLabelText">Vyhledat podle jména nebo username</span>
@@ -139,35 +131,12 @@ export default function InternsOverviewPage() {
           </label>
         </header>
         <div className="internsOverview__grid" role="list">
-          {paginatedInterns.map(intern => (
+          {visibleInterns.map(intern => (
             <div key={intern.id} role="listitem">
               <InternCard intern={intern} onOpenDetail={openDetail} />
             </div>
           ))}
         </div>
-        {totalPages > 1 ? (
-          <nav className="internsOverview__pagination" aria-label="Stránkování stážistů">
-            <button
-              type="button"
-              className="internsOverview__paginationButton"
-              onClick={() => setPage(Math.max(0, currentPage - 1))}
-              disabled={currentPage === 0}
-            >
-              Předchozí
-            </button>
-            <p>
-              Stránka <strong>{currentPage + 1}</strong> z <strong>{totalPages}</strong>
-            </p>
-            <button
-              type="button"
-              className="internsOverview__paginationButton"
-              onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
-              disabled={currentPage >= totalPages - 1}
-            >
-              Další
-            </button>
-          </nav>
-        ) : null}
       </>
     );
   }

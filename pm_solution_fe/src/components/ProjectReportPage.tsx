@@ -154,17 +154,18 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
   }
 
   return (
-    <div className="projectReportPage">
-      {teamCard}
-      <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
-        <div className="projectReport__toolbar">
-          <button type="button" className="projectReport__backButton" onClick={onBack}>
-            ← Zpět na projekty
-          </button>
-          <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
-            Zobrazit detailní report
-          </button>
-        </div>
+    <>
+      <div className="projectReport__toolbar">
+        <button type="button" className="projectReport__backButton" onClick={onBack}>
+          ← Zpět na projekty
+        </button>
+        <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
+          Zobrazit detailní report
+        </button>
+      </div>
+      <div className="projectReportPage">
+        {teamCard}
+        <section className="projectReport" aria-label={`Report projektu ${project.name}`}>
         <div className="projectReport__card projectReport__overviewCard">
           <div className="projectReport__overviewHeader">
             <h2>Otevřené issue</h2>
@@ -238,5 +239,6 @@ export default function ProjectReportPage({ project, onBack, onShowDetail }: Pro
         </div>
       </section>
     </div>
+    </>
   );
 }

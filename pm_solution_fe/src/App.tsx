@@ -329,6 +329,17 @@ function App() {
     isReportsProject && (reportView === 'summary' || reportView === null || reportView === undefined);
   const isReportsProjectDetail = isReportsProject && reportView !== null && reportView !== 'summary';
   const shouldUseFullWidthContent = isReportsProjectDetail || isProjectsOverview;
+  const appContentClassNames = ['app-content'];
+  if (isProjectsOverview) {
+    appContentClassNames.push('app-content--projects-overview');
+  }
+  const appContentInnerClassNames = ['app-content__inner'];
+  if (shouldUseFullWidthContent) {
+    appContentInnerClassNames.push('app-content__inner--full');
+  }
+  if (isInternsOverview) {
+    appContentInnerClassNames.push('app-content__inner--interns-overview');
+  }
 
   const headerEyebrow =
     isReportsProjectDetail && selectedReportProject ? selectedReportProject.name : activeModule?.name ?? '';
@@ -670,8 +681,8 @@ function App() {
         activeSubmoduleKey={activeSubmoduleKey}
         onSelect={handleNavigation}
       />
-      <main className="app-content">
-        <div className={`app-content__inner${shouldUseFullWidthContent ? ' app-content__inner--full' : ''}`}>
+      <main className={appContentClassNames.join(' ')}>
+        <div className={appContentInnerClassNames.join(' ')}>
           <header className={`page-header${isReportsProjectDetail ? ' page-header--with-nav' : ''}`}>
             <div className="page-header__top">
               <div className="page-header__headline">

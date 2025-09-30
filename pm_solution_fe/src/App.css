@@ -21,6 +21,39 @@
   padding: 0;
 }
 
+.app-content--projects-overview {
+  margin: 0 auto;
+  width: 80%;
+  max-width: 80%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  padding: clamp(32px, 6vw, 72px);
+  padding-left: calc(var(--navbar-width) + clamp(32px, 6vw, 72px));
+}
+
+.app-content--projects-overview > .app-content__inner {
+  max-width: none;
+  width: 100%;
+}
+
+.app-content__inner--interns-overview {
+  width: 60%;
+  max-width: none;
+}
+
+@media (max-width: 1024px) {
+  .app-content--projects-overview {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .app-content__inner--interns-overview {
+    width: 100%;
+  }
+}
+
 .page-header {
   margin-bottom: 32px;
   display: flex;
