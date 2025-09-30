@@ -368,6 +368,8 @@ function App() {
   const appContentClassNames = ['app-content'];
   if (isProjectsOverview) {
     appContentClassNames.push('app-content--projects-overview');
+  } else if (isSyncReportsOverview) {
+    appContentClassNames.push('app-content--sync-report-overview');
   }
   const appContentInnerClassNames = ['app-content__inner'];
   if (shouldUseFullWidthContent) {

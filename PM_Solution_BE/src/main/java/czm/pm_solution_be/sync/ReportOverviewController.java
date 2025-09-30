@@ -31,11 +31,12 @@ public class ReportOverviewController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
+            @RequestParam(name = "untracked_only", defaultValue = "false") boolean untrackedOnly) {
         if (from != null && to != null && from.isAfter(to)) {
             throw ApiException.validation("Parametr \"od\" nesmí být později než \"do\".");
         }
-        return dao.listReportOverview(from, to).stream()
+        return dao.listReportOverview(from, to, untrackedOnly).stream()
                 .map(row -> new ReportOverviewItem(
                         row.issueTitle(),
                         row.repositoryName(),

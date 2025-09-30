@@ -426,6 +426,7 @@ export async function deleteAllReports(): Promise<DeleteReportsResult> {
 export async function getSyncReportOverview(params?: {
   from?: string;
   to?: string;
+  untrackedOnly?: boolean;
 }): Promise<SyncReportOverviewRowDTO[]> {
   const searchParams = new URLSearchParams();
   if (params?.from) {
@@ -433,6 +434,9 @@ export async function getSyncReportOverview(params?: {
   }
   if (params?.to) {
     searchParams.set("to", params.to);
+  }
+  if (params?.untrackedOnly) {
+    searchParams.set("untracked_only", "true");
   }
   const query = searchParams.toString();
   const res = await fetch(`${API_BASE}/api/sync/reports/overview${query ? `?${query}` : ""}`);

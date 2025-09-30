@@ -21,11 +21,24 @@
 
 .syncReportOverview__actions {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  gap: 12px;
 }
 
 .syncReportOverview__actions button {
   min-width: 160px;
+}
+
+.syncReportOverview__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.syncReportOverview__checkbox input {
+  margin: 0;
 }
 
 .syncReportOverview__hint {

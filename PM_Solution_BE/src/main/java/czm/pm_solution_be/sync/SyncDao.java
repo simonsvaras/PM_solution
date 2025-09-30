@@ -602,9 +602,9 @@ public class SyncDao {
                                     BigDecimal timeSpentHours,
                                     String resolvedUsername) {}
 
-    public List<ReportOverviewRow> listReportOverview(OffsetDateTime from, OffsetDateTime to) {
+    public List<ReportOverviewRow> listReportOverview(OffsetDateTime from, OffsetDateTime to, boolean untrackedOnly) {
         StringBuilder sql = new StringBuilder("SELECT r.repository_id, " +
-                "repo.name AS repository_name, " +
+                "repo.name_with_namespace AS repository_name, " +
                 "r.iid AS issue_iid, " +
                 "iss.title AS issue_title, " +
                 "r.spent_at, " +
@@ -625,7 +625,11 @@ public class SyncDao {
             params.add(to);
         }
 
-        sql.append(" ORDER BY r.spent_at DESC, repo.name ASC, r.iid NULLS LAST, iss.title NULLS LAST");
+        if (untrackedOnly) {
+            sql.append(" AND NOT EXISTS (SELECT 1 FROM projects_to_repositorie ptr WHERE ptr.repository_id = r.repository_id)");
+        }
+
+        sql.append(" ORDER BY r.spent_at DESC, repo.name_with_namespace ASC, r.iid NULLS LAST, iss.title NULLS LAST");
 
         return jdbc.query(sql.toString(), (rs, rn) -> new ReportOverviewRow(
                 rs.getLong("repository_id"),

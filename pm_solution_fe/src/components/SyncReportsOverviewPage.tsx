@@ -59,6 +59,7 @@ export default function SyncReportsOverviewPage() {
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorResponse | null>(null);
+  const [untrackedOnly, setUntrackedOnly] = useState(false);
 
   const isRangeValid = useMemo(() => {
     if (!from || !to) {
@@ -87,6 +88,7 @@ export default function SyncReportsOverviewPage() {
       const data = await getSyncReportOverview({
         from: datetimeLocalToIso(from),
         to: datetimeLocalToIso(to),
+        untrackedOnly,
       });
       setRows(data.map(mapDto));
     } catch (err) {
@@ -95,7 +97,7 @@ export default function SyncReportsOverviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, isRangeValid]);
+  }, [from, to, isRangeValid, untrackedOnly]);
 
   useEffect(() => {
     void loadReports();
@@ -125,6 +127,14 @@ export default function SyncReportsOverviewPage() {
             <button type="submit" disabled={!isRangeValid || loading}>
               {loading ? 'Načítám…' : 'Získat'}
             </button>
+            <label className="syncReportOverview__checkbox">
+              <input
+                type="checkbox"
+                checked={untrackedOnly}
+                onChange={event => setUntrackedOnly(event.target.checked)}
+              />
+              <span>Pouze netrackovaná repa</span>
+            </label>
           </div>
           <p className={hintClassName}>{hintText}</p>
         </form>
