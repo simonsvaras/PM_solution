@@ -53,6 +53,14 @@ export type DeleteReportsResult = {
   deleted: number;
 };
 
+export type SyncReportOverviewRowDTO = {
+  issueTitle: string | null;
+  repositoryName: string;
+  username: string | null;
+  spentAt: string;
+  timeSpentHours: number | string;
+};
+
 export type ProjectDTO = {
   id: number;
   gitlabProjectId: number | null;
@@ -400,6 +408,23 @@ export async function deleteReports(projectIds?: number[]): Promise<DeleteReport
 
 export async function deleteAllReports(): Promise<DeleteReportsResult> {
   return deleteReports();
+}
+
+export async function getSyncReportOverview(params?: {
+  from?: string;
+  to?: string;
+}): Promise<SyncReportOverviewRowDTO[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.from) {
+    searchParams.set("from", params.from);
+  }
+  if (params?.to) {
+    searchParams.set("to", params.to);
+  }
+  const query = searchParams.toString();
+  const res = await fetch(`${API_BASE}/api/sync/reports/overview${query ? `?${query}` : ""}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<SyncReportOverviewRowDTO[]>(res);
 }
 
 

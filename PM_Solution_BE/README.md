@@ -36,6 +36,7 @@ Key REST endpoints
   issue/intern for the project's repositories within the optional time range. Passing `internUsername` narrows the aggregation to a
   single intern while still returning the complete list of assigned members for UI filters.
 - `DELETE /api/sync/reports?projectId=1&projectId=2` – trvale odstraní uložené výkazy. Bez parametrů smaže vše, s opakovaným `projectId` zlikviduje jen záznamy repozitářů přiřazených k vybraným projektům. Volání vrací `{ "deleted": <počet_záznamů> }`.
+- `GET /api/sync/reports/overview?from={iso?}&to={iso?}` – vrátí jednotlivé záznamy z tabulky `report` včetně názvu issue, repozitáře, uživatele, času zápisu a počtu hodin. Parametry `from`/`to` jsou nepovinné a filtrují interval `spent_at`.
 
 ### Local project management
 - `GET /api/projects` – list local projects (id, gitlabProjectId, name, budget, budgetFrom, budgetTo).

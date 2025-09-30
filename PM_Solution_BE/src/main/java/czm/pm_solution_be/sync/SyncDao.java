@@ -550,6 +550,50 @@ public class SyncDao {
                 id);
     }
 
+    public record ReportOverviewRow(long repositoryId,
+                                    String repositoryName,
+                                    Long issueIid,
+                                    String issueTitle,
+                                    OffsetDateTime spentAt,
+                                    BigDecimal timeSpentHours,
+                                    String resolvedUsername) {}
+
+    public List<ReportOverviewRow> listReportOverview(OffsetDateTime from, OffsetDateTime to) {
+        StringBuilder sql = new StringBuilder("SELECT r.repository_id, " +
+                "repo.name AS repository_name, " +
+                "r.iid AS issue_iid, " +
+                "iss.title AS issue_title, " +
+                "r.spent_at, " +
+                "r.time_spent_hours, " +
+                "COALESCE(r.username, r.unregistered_username) AS resolved_username " +
+                "FROM report r " +
+                "JOIN repository repo ON repo.id = r.repository_id " +
+                "LEFT JOIN issue iss ON iss.repository_id = r.repository_id AND iss.iid = r.iid " +
+                "WHERE 1 = 1");
+
+        List<Object> params = new ArrayList<>();
+        if (from != null) {
+            sql.append(" AND r.spent_at >= ?");
+            params.add(from);
+        }
+        if (to != null) {
+            sql.append(" AND r.spent_at <= ?");
+            params.add(to);
+        }
+
+        sql.append(" ORDER BY r.spent_at DESC, repo.name ASC, r.iid NULLS LAST, iss.title NULLS LAST");
+
+        return jdbc.query(sql.toString(), (rs, rn) -> new ReportOverviewRow(
+                rs.getLong("repository_id"),
+                rs.getString("repository_name"),
+                (Long) rs.getObject("issue_iid"),
+                rs.getString("issue_title"),
+                rs.getObject("spent_at", OffsetDateTime.class),
+                rs.getBigDecimal("time_spent_hours"),
+                rs.getString("resolved_username")
+        ), params.toArray());
+    }
+
     public record ProjectInternRow(long id, String username, String firstName, String lastName) {}
 
     public record ProjectReportDetailRow(long repositoryId,
