@@ -27,12 +27,14 @@ public class SyncController {
 
     private final IssueSyncService issueSyncService;
     private final RepositorySyncService repositorySyncService;
+    private final MilestoneSyncService milestoneSyncService;
     private final ReportSyncService reportSyncService;
 
-    public SyncController(IssueSyncService issueSyncService, RepositorySyncService repositorySyncService, ReportSyncService reportSyncService) {
+    public SyncController(IssueSyncService issueSyncService, RepositorySyncService repositorySyncService, ReportSyncService reportSyncService, MilestoneSyncService milestoneSyncService) {
         this.issueSyncService = issueSyncService;
         this.repositorySyncService = repositorySyncService;
         this.reportSyncService = reportSyncService;
+        this.milestoneSyncService = milestoneSyncService;
     }
 
     @Deprecated
@@ -78,6 +80,14 @@ public class SyncController {
         SyncSummary s = issueSyncService.syncProjectIssues(projectId, full);
         s.durationMs = System.currentTimeMillis() - start;
         return s;
+    }
+
+    @PostMapping("/projects/{projectId}/milestones")
+    public SyncSummary syncMilestones(@PathVariable long projectId) {
+        long start = System.currentTimeMillis();
+        SyncSummary summary = milestoneSyncService.syncProjectMilestones(projectId);
+        summary.durationMs = System.currentTimeMillis() - start;
+        return summary;
     }
 
     @Schema(description = "Parametry pro synchronizaci reportů projektu.")

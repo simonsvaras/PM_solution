@@ -185,6 +185,20 @@ public class SyncDao {
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 
+    public record RepositoryNamespace(Long repositoryId, Long namespaceId) {}
+
+    public Optional<RepositoryNamespace> findRepositoryNamespaceByGitLabRepoId(long gitlabRepoId) {
+        List<RepositoryNamespace> rows = jdbc.query(
+                "SELECT id, namespace_id FROM repository WHERE gitlab_repo_id = ?",
+                (rs, rn) -> new RepositoryNamespace(
+                        rs.getLong("id"),
+                        (Long) rs.getObject("namespace_id")
+                ),
+                gitlabRepoId
+        );
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
     public void linkProjectRepository(long projectId, long repositoryId) {
         jdbc.update("INSERT INTO projects_to_repositorie (project_id, repository_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
                 projectId, repositoryId);
@@ -318,6 +332,43 @@ public class SyncDao {
                     ps.setString(13, milestoneState);
                     ps.setString(14, dueDate);
                     if (updatedAt == null) ps.setNull(15, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(15, updatedAt);
+                });
+        return new UpsertResult<>(null, true);
+    }
+
+    public UpsertResult<Void> upsertMilestone(long projectId,
+                                              long milestoneId,
+                                              long milestoneIid,
+                                              String title,
+                                              String state,
+                                              LocalDate dueDate,
+                                              OffsetDateTime createdAt,
+                                              OffsetDateTime updatedAt) {
+        int updated = jdbc.update("UPDATE milestone SET project_id=?, milestone_iid=?, title=?, state=?, due_date=?, created_at=?, updated_at=? WHERE milestone_id=?",
+                ps -> {
+                    ps.setLong(1, projectId);
+                    ps.setLong(2, milestoneIid);
+                    ps.setString(3, title);
+                    ps.setString(4, state);
+                    if (dueDate == null) ps.setNull(5, Types.DATE); else ps.setObject(5, dueDate);
+                    if (createdAt == null) ps.setNull(6, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(6, createdAt);
+                    if (updatedAt == null) ps.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(7, updatedAt);
+                    ps.setLong(8, milestoneId);
+                });
+        if (updated > 0) {
+            return new UpsertResult<>(null, false);
+        }
+
+        jdbc.update("INSERT INTO milestone (milestone_id, project_id, milestone_iid, title, state, due_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                ps -> {
+                    ps.setLong(1, milestoneId);
+                    ps.setLong(2, projectId);
+                    ps.setLong(3, milestoneIid);
+                    ps.setString(4, title);
+                    ps.setString(5, state);
+                    if (dueDate == null) ps.setNull(6, Types.DATE); else ps.setObject(6, dueDate);
+                    if (createdAt == null) ps.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(7, createdAt);
+                    if (updatedAt == null) ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(8, updatedAt);
                 });
         return new UpsertResult<>(null, true);
     }
