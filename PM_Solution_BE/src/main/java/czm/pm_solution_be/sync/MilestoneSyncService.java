@@ -17,33 +17,25 @@ public class MilestoneSyncService {
 
     private final GitLabClient gitlab;
     private final SyncDao dao;
-    private final RepositorySyncService repositorySyncService;
     private final TransactionTemplate txTemplate;
 
     public MilestoneSyncService(GitLabClient gitlab,
                                 SyncDao dao,
-                                RepositorySyncService repositorySyncService,
                                 PlatformTransactionManager transactionManager) {
         this.gitlab = gitlab;
         this.dao = dao;
-        this.repositorySyncService = repositorySyncService;
         this.txTemplate = new TransactionTemplate(transactionManager);
     }
 
-    public SyncSummary syncProjectMilestones(long gitlabProjectId) {
-        SyncDao.RepositoryNamespace repository = ensureRepository(gitlabProjectId);
-        Long namespaceId = repository.namespaceId();
-        if (namespaceId == null) {
-            throw new IllegalStateException("Repository " + gitlabProjectId + " nemá přiřazený namespace.");
-        }
-        Long projectId = dao.findProjectIdByNamespaceId(namespaceId)
-                .orElseThrow(() -> new IllegalArgumentException("Nenalezen projekt pro namespace " + namespaceId));
+    public SyncSummary syncNamespaceMilestones(long gitlabNamespaceId) {
+        Long projectId = dao.findProjectIdByNamespaceId(gitlabNamespaceId)
+                .orElseThrow(() -> new IllegalArgumentException("Nenalezen projekt pro namespace " + gitlabNamespaceId));
 
-        log.info("Starting milestones sync repo={}", gitlabProjectId);
+        log.info("Starting milestones sync namespace={} project={}", gitlabNamespaceId, projectId);
         SyncSummary summary = new SyncSummary();
         Integer page = 1;
         while (true) {
-            GitLabClient.PageResult<GitLabMilestone> pageRes = gitlab.listProjectMilestonesPage(gitlabProjectId, page);
+            GitLabClient.PageResult<GitLabMilestone> pageRes = gitlab.listGroupMilestonesPage(gitlabNamespaceId, page);
             List<GitLabMilestone> milestones = pageRes.data;
             if ((milestones == null || milestones.isEmpty()) && (page == null || page == 1)) {
                 break;
@@ -76,18 +68,7 @@ public class MilestoneSyncService {
             }
             page = Integer.parseInt(pageRes.nextPage);
         }
-        log.info("Milestones sync done: repo={} fetched={} pages={}", gitlabProjectId, summary.fetched, summary.pages);
+        log.info("Milestones sync done: namespace={} project={} fetched={} pages={}", gitlabNamespaceId, projectId, summary.fetched, summary.pages);
         return summary;
-    }
-
-    private SyncDao.RepositoryNamespace ensureRepository(long gitlabProjectId) {
-        SyncDao.RepositoryNamespace repository = dao.findRepositoryNamespaceByGitLabRepoId(gitlabProjectId).orElse(null);
-        if (repository != null) {
-            return repository;
-        }
-
-        repositorySyncService.syncProjectRepositories(gitlabProjectId);
-        return dao.findRepositoryNamespaceByGitLabRepoId(gitlabProjectId)
-                .orElseThrow(() -> new IllegalArgumentException("Repository not found locally: " + gitlabProjectId));
     }
 }

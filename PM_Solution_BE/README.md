@@ -30,7 +30,11 @@ Key REST endpoints
 - `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
 - `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
-- `POST /api/sync/projects/{projectId}/milestones` – sync milestones for the GitLab project and store them under the mapped namespace project.
+- `POST /api/sync/projects/{namespaceId}/milestones` – sync milestones for the GitLab namespace (group) mapped to the local project and persist them in the `milestone` table.
+
+  Milestone synchronisation expects the numeric GitLab namespace (group) identifier stored on the project (`project.namespace_id`).
+  The backend calls `GET /groups/:group_id/milestones`, paginates through all results (state=`all`) and upserts the data into the
+  `milestone` table.
 - `POST /api/sync/projects/{projectId}/reports` – sync report entries for the repositories assigned to the project (optional `from`, `to`, `sinceLast`).
 - `POST /api/sync/reports` – sync report entries for all repositories (optional `from`, `to`, `sinceLast`).
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}&internUsername={username?}` – aggregated timelog hours per
