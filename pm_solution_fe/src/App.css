@@ -46,6 +46,11 @@
   padding-left: calc(var(--navbar-width) + clamp(32px, 6vw, 72px));
 }
 
+.app-content--sync-report-overview > .app-content__inner {
+  max-width: none;
+  width: 100%;
+}
+
 .app-content__inner--interns-overview {
   width: 60%;
   max-width: none;
