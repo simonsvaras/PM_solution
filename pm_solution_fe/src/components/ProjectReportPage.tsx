@@ -8,6 +8,7 @@ import ProjectSettingsModal from './ProjectSettingsModal';
 
 type ProjectReportPageProps = {
   project: ProjectOverviewDTO;
+  namespaceId: number | null;
   namespaceName: string | null;
   onBack: () => void;
   onShowDetail: () => void;
@@ -20,6 +21,7 @@ type ProjectReportPageProps = {
  */
 export default function ProjectReportPage({
   project,
+  namespaceId,
   namespaceName,
   onBack,
   onShowDetail,
@@ -189,11 +191,15 @@ export default function ProjectReportPage({
   }
 
   async function handleMilestoneSync() {
+    if (namespaceId == null) {
+      setMilestoneError('Projekt nemá přiřazený namespace pro synchronizaci milníků.');
+      return;
+    }
     setMilestoneError(null);
     setMilestoneSummary(null);
     setMilestoneSyncing(true);
     try {
-      const summary = await syncProjectMilestones(project.id);
+      const summary = await syncProjectMilestones(namespaceId);
       setMilestoneSummary(summary);
     } catch (err) {
       const error = err as ErrorResponse;
@@ -246,7 +252,7 @@ export default function ProjectReportPage({
               type="button"
               className="projectReport__syncButton"
               onClick={handleMilestoneSync}
-              disabled={milestoneSyncing || !namespaceName}
+              disabled={milestoneSyncing || namespaceId == null}
             >
               {milestoneSyncing ? 'Synchronizuji…' : 'Sync Milestones'}
             </button>

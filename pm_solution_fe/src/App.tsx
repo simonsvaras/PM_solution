@@ -333,6 +333,14 @@ function App() {
     return match?.namespaceName ?? null;
   }, [availableProjects, selectedReportProject]);
 
+  const selectedProjectNamespaceId = useMemo(() => {
+    if (!selectedReportProject) {
+      return null;
+    }
+    const match = availableProjects.find(project => project.id === selectedReportProject.id);
+    return match?.namespaceId ?? null;
+  }, [availableProjects, selectedReportProject]);
+
   const canRun = useMemo(() => running === null, [running]);
   const isReportRangeValid = useMemo(() => {
     if (!reportsFrom || !reportsTo) {
@@ -921,6 +929,7 @@ function App() {
               ) : (
                 <ProjectReportPage
                   project={selectedReportProject}
+                  namespaceId={selectedProjectNamespaceId}
                   namespaceName={selectedProjectNamespaceName}
                   onBack={handleExitReportProject}
                   onShowDetail={handleShowReportDetail}

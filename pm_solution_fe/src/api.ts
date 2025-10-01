@@ -523,8 +523,8 @@ export async function syncProjectReports(projectId: number, payload: ProjectRepo
   return parseJson<SyncSummary>(res);
 }
 
-export async function syncProjectMilestones(projectId: number): Promise<SyncSummary> {
-  const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/milestones`, {
+export async function syncProjectMilestones(gitlabProjectId: number): Promise<SyncSummary> {
+  const res = await fetch(`${API_BASE}/api/sync/projects/${gitlabProjectId}/milestones`, {
     method: "POST",
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
