@@ -2,6 +2,7 @@ package czm.pm_solution_be.gitlab;
 
 import czm.pm_solution_be.config.GitLabProperties;
 import czm.pm_solution_be.gitlab.dto.GitLabIssue;
+import czm.pm_solution_be.gitlab.dto.GitLabMilestone;
 import czm.pm_solution_be.gitlab.dto.GitLabProject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,5 +141,15 @@ public class GitLabClient {
         if (page != null) q.add("page", String.valueOf(page));
         String path = "/groups/" + groupId + "/projects";
         return getPage(path, q, new ParameterizedTypeReference<List<GitLabProject>>(){});
+    }
+
+    public PageResult<GitLabMilestone> listProjectMilestonesPage(long projectId, Integer page) {
+        MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
+        q.add("per_page", String.valueOf(props.getPerPage()));
+        q.add("state", "all");
+        if (page != null) q.add("page", String.valueOf(page));
+
+        String path = "/projects/" + projectId + "/milestones";
+        return getPage(path, q, new ParameterizedTypeReference<List<GitLabMilestone>>(){});
     }
 }

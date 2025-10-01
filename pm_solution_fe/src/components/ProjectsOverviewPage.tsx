@@ -3,7 +3,11 @@ import './ProjectsOverviewPage.css';
 import ProjectInfoCard from './ProjectInfoCard';
 import { getProjectsOverview, type ErrorResponse, type ProjectOverviewDTO } from '../api';
 
-export default function ProjectsOverviewPage() {
+type ProjectsOverviewPageProps = {
+  onSelectProject?: (project: ProjectOverviewDTO) => void;
+};
+
+export default function ProjectsOverviewPage({ onSelectProject }: ProjectsOverviewPageProps) {
   const [projects, setProjects] = useState<ProjectOverviewDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorResponse | null>(null);
@@ -48,7 +52,7 @@ export default function ProjectsOverviewPage() {
     <section className="projectsOverview" aria-label="Přehled projektů">
       <div className="projectsOverview__grid">
         {projects.map(project => (
-          <ProjectInfoCard key={project.id} project={project} />
+          <ProjectInfoCard key={project.id} project={project} onSelect={onSelectProject} />
         ))}
       </div>
     </section>

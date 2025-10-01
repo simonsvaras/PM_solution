@@ -1,13 +1,14 @@
-import { useMemo } from 'react';
+import { type MouseEvent, useMemo } from 'react';
 import './ProjectInfoCard.css';
 import type { ProjectOverviewDTO } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
 
 type ProjectInfoCardProps = {
   project: ProjectOverviewDTO;
+  onSelect?: (project: ProjectOverviewDTO) => void;
 };
 
-export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
+export default function ProjectInfoCard({ project, onSelect }: ProjectInfoCardProps) {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('cs-CZ'), []);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
@@ -17,11 +18,23 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
   const reportsOverviewLink = `?module=projects&submodule=projects-overview&projectId=${project.id}`;
 
+  function handleDetailClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (!onSelect) {
+      return;
+    }
+    event.preventDefault();
+    onSelect(project);
+  }
+
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
       <header className="projectInfoCard__header">
         <h2>{project.name}</h2>
-        <a className="projectInfoCard__detailLink" href={reportsOverviewLink}>
+        <a
+          className="projectInfoCard__detailLink"
+          href={reportsOverviewLink}
+          onClick={onSelect ? handleDetailClick : undefined}
+        >
           Zobrazit detail
         </a>
       </header>

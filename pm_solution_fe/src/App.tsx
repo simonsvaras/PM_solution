@@ -325,6 +325,14 @@ function App() {
     [availableProjects, selectedProjectIds],
   );
 
+  const selectedProjectNamespaceName = useMemo(() => {
+    if (!selectedReportProject) {
+      return null;
+    }
+    const match = availableProjects.find(project => project.id === selectedReportProject.id);
+    return match?.namespaceName ?? null;
+  }, [availableProjects, selectedReportProject]);
+
   const canRun = useMemo(() => running === null, [running]);
   const isReportRangeValid = useMemo(() => {
     if (!reportsFrom || !reportsTo) {
@@ -488,8 +496,8 @@ function App() {
   }
 
   function handleSelectReportProject(project: ProjectOverviewDTO) {
-    setActiveModuleKey('reports');
-    setActiveSubmoduleKey('reports-overview');
+    setActiveModuleKey('projects');
+    setActiveSubmoduleKey('projects-overview');
     setSelectedReportProject(project);
     setReportView('summary');
     setPendingReportProjectId(project.id);
@@ -500,8 +508,8 @@ function App() {
     });
     pushRoute(
       normalizeRoute({
-        moduleKey: 'reports',
-        submoduleKey: 'reports-overview',
+        moduleKey: 'projects',
+        submoduleKey: 'projects-overview',
         projectId: project.id,
         view: 'summary',
       }),
@@ -910,16 +918,17 @@ function App() {
                   onCloseDetail={handleHideReportDetail}
                 />
               )
-            ) : (
-              <ProjectReportPage
-                project={selectedReportProject}
-                onBack={handleExitReportProject}
-                onShowDetail={handleShowReportDetail}
-                onProjectUpdated={handleReportProjectUpdated}
-              />
+              ) : (
+                <ProjectReportPage
+                  project={selectedReportProject}
+                  namespaceName={selectedProjectNamespaceName}
+                  onBack={handleExitReportProject}
+                  onShowDetail={handleShowReportDetail}
+                  onProjectUpdated={handleReportProjectUpdated}
+                />
             )
           ) : isProjectsOverview ? (
-            <ProjectsOverviewPage />
+            <ProjectsOverviewPage onSelectProject={handleSelectReportProject} />
           ) : isProjectsAdmin ? (
             <ProjectsPage />
           ) : isInternsOverview ? (

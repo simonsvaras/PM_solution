@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import './ProjectReportPage.css';
 import TeamReportTable from './TeamReportTable';
 import type { ProjectOverviewDTO, SyncSummary, TeamReportTeam, ErrorResponse } from '../api';
-import { getReportTeams, syncProjectReports } from '../api';
+import { getReportTeams, syncProjectReports, syncProjectMilestones } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
 import ProjectSettingsModal from './ProjectSettingsModal';
 
 type ProjectReportPageProps = {
   project: ProjectOverviewDTO;
+  namespaceName: string | null;
   onBack: () => void;
   onShowDetail: () => void;
   onProjectUpdated: (next: ProjectOverviewDTO) => void;
@@ -17,7 +18,13 @@ type ProjectReportPageProps = {
  * Page displaying project level metrics together with the controls for triggering
  * report synchronisation.
  */
-export default function ProjectReportPage({ project, onBack, onShowDetail, onProjectUpdated }: ProjectReportPageProps) {
+export default function ProjectReportPage({
+  project,
+  namespaceName,
+  onBack,
+  onShowDetail,
+  onProjectUpdated,
+}: ProjectReportPageProps) {
   const [sinceLast, setSinceLast] = useState(true);
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
@@ -30,6 +37,9 @@ export default function ProjectReportPage({ project, onBack, onShowDetail, onPro
   const [teamReloadToken, setTeamReloadToken] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState<ProjectOverviewDTO>(project);
+  const [milestoneSyncing, setMilestoneSyncing] = useState(false);
+  const [milestoneError, setMilestoneError] = useState<string | null>(null);
+  const [milestoneSummary, setMilestoneSummary] = useState<SyncSummary | null>(null);
 
   useEffect(() => {
     setCurrentProject(project);
@@ -178,6 +188,26 @@ export default function ProjectReportPage({ project, onBack, onShowDetail, onPro
     setTeamReloadToken(token => token + 1);
   }
 
+  async function handleMilestoneSync() {
+    setMilestoneError(null);
+    setMilestoneSummary(null);
+    setMilestoneSyncing(true);
+    try {
+      const summary = await syncProjectMilestones(project.id);
+      setMilestoneSummary(summary);
+    } catch (err) {
+      const error = err as ErrorResponse;
+      const message = error?.error?.message ?? 'Synchronizaci milníků se nepodařilo dokončit.';
+      setMilestoneError(message);
+    } finally {
+      setMilestoneSyncing(false);
+    }
+  }
+
+  const milestoneNamespaceMessage = namespaceName
+    ? `Milestones pro projekt jsou z namespace ${namespaceName}.`
+    : 'Projekt nemá přiřazený namespace pro synchronizaci milníků.';
+
   return (
     <>
       <div className="projectReport__toolbar">
@@ -198,7 +228,30 @@ export default function ProjectReportPage({ project, onBack, onShowDetail, onPro
         </div>
       </div>
       <div className="projectReportPage">
-        {teamCard}
+        <div className="projectReportPage__sidebar">
+          {teamCard}
+          <section className="projectReport__card projectReport__milestoneCard" aria-label="Synchronizace milníků">
+            <h2>Milníky</h2>
+            <p className="projectReport__milestoneDescription">{milestoneNamespaceMessage}</p>
+            {milestoneError ? (
+              <p className="projectReport__status projectReport__status--error">{milestoneError}</p>
+            ) : null}
+            {milestoneSummary ? (
+              <p className="projectReport__status projectReport__status--success">
+                Načteno {milestoneSummary.fetched} milníků, vloženo {milestoneSummary.inserted}, aktualizováno{' '}
+                {milestoneSummary.updated}, přeskočeno {milestoneSummary.skipped}. Trvalo {milestoneSummary.durationMs} ms.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="projectReport__syncButton"
+              onClick={handleMilestoneSync}
+              disabled={milestoneSyncing || !namespaceName}
+            >
+              {milestoneSyncing ? 'Synchronizuji…' : 'Sync Milestones'}
+            </button>
+          </section>
+        </div>
         <section className="projectReport" aria-label={`Report projektu ${currentProject.name}`}>
         <div className="projectReport__card projectReport__overviewCard">
           <div className="projectReport__overviewHeader">

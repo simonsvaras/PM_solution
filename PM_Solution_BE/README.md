@@ -30,6 +30,7 @@ Key REST endpoints
 - `POST /api/sync/all?full={bool}&since={timestamp?}` – sync all issues globally.
 - `POST /api/sync/projects/{projectId}/repositories` – sync a single project.
 - `POST /api/sync/projects/{projectId}/issues?full={bool}` – sync issues for one project.
+- `POST /api/sync/projects/{projectId}/milestones` – sync milestones for the GitLab project and store them under the mapped namespace project.
 - `POST /api/sync/projects/{projectId}/reports` – sync report entries for the repositories assigned to the project (optional `from`, `to`, `sinceLast`).
 - `POST /api/sync/reports` – sync report entries for all repositories (optional `from`, `to`, `sinceLast`).
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}&internUsername={username?}` – aggregated timelog hours per
@@ -88,6 +89,7 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V17__intern_project_reported_cost_flag.sql` – adds `intern_project.include_in_reported_cost`, wiring the flag into the cached project `reported_cost` calculation and refreshing triggers.
 - `V18__report_unregistered_usernames.sql` – umožní ukládat výkazy uživatelů, kteří ještě nejsou vedeni v tabulce `intern`, a udržet je mimo výpočet nákladů.
 - `V19__project_namespace.sql` – přejmenuje `project.gitlab_project_id` na `namespace_id`, přidá `namespace_name` a udrží jedinečnost namespace ID.
+- `V20__milestones.sql` – přidá tabulku `milestone` s vazbou na projekt a ukládá synchronizované GitLab milníky.
 - `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 - `V11__report_username_nullable.sql` – opětovně aplikuje `ALTER TABLE report ALTER COLUMN username DROP NOT NULL;` pro instance, které migrovaly z verze bez předchozí opravy.
 
