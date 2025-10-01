@@ -467,6 +467,23 @@ function App() {
     </nav>
   ) : null;
 
+  const headerEyebrowContent = headerEyebrow ? <p className="page-header__eyebrow">{headerEyebrow}</p> : null;
+  const showProjectNavigation = isProjectsOverview && selectedReportProject !== null;
+  const showProjectSummaryNavigation = showProjectNavigation && reportView !== null && reportView !== 'summary';
+  const headerEyebrowActions = showProjectNavigation ? (
+    <div className="page-header__eyebrowActions">
+      <button type="button" className="page-header__eyebrowButton" onClick={handleExitReportProject}>
+        ← Zpět na projekty
+      </button>
+      {showProjectSummaryNavigation ? (
+        <button type="button" className="page-header__eyebrowLink" onClick={handleHideReportDetail}>
+          ← Zpět na souhrn
+        </button>
+      ) : null}
+    </div>
+  ) : null;
+  const shouldRenderEyebrowRow = headerEyebrowContent !== null || headerEyebrowActions !== null;
+
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     const moduleDef = modules.find(module => module.key === moduleKey) ?? modules[0];
     const fallbackSubmoduleKey = moduleDef.submodules[0]?.key ?? modules[0].submodules[0].key;
@@ -763,7 +780,12 @@ function App() {
           <header className={`page-header${isProjectReportDetail ? ' page-header--with-nav' : ''}`}>
             <div className="page-header__top">
               <div className="page-header__headline">
-                {headerEyebrow ? <p className="page-header__eyebrow">{headerEyebrow}</p> : null}
+                {shouldRenderEyebrowRow ? (
+                  <div className="page-header__eyebrowRow">
+                    {headerEyebrowContent}
+                    {headerEyebrowActions}
+                  </div>
+                ) : null}
                 <h1>{headerTitle}</h1>
               </div>
               {detailNavigation}
@@ -908,30 +930,17 @@ function App() {
           ) : isProjectReportActive && selectedReportProject ? (
             reportView && reportView !== 'summary' ? (
               reportView === 'detail' ? (
-                <ProjectReportDetailPage
-                  project={selectedReportProject}
-                  onBack={handleExitReportProject}
-                  onCloseDetail={handleHideReportDetail}
-                />
+                <ProjectReportDetailPage project={selectedReportProject} />
               ) : reportView === 'detail-intern' ? (
-                <ProjectReportInternDetailPage
-                  project={selectedReportProject}
-                  onBack={handleExitReportProject}
-                  onCloseDetail={handleHideReportDetail}
-                />
+                <ProjectReportInternDetailPage project={selectedReportProject} />
               ) : (
-                <ProjectReportProjectDetailPage
-                  project={selectedReportProject}
-                  onBack={handleExitReportProject}
-                  onCloseDetail={handleHideReportDetail}
-                />
+                <ProjectReportProjectDetailPage project={selectedReportProject} />
               )
               ) : (
                 <ProjectReportPage
                   project={selectedReportProject}
                   namespaceId={selectedProjectNamespaceId}
                   namespaceName={selectedProjectNamespaceName}
-                  onBack={handleExitReportProject}
                   onShowDetail={handleShowReportDetail}
                   onProjectUpdated={handleReportProjectUpdated}
                 />

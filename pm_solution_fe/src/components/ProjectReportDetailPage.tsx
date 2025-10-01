@@ -11,8 +11,6 @@ import { getProjectInterns, getProjectReportDetail } from '../api';
 
 type ProjectReportDetailPageProps = {
   project: ProjectOverviewDTO;
-  onBack: () => void;
-  onCloseDetail: () => void;
 };
 
 function toIsoOrUndefined(value: string): string | undefined {
@@ -91,7 +89,7 @@ type StoredReportState = {
   showCosts: boolean;
 };
 
-export default function ProjectReportDetailPage({ project, onBack, onCloseDetail }: ProjectReportDetailPageProps) {
+export default function ProjectReportDetailPage({ project }: ProjectReportDetailPageProps) {
   const [fromValue, setFromValue] = useState('');
   const [toValue, setToValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -388,14 +386,6 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
   return (
     <section className="projectReportDetail" aria-label={`Detailní report projektu ${project.name}`}>
       <header className="projectReportDetail__header" role="banner">
-        <div className="projectReportDetail__nav">
-          <button type="button" className="projectReport__backButton" onClick={onBack}>
-            ← Zpět na projekty
-          </button>
-          <button type="button" className="projectReportDetail__link" onClick={onCloseDetail}>
-            ← Zpět na souhrn
-          </button>
-        </div>
         <div className="projectReportDetail__controls">
           <div className="projectReportDetail__filters">
             <label>

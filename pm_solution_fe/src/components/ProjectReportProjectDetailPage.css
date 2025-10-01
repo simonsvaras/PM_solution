@@ -10,27 +10,6 @@
   gap: 16px;
 }
 
-.projectReportProjectDetail__nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.projectReportProjectDetail__link {
-  background: transparent;
-  border: none;
-  color: var(--color-accent-strong);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.projectReportProjectDetail__link:hover,
-.projectReportProjectDetail__link:focus-visible {
-  text-decoration: underline;
-}
-
 .projectReportProjectDetail__headline {
   display: flex;
   flex-direction: column;

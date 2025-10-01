@@ -10,7 +10,6 @@ type ProjectReportPageProps = {
   project: ProjectOverviewDTO;
   namespaceId: number | null;
   namespaceName: string | null;
-  onBack: () => void;
   onShowDetail: () => void;
   onProjectUpdated: (next: ProjectOverviewDTO) => void;
 };
@@ -23,7 +22,6 @@ export default function ProjectReportPage({
   project,
   namespaceId,
   namespaceName,
-  onBack,
   onShowDetail,
   onProjectUpdated,
 }: ProjectReportPageProps) {
@@ -217,9 +215,6 @@ export default function ProjectReportPage({
   return (
     <>
       <div className="projectReport__toolbar">
-        <button type="button" className="projectReport__backButton" onClick={onBack}>
-          ← Zpět na projekty
-        </button>
         <div className="projectReport__toolbarActions">
           <button type="button" className="projectReport__detailButton" onClick={onShowDetail}>
             Zobrazit detailní report

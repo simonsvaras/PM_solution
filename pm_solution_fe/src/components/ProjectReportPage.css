@@ -56,20 +56,6 @@
   margin-left: auto;
 }
 
-.projectReport__backButton {
-  background: transparent;
-  border: none;
-  color: var(--color-accent-strong);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.projectReport__backButton:hover,
-.projectReport__backButton:focus-visible {
-  text-decoration: underline;
-}
-
 .projectReport__detailButton {
   background: rgba(30, 64, 175, 0.08);
   border: 1px solid rgba(30, 64, 175, 0.3);

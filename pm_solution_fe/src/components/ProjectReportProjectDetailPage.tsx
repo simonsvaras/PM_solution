@@ -37,15 +37,9 @@ function formatDate(value: string | null): string {
 
 type ProjectReportProjectDetailPageProps = {
   project: ProjectOverviewDTO;
-  onBack: () => void;
-  onCloseDetail: () => void;
 };
 
-export default function ProjectReportProjectDetailPage({
-  project,
-  onBack,
-  onCloseDetail,
-}: ProjectReportProjectDetailPageProps) {
+export default function ProjectReportProjectDetailPage({ project }: ProjectReportProjectDetailPageProps) {
   const [milestones, setMilestones] = useState<ProjectMilestoneSummary[]>([]);
   const [loadingMilestones, setLoadingMilestones] = useState(false);
   const [milestoneError, setMilestoneError] = useState<ErrorResponse | null>(null);
@@ -205,14 +199,6 @@ export default function ProjectReportProjectDetailPage({
   return (
     <section className="projectReportProjectDetail" aria-label={`Milníky projektu ${project.name}`}>
       <header className="projectReportProjectDetail__header">
-        <div className="projectReportProjectDetail__nav">
-          <button type="button" className="projectReport__backButton" onClick={onBack}>
-            ← Zpět na projekty
-          </button>
-          <button type="button" className="projectReportProjectDetail__link" onClick={onCloseDetail}>
-            ← Zpět na souhrn
-          </button>
-        </div>
         <div className="projectReportProjectDetail__headline">
           <h1>Detail projektu</h1>
           <p>Práce na projektu {project.name} seskupené podle aktivních milníků.</p>

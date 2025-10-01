@@ -8,42 +8,6 @@
   box-sizing: border-box;
 }
 
-.projectReportPlaceholder__nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-}
-
-.projectReportPlaceholder__backButton {
-  background: transparent;
-  border: none;
-  color: var(--color-accent-strong);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.projectReportPlaceholder__backButton:hover,
-.projectReportPlaceholder__backButton:focus-visible {
-  text-decoration: underline;
-}
-
-.projectReportPlaceholder__link {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.projectReportPlaceholder__link:hover,
-.projectReportPlaceholder__link:focus-visible {
-  color: var(--color-text-primary);
-  text-decoration: underline;
-}
-
 .projectReportPlaceholder__body {
   flex: 1 1 auto;
   display: flex;
