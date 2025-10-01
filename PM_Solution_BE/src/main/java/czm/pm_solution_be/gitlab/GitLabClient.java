@@ -143,13 +143,13 @@ public class GitLabClient {
         return getPage(path, q, new ParameterizedTypeReference<List<GitLabProject>>(){});
     }
 
-    public PageResult<GitLabMilestone> listProjectMilestonesPage(long projectId, Integer page) {
+    public PageResult<GitLabMilestone> listGroupMilestonesPage(long groupId, Integer page) {
         MultiValueMap<String, String> q = new LinkedMultiValueMap<>();
         q.add("per_page", String.valueOf(props.getPerPage()));
         q.add("state", "all");
         if (page != null) q.add("page", String.valueOf(page));
 
-        String path = "/projects/" + projectId + "/milestones";
+        String path = "/groups/" + groupId + "/milestones";
         return getPage(path, q, new ParameterizedTypeReference<List<GitLabMilestone>>(){});
     }
 }

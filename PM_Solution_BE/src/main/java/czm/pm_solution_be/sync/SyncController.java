@@ -82,10 +82,10 @@ public class SyncController {
         return s;
     }
 
-    @PostMapping("/projects/{projectId}/milestones")
-    public SyncSummary syncMilestones(@PathVariable long projectId) {
+    @PostMapping("/projects/{namespaceId}/milestones")
+    public SyncSummary syncMilestones(@PathVariable long namespaceId) {
         long start = System.currentTimeMillis();
-        SyncSummary summary = milestoneSyncService.syncProjectMilestones(projectId);
+        SyncSummary summary = milestoneSyncService.syncNamespaceMilestones(namespaceId);
         summary.durationMs = System.currentTimeMillis() - start;
         return summary;
     }
