@@ -5,7 +5,13 @@
   gap: 24px;
 }
 
-.projectReportPage > .teamReport {
+.projectReportPage__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.projectReportPage__sidebar > .teamReport {
   width: 100%;
 }
 
@@ -15,8 +21,12 @@
     align-items: flex-start;
   }
 
-  .projectReportPage > .teamReport {
+  .projectReportPage__sidebar {
     flex: 0 0 360px;
+  }
+
+  .projectReportPage__sidebar > .teamReport {
+    width: auto;
   }
 
   .projectReportPage > .projectReport {
@@ -102,6 +112,18 @@
   border-radius: 18px;
   padding: 32px;
   box-shadow: 0 20px 36px rgba(15, 23, 42, 0.1);
+}
+
+.projectReport__milestoneCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.projectReport__milestoneDescription {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
 }
 
 .projectReport__card h2 {
