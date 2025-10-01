@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
+import { type MouseEvent, useMemo } from 'react';
 import './ProjectInfoCard.css';
 import type { ProjectOverviewDTO } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
 
 type ProjectInfoCardProps = {
   project: ProjectOverviewDTO;
-  onSelectProject?: (project: ProjectOverviewDTO) => void;
+  onSelect?: (project: ProjectOverviewDTO) => void;
 };
 
-export default function ProjectInfoCard({ project, onSelectProject }: ProjectInfoCardProps) {
+export default function ProjectInfoCard({ project, onSelect }: ProjectInfoCardProps) {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('cs-CZ'), []);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
@@ -18,24 +18,25 @@ export default function ProjectInfoCard({ project, onSelectProject }: ProjectInf
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
   const reportsOverviewLink = `?module=projects&submodule=projects-overview&projectId=${project.id}`;
 
-  function handleSelectProject() {
-    if (!onSelectProject) return;
-    onSelectProject(project);
+  function handleDetailClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (!onSelect) {
+      return;
+    }
+    event.preventDefault();
+    onSelect(project);
   }
 
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
       <header className="projectInfoCard__header">
         <h2>{project.name}</h2>
-        {onSelectProject ? (
-          <button type="button" className="projectInfoCard__detailLink" onClick={handleSelectProject}>
-            Zobrazit detail
-          </button>
-        ) : (
-          <a className="projectInfoCard__detailLink" href={reportsOverviewLink}>
-            Zobrazit detail
-          </a>
-        )}
+        <a
+          className="projectInfoCard__detailLink"
+          href={reportsOverviewLink}
+          onClick={onSelect ? handleDetailClick : undefined}
+        >
+          Zobrazit detail
+        </a>
       </header>
       <dl className="projectInfoCard__stats">
         <div className="projectInfoCard__stat">

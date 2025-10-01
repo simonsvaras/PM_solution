@@ -52,7 +52,7 @@ export default function ProjectsOverviewPage({ onSelectProject }: ProjectsOvervi
     <section className="projectsOverview" aria-label="Přehled projektů">
       <div className="projectsOverview__grid">
         {projects.map(project => (
-          <ProjectInfoCard key={project.id} project={project} onSelectProject={onSelectProject} />
+          <ProjectInfoCard key={project.id} project={project} onSelect={onSelectProject} />
         ))}
       </div>
     </section>

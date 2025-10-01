@@ -495,6 +495,27 @@ function App() {
     );
   }
 
+  function handleSelectReportProject(project: ProjectOverviewDTO) {
+    setActiveModuleKey('projects');
+    setActiveSubmoduleKey('projects-overview');
+    setSelectedReportProject(project);
+    setReportView('summary');
+    setPendingReportProjectId(project.id);
+    setReportProjectsCache(prev => {
+      const next = new Map(prev);
+      next.set(project.id, project);
+      return next;
+    });
+    pushRoute(
+      normalizeRoute({
+        moduleKey: 'projects',
+        submoduleKey: 'projects-overview',
+        projectId: project.id,
+        view: 'summary',
+      }),
+    );
+  }
+
   const handleReportProjectUpdated = useCallback((next: ProjectOverviewDTO) => {
     setSelectedReportProject(prev => (prev && prev.id === next.id ? { ...prev, ...next } : prev));
     setReportProjectsCache(prev => {
