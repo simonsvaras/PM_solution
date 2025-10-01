@@ -15,11 +15,6 @@
   margin: 0 auto;
 }
 
-.app-content__inner--reports-overview {
-  width: 80%;
-  max-width: none;
-}
-
 .app-content__inner--full {
   max-width: none;
   margin: 0;
@@ -73,9 +68,6 @@
     width: 100%;
   }
 
-  .app-content__inner--reports-overview {
-    width: 100%;
-  }
 }
 
 .page-header {

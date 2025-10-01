@@ -3,7 +3,6 @@ import './App.css';
 import Navbar, { type Module } from './components/Navbar';
 import ProjectsPage from './components/ProjectsPage';
 import ProjectsOverviewPage from './components/ProjectsOverviewPage';
-import ReportsOverviewPage from './components/ReportsOverviewPage';
 import ProjectReportPage from './components/ProjectReportPage';
 import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import ProjectReportInternDetailPage from './components/ProjectReportInternDetailPage';
@@ -60,13 +59,6 @@ const modules: Module[] = [
     ],
   },
   {
-    key: 'reports',
-    name: 'Reporty',
-    submodules: [
-      { key: 'reports-overview', name: 'Přehled' },
-    ],
-  },
-  {
     key: 'settings',
     name: 'Nastavení',
     submodules: [
@@ -111,23 +103,29 @@ function parseRoute(search: string): ParsedRoute {
 }
 
 function normalizeRoute(route: ParsedRoute): NormalizedRoute {
+  const requestedModuleKey = route.moduleKey === 'reports' ? 'projects' : route.moduleKey;
+  const requestedSubmoduleKey =
+    route.moduleKey === 'reports' && route.submoduleKey === 'reports-overview'
+      ? 'projects-overview'
+      : route.submoduleKey;
+
   const fallbackModule = modules[0];
   const moduleDef =
-    route.moduleKey && modules.some(module => module.key === route.moduleKey)
-      ? (modules.find(module => module.key === route.moduleKey) as Module)
+    requestedModuleKey && modules.some(module => module.key === requestedModuleKey)
+      ? (modules.find(module => module.key === requestedModuleKey) as Module)
       : fallbackModule;
   const fallbackSubmodule = moduleDef.submodules[0];
   const submoduleDef =
-    route.submoduleKey && moduleDef.submodules.some(submodule => submodule.key === route.submoduleKey)
-      ? (moduleDef.submodules.find(submodule => submodule.key === route.submoduleKey) as Module['submodules'][number])
+    requestedSubmoduleKey && moduleDef.submodules.some(submodule => submodule.key === requestedSubmoduleKey)
+      ? (moduleDef.submodules.find(submodule => submodule.key === requestedSubmoduleKey) as Module['submodules'][number])
       : fallbackSubmodule;
 
-  const isReportsOverview = moduleDef.key === 'reports' && submoduleDef?.key === 'reports-overview';
-  const projectId = isReportsOverview && typeof route.projectId === 'number' && !Number.isNaN(route.projectId)
+  const isProjectsOverview = moduleDef.key === 'projects' && submoduleDef?.key === 'projects-overview';
+  const projectId = isProjectsOverview && typeof route.projectId === 'number' && !Number.isNaN(route.projectId)
     ? route.projectId
     : null;
   let view: ReportDetailView | null = null;
-  if (isReportsOverview) {
+  if (isProjectsOverview) {
     if (projectId === null) {
       view = null;
     } else if (route.view && route.view !== 'summary') {
@@ -354,17 +352,16 @@ function App() {
   );
   const isOnDemand = activeModuleKey === 'sync' && activeSubmoduleKey === 'sync-on-demand';
   const isSyncReportsOverview = activeModuleKey === 'sync' && activeSubmoduleKey === 'sync-report-overview';
-  const isProjectsOverview = activeSubmoduleKey === 'projects-overview';
-  const isProjectsAdmin = activeSubmoduleKey === 'projects-admin';
-  const isInternsOverview = activeSubmoduleKey === 'interns-overview';
-  const isInternsAdmin = activeSubmoduleKey === 'interns-admin';
-  const isReportsOverview = activeSubmoduleKey === 'reports-overview';
-  const isProjectsTeams = activeSubmoduleKey === 'projects-teams';
-  const isReportsProject = activeModuleKey === 'reports' && selectedReportProject !== null;
-  const isReportsProjectSummary =
-    isReportsProject && (reportView === 'summary' || reportView === null || reportView === undefined);
-  const isReportsProjectDetail = isReportsProject && reportView !== null && reportView !== 'summary';
-  const shouldUseFullWidthContent = isReportsProjectDetail || isProjectsOverview;
+  const isProjectsOverview = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-overview';
+  const isProjectsAdmin = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-admin';
+  const isProjectsTeams = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-teams';
+  const isInternsOverview = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-overview';
+  const isInternsAdmin = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-admin';
+  const isProjectReportActive = isProjectsOverview && selectedReportProject !== null;
+  const isProjectReportSummary =
+    isProjectReportActive && (reportView === 'summary' || reportView === null || reportView === undefined);
+  const isProjectReportDetail = isProjectReportActive && reportView !== null && reportView !== 'summary';
+  const shouldUseFullWidthContent = isProjectReportDetail || isProjectsOverview;
   const appContentClassNames = ['app-content'];
   if (isProjectsOverview) {
     appContentClassNames.push('app-content--projects-overview');
@@ -378,14 +375,11 @@ function App() {
   if (isInternsOverview) {
     appContentInnerClassNames.push('app-content__inner--interns-overview');
   }
-  if (isReportsOverview && !isReportsProjectDetail) {
-    appContentInnerClassNames.push('app-content__inner--reports-overview');
-  }
 
   const headerEyebrow =
-    isReportsProjectDetail && selectedReportProject ? selectedReportProject.name : activeModule?.name ?? '';
+    isProjectReportDetail && selectedReportProject ? selectedReportProject.name : activeModule?.name ?? '';
   let headerTitle = activeSubmodule?.name ?? activeModule?.name ?? '';
-  if (isReportsProjectDetail) {
+  if (isProjectReportDetail) {
     if (reportView === 'detail') {
       headerTitle = 'Detailní report';
     } else if (reportView === 'detail-intern') {
@@ -397,7 +391,7 @@ function App() {
     headerTitle = selectedReportProject.name;
   }
   let headerDescription = '';
-  if (isReportsProjectDetail) {
+  if (isProjectReportDetail) {
     if (reportView === 'detail') {
       headerDescription =
         'Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.';
@@ -408,7 +402,7 @@ function App() {
     }
   } else if (isOnDemand) {
     headerDescription = 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.';
-  } else if (isProjectsOverview) {
+  } else if (isProjectsOverview && !isProjectReportActive) {
     headerDescription = 'Získejte rychlý přehled o projektech, jejich týmech a otevřených issue.';
   } else if (isProjectsAdmin) {
     headerDescription = 'Vytvářejte a spravujte projekty v aplikaci.';
@@ -416,9 +410,7 @@ function App() {
     headerDescription = 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.';
   } else if (isSyncReportsOverview) {
     headerDescription = 'Prohlédněte si jednotlivé výkazy podle zvoleného období.';
-  } else if (isReportsOverview && !isReportsProject) {
-    headerDescription = 'Vyberte projekt a zobrazte jeho detailní report.';
-  } else if (isReportsProjectSummary) {
+  } else if (isProjectReportSummary) {
     headerDescription = 'Souhrn otevřených issue vybraného projektu.';
   } else if (isProjectsTeams) {
     headerDescription = 'Zobrazte složení týmů a jejich úvazky na projektech.';
@@ -427,8 +419,9 @@ function App() {
     !isProjectsOverview &&
     !isProjectsAdmin &&
     !isInternsAdmin &&
-    !isReportsOverview &&
-    !isProjectsTeams
+    !isProjectsTeams &&
+    !isInternsOverview &&
+    !isSyncReportsOverview
   ) {
     headerDescription = 'Vyberte modul z navigace a zpřístupněte si funkce, které potřebujete pro správu projektů a stážistů.';
   }
@@ -439,7 +432,7 @@ function App() {
     { view: 'detail-project', label: 'Detail projektu' },
   ];
 
-  const detailNavigation = isReportsProjectDetail ? (
+  const detailNavigation = isProjectReportDetail ? (
     <nav className="page-header__nav" aria-label="Navigace detailního reportu">
       {detailNavigationItems.map(item => {
         const isActive = reportView === item.view;
@@ -472,7 +465,7 @@ function App() {
     let nextProjectId = selectedReportProject?.id ?? pendingReportProjectId;
     let nextView: ReportDetailView | null = reportView;
 
-    if (moduleDef.key !== 'reports' || nextSubmoduleKey !== 'reports-overview') {
+    if (moduleDef.key !== 'projects' || nextSubmoduleKey !== 'projects-overview') {
       nextProjectId = null;
       nextView = null;
       setSelectedReportProject(null);
@@ -494,35 +487,14 @@ function App() {
     );
   }
 
-  function handleSelectReportProject(project: ProjectOverviewDTO) {
-    setActiveModuleKey('reports');
-    setActiveSubmoduleKey('reports-overview');
-    setSelectedReportProject(project);
-    setReportView('summary');
-    setPendingReportProjectId(project.id);
-    setReportProjectsCache(prev => {
-      const next = new Map(prev);
-      next.set(project.id, project);
-      return next;
-    });
-    pushRoute(
-      normalizeRoute({
-        moduleKey: 'reports',
-        submoduleKey: 'reports-overview',
-        projectId: project.id,
-        view: 'summary',
-      }),
-    );
-  }
-
   function handleExitReportProject() {
     setSelectedReportProject(null);
     setReportView(null);
     setPendingReportProjectId(null);
     pushRoute(
       normalizeRoute({
-        moduleKey: 'reports',
-        submoduleKey: 'reports-overview',
+        moduleKey: 'projects',
+        submoduleKey: 'projects-overview',
         projectId: null,
         view: null,
       }),
@@ -536,8 +508,8 @@ function App() {
     setPendingReportProjectId(selectedReportProject.id);
     pushRoute(
       normalizeRoute({
-        moduleKey: 'reports',
-        submoduleKey: 'reports-overview',
+        moduleKey: 'projects',
+        submoduleKey: 'projects-overview',
         projectId: selectedReportProject.id,
         view: next,
       }),
@@ -741,7 +713,7 @@ function App() {
       />
       <main className={appContentClassNames.join(' ')}>
         <div className={appContentInnerClassNames.join(' ')}>
-          <header className={`page-header${isReportsProjectDetail ? ' page-header--with-nav' : ''}`}>
+          <header className={`page-header${isProjectReportDetail ? ' page-header--with-nav' : ''}`}>
             <div className="page-header__top">
               <div className="page-header__headline">
                 {headerEyebrow ? <p className="page-header__eyebrow">{headerEyebrow}</p> : null}
@@ -886,7 +858,7 @@ function App() {
             </>
           ) : isSyncReportsOverview ? (
             <SyncReportsOverviewPage />
-          ) : isReportsProject && selectedReportProject ? (
+          ) : isProjectReportActive && selectedReportProject ? (
             reportView && reportView !== 'summary' ? (
               reportView === 'detail' ? (
                 <ProjectReportDetailPage
@@ -922,8 +894,6 @@ function App() {
             <InternsOverviewPage />
           ) : isInternsAdmin ? (
             <InternsPage />
-          ) : isReportsOverview ? (
-            <ReportsOverviewPage onSelectProject={handleSelectReportProject} />
           ) : isProjectsTeams ? (
             <ReportsTeamsPage />
           ) : (

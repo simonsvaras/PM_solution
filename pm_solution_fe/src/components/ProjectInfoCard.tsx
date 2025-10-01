@@ -15,7 +15,7 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
   );
 
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
-  const reportsOverviewLink = `?module=reports&submodule=reports-overview&projectId=${project.id}`;
+  const reportsOverviewLink = `?module=projects&submodule=projects-overview&projectId=${project.id}`;
 
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
