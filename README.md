@@ -27,10 +27,10 @@ Notes
 
 ## Report synchronisation
 
-The report module now provides an overview of all projects and a detailed page for each project:
+Projektové reporty jsou dostupné přímo z modulu **Projekty → Přehled projektů**:
 
-- **Overview (`/reports`)** lists every project using `SimpleProjectCard` tiles. Selecting a tile opens the project report detail.
-- **Project detail** shows the number of open issues and exposes a "Synchronizovat výkazy" button. Users can either synchronise from the last stored timelog or supply a custom time range. The UI disables manual date inputs when "Synchronizovat data jen od poslední synchronizace" is ticked to prevent conflicting filters.
+- **Souhrn projektu** otevřete z dlaždice projektu přes odkaz „Zobrazit detail“. Stránka ukazuje základní statistiky a umožňuje spustit synchronizaci výkazů pro zvolené období.
+- **Detailní report** nabízí přepínače pro jednotlivé sekce (obecný přehled, detail stážisty a detail projektu). Mezi sekcemi lze přecházet bez opuštění modulu „Projekty“.
 - **On-demand maintenance** (Synchronizace → On-demand) now contains a red "Smazat všechny reporty" panel. The action requires a confirmation dialog and calls `DELETE /api/sync/reports`, which permanently removes every row from the `report` table. Use it to reset the database before a full re-import.
 - **Synchronizace → Přehled reportů** nabízí tabulku všech uložených výkazů. Filtry „od“ a „do“ jsou předvyplněny podle vykazovacího období a můžete je kdykoliv upravit, než stisknete tlačítko „Získat“ pro načtení dat.
 
