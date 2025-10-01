@@ -523,6 +523,14 @@ export async function syncProjectReports(projectId: number, payload: ProjectRepo
   return parseJson<SyncSummary>(res);
 }
 
+export async function syncProjectMilestones(projectId: number): Promise<SyncSummary> {
+  const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/milestones`, {
+    method: "POST",
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<SyncSummary>(res);
+}
+
 export async function getProjectReportDetail(
   projectId: number,
   params: ProjectReportDetailParams,
