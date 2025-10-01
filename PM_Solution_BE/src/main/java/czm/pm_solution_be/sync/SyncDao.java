@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -707,6 +708,19 @@ public class SyncDao {
                                          BigDecimal hours,
                                          BigDecimal cost) {}
 
+    public record ActiveMilestoneRow(long milestoneId,
+                                     long milestoneIid,
+                                     String title,
+                                     String state,
+                                     LocalDate dueDate,
+                                     long totalTimeSpentSeconds) {}
+
+    public record MilestoneIssueCostRow(long milestoneId,
+                                        Long issueId,
+                                        Long issueIid,
+                                        String issueTitle,
+                                        BigDecimal totalCost) {}
+
     public List<ProjectInternRow> listProjectInterns(long projectId) {
         String sql = """
                 SELECT DISTINCT i.id,
@@ -780,6 +794,91 @@ public class SyncDao {
                 rs.getString("intern_last_name"),
                 rs.getBigDecimal("hours"),
                 rs.getBigDecimal("cost")
+        ), params.toArray());
+    }
+
+    public List<ActiveMilestoneRow> listActiveMilestones(long projectId) {
+        String sql = """
+                SELECT m.milestone_id,
+                       m.milestone_iid,
+                       m.title,
+                       m.state,
+                       m.due_date,
+                       COALESCE(SUM(iss.total_time_spent_seconds), 0) AS total_time_spent_seconds
+                FROM milestone m
+                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
+                LEFT JOIN issue iss
+                       ON iss.repository_id = ptr.repository_id
+                      AND iss.milestone_title = m.title
+                WHERE m.project_id = ?
+                  AND m.state = 'active'
+                GROUP BY m.milestone_id, m.milestone_iid, m.title, m.state, m.due_date
+                ORDER BY m.due_date NULLS LAST, LOWER(m.title)
+                """;
+        return jdbc.query(sql, (rs, rn) -> new ActiveMilestoneRow(
+                rs.getLong("milestone_id"),
+                rs.getLong("milestone_iid"),
+                rs.getString("title"),
+                rs.getString("state"),
+                rs.getObject("due_date", LocalDate.class),
+                ((Number) rs.getObject("total_time_spent_seconds")).longValue()
+        ), projectId);
+    }
+
+    public List<MilestoneIssueCostRow> listMilestoneIssueCosts(long projectId, List<Long> milestoneIds) {
+        if (milestoneIds == null || milestoneIds.isEmpty()) {
+            return List.of();
+        }
+
+        var uniqueIds = milestoneIds.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (uniqueIds.isEmpty()) {
+            return List.of();
+        }
+
+        String placeholders = uniqueIds.stream()
+                .map(id -> "?")
+                .collect(Collectors.joining(","));
+
+        String sql = """
+                SELECT m.milestone_id,
+                       iss.id AS issue_id,
+                       iss.iid AS issue_iid,
+                       COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
+                       COALESCE(SUM(CASE
+                           WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN COALESCE(r.cost, 0)
+                           ELSE 0
+                       END), 0) AS total_cost
+                FROM milestone m
+                JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
+                JOIN issue iss
+                  ON iss.repository_id = ptr.repository_id
+                 AND iss.milestone_title = m.title
+                LEFT JOIN report r
+                  ON r.repository_id = iss.repository_id
+                 AND r.iid = iss.iid
+                LEFT JOIN intern i ON i.username = r.username
+                LEFT JOIN intern_project ip
+                  ON ip.intern_id = i.id
+                 AND ip.project_id = ptr.project_id
+                WHERE m.project_id = ?
+                  AND m.state = 'active'
+                  AND m.milestone_id IN (%s)
+                GROUP BY m.milestone_id, iss.id, iss.iid, issue_title
+                ORDER BY m.due_date NULLS LAST, LOWER(m.title), issue_title
+                """.formatted(placeholders);
+
+        List<Object> params = new ArrayList<>();
+        params.add(projectId);
+        params.addAll(uniqueIds);
+
+        return jdbc.query(sql, (rs, rn) -> new MilestoneIssueCostRow(
+                rs.getLong("milestone_id"),
+                (Long) rs.getObject("issue_id"),
+                (Long) rs.getObject("issue_iid"),
+                rs.getString("issue_title"),
+                rs.getBigDecimal("total_cost")
         ), params.toArray());
     }
 

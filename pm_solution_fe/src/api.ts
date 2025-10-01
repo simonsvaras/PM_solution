@@ -81,6 +81,21 @@ export type ProjectOverviewDTO = {
   teamMembers: number;
   openIssues: number;
 };
+export type ProjectMilestoneSummary = {
+  milestoneId: number;
+  milestoneIid: number;
+  title: string;
+  state: string;
+  dueDate: string | null;
+  totalTimeSpentSeconds: number;
+};
+export type ProjectMilestoneIssueCost = {
+  milestoneId: number;
+  issueId: number | null;
+  issueIid: number | null;
+  issueTitle: string;
+  totalCost: number;
+};
 export type ProjectBudgetPayload = {
   name: string;
   budget?: number | null;
@@ -502,6 +517,32 @@ export async function updateProjectInterns(projectId: number, interns: ProjectIn
     body: JSON.stringify({ interns }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function getProjectActiveMilestones(projectId: number): Promise<ProjectMilestoneSummary[]> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/active`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectMilestoneSummary[]>(res);
+}
+
+export async function getProjectMilestoneIssueCosts(
+  projectId: number,
+  milestoneIds: number[],
+): Promise<ProjectMilestoneIssueCost[]> {
+  const uniqueIds = Array.from(new Set(milestoneIds.filter(id => typeof id === "number" && Number.isFinite(id))));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+  const params = new URLSearchParams();
+  for (const id of uniqueIds) {
+    params.append("milestoneId", String(id));
+  }
+  const query = params.toString();
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/milestones/issues${query ? `?${query}` : ""}`,
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectMilestoneIssueCost[]>(res);
 }
 
 export async function syncRepositories(): Promise<SyncSummary> {
