@@ -919,7 +919,7 @@ function App() {
               />
             )
           ) : isProjectsOverview ? (
-            <ProjectsOverviewPage />
+            <ProjectsOverviewPage onSelectProject={handleSelectReportProject} />
           ) : isProjectsAdmin ? (
             <ProjectsPage />
           ) : isInternsOverview ? (

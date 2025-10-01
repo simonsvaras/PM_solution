@@ -5,9 +5,10 @@ import BudgetBurnIndicator from './BudgetBurnIndicator';
 
 type ProjectInfoCardProps = {
   project: ProjectOverviewDTO;
+  onSelectProject?: (project: ProjectOverviewDTO) => void;
 };
 
-export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
+export default function ProjectInfoCard({ project, onSelectProject }: ProjectInfoCardProps) {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('cs-CZ'), []);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 2 }),
@@ -17,13 +18,24 @@ export default function ProjectInfoCard({ project }: ProjectInfoCardProps) {
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
   const reportsOverviewLink = `?module=projects&submodule=projects-overview&projectId=${project.id}`;
 
+  function handleSelectProject() {
+    if (!onSelectProject) return;
+    onSelectProject(project);
+  }
+
   return (
     <article className="projectInfoCard" aria-label={`Projekt ${project.name}`}>
       <header className="projectInfoCard__header">
         <h2>{project.name}</h2>
-        <a className="projectInfoCard__detailLink" href={reportsOverviewLink}>
-          Zobrazit detail
-        </a>
+        {onSelectProject ? (
+          <button type="button" className="projectInfoCard__detailLink" onClick={handleSelectProject}>
+            Zobrazit detail
+          </button>
+        ) : (
+          <a className="projectInfoCard__detailLink" href={reportsOverviewLink}>
+            Zobrazit detail
+          </a>
+        )}
       </header>
       <dl className="projectInfoCard__stats">
         <div className="projectInfoCard__stat">
