@@ -960,7 +960,9 @@ public class SyncDao {
                 LEFT JOIN intern i ON i.username = iss.assignee_username
                 WHERE m.project_id = ?
                   AND m.milestone_id = ?
-                ORDER BY iss.due_date NULLS LAST, LOWER(issue_title), iss.iid
+                ORDER BY iss.due_date NULLS LAST,
+                         LOWER(COALESCE(NULLIF(iss.title, ''), 'Bez názvu')),
+                         iss.iid
                 """;
 
         return jdbc.query(sql, (rs, rn) -> new MilestoneIssueDetailRow(
