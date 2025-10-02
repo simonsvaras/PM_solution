@@ -59,6 +59,7 @@ export type SyncReportOverviewRowDTO = {
   username: string | null;
   spentAt: string;
   timeSpentHours: number | string;
+  cost: number | string | null;
 };
 
 export type ProjectDTO = {

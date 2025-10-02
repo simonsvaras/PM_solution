@@ -660,7 +660,8 @@ public class SyncDao {
                                     String issueTitle,
                                     OffsetDateTime spentAt,
                                     BigDecimal timeSpentHours,
-                                    String resolvedUsername) {}
+                                    String resolvedUsername,
+                                    BigDecimal cost) {}
 
     public List<ReportOverviewRow> listReportOverview(OffsetDateTime from, OffsetDateTime to, boolean untrackedOnly) {
         StringBuilder sql = new StringBuilder("SELECT r.repository_id, " +
@@ -669,6 +670,7 @@ public class SyncDao {
                 "iss.title AS issue_title, " +
                 "r.spent_at, " +
                 "r.time_spent_hours, " +
+                "r.cost, " +
                 "COALESCE(r.username, r.unregistered_username) AS resolved_username " +
                 "FROM report r " +
                 "JOIN repository repo ON repo.id = r.repository_id " +
@@ -698,7 +700,8 @@ public class SyncDao {
                 rs.getString("issue_title"),
                 rs.getObject("spent_at", OffsetDateTime.class),
                 rs.getBigDecimal("time_spent_hours"),
-                rs.getString("resolved_username")
+                rs.getString("resolved_username"),
+                rs.getBigDecimal("cost")
         ), params.toArray());
     }
 

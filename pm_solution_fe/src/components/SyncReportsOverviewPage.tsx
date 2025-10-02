@@ -10,9 +10,19 @@ type ReportRow = {
   username: string | null;
   spentAt: string;
   timeSpentHours: number | null;
+  cost: number | null;
 };
 
-function toNumber(value: number | string): number | null {
+type SummaryRow = {
+  username: string;
+  totalHours: number | null;
+  totalCost: number | null;
+};
+
+function toNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null;
   }
@@ -27,6 +37,7 @@ function mapDto(row: SyncReportOverviewRowDTO): ReportRow {
     username: row.username,
     spentAt: row.spentAt,
     timeSpentHours: toNumber(row.timeSpentHours),
+    cost: toNumber(row.cost),
   };
 }
 
@@ -37,6 +48,16 @@ function formatHours(value: number | null): string {
   return value.toLocaleString('cs-CZ', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  });
+}
+
+function formatCost(value: number | null): string {
+  if (value === null || Number.isNaN(value)) {
+    return '—';
+  }
+  return value.toLocaleString('cs-CZ', {
+    style: 'currency',
+    currency: 'CZK',
   });
 }
 
@@ -60,6 +81,7 @@ export default function SyncReportsOverviewPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [untrackedOnly, setUntrackedOnly] = useState(false);
+  const [showClosures, setShowClosures] = useState(false);
 
   const isRangeValid = useMemo(() => {
     if (!from || !to) {
@@ -111,6 +133,31 @@ export default function SyncReportsOverviewPage() {
     [loadReports],
   );
 
+  const summaryRows = useMemo<SummaryRow[]>(() => {
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const totals = new Map<string, { hours: number; cost: number }>();
+    for (const row of rows) {
+      const key = row.username ?? '—';
+      const existing = totals.get(key) ?? { hours: 0, cost: 0 };
+      const hours = Number.isFinite(row.timeSpentHours ?? NaN) ? row.timeSpentHours ?? 0 : 0;
+      const cost = Number.isFinite(row.cost ?? NaN) ? row.cost ?? 0 : 0;
+      existing.hours += hours;
+      existing.cost += cost;
+      totals.set(key, existing);
+    }
+
+    return Array.from(totals.entries())
+      .map(([username, values]) => ({
+        username,
+        totalHours: values.hours,
+        totalCost: values.cost,
+      }))
+      .sort((a, b) => a.username.localeCompare(b.username, 'cs', { sensitivity: 'base' }));
+  }, [rows]);
+
   return (
     <section className="panel">
       <div className="panel__body syncReportOverview">
@@ -145,6 +192,49 @@ export default function SyncReportsOverviewPage() {
           </p>
         ) : null}
 
+        <div className="syncReportOverview__summaryToggle">
+          <button type="button" onClick={() => setShowClosures(prev => !prev)}>
+            {showClosures ? 'Skrýt uzávěrky' : 'Zobrazit uzávěrky'}
+          </button>
+        </div>
+
+        {showClosures ? (
+          <div className="syncReportOverview__tableWrapper">
+            <table className="syncReportOverview__table">
+              <thead>
+                <tr>
+                  <th scope="col">Username</th>
+                  <th scope="col">Celkové hodiny</th>
+                  <th scope="col">Celkové náklady</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={3} className="syncReportOverview__empty">
+                      Načítám uzávěrky…
+                    </td>
+                  </tr>
+                ) : summaryRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="syncReportOverview__empty">
+                      Žádná data pro uzávěrku.
+                    </td>
+                  </tr>
+                ) : (
+                  summaryRows.map(row => (
+                    <tr key={row.username}>
+                      <td>{row.username}</td>
+                      <td className="syncReportOverview__cell--numeric">{formatHours(row.totalHours)}</td>
+                      <td className="syncReportOverview__cell--numeric">{formatCost(row.totalCost)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         <div className="syncReportOverview__tableWrapper">
           <table className="syncReportOverview__table">
             <thead>
@@ -176,7 +266,7 @@ export default function SyncReportsOverviewPage() {
                     <td>{row.repositoryName}</td>
                     <td>{row.username ?? '—'}</td>
                     <td>{formatDateTime(row.spentAt)}</td>
-                    <td>{formatHours(row.timeSpentHours)}</td>
+                    <td className="syncReportOverview__cell--numeric">{formatHours(row.timeSpentHours)}</td>
                   </tr>
                 ))
               )}
