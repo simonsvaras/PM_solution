@@ -36,23 +36,6 @@ function formatDate(value: string | null): string {
   return date.toLocaleDateString('cs-CZ');
 }
 
-function formatMilestoneState(value?: string | null): string {
-  if (!value) {
-    return '—';
-  }
-  const lower = value.toLowerCase();
-  switch (lower) {
-    case 'active':
-      return 'Aktivní';
-    case 'closed':
-      return 'Uzavřený';
-    case 'upcoming':
-      return 'Plánovaný';
-    default:
-      return value;
-  }
-}
-
 function formatIssueState(value?: string | null): string {
   if (!value) {
     return '—';
@@ -295,41 +278,10 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
           </div>
 
           <div className="projectReportProjectDetail__summarySection">
-            <article
-              className="projectReportProjectDetail__milestoneCard"
-              aria-label={`Detail milníku ${detail.summary.title}`}
-            >
-              <h3>{detail.summary.title}</h3>
-              {detail.summary.description?.trim() ? (
-                <p className="projectReportProjectDetail__milestoneDescription">
-                  {detail.summary.description.trim()}
-                </p>
-              ) : null}
-              <dl className="projectReportProjectDetail__milestoneMeta">
-                <div>
-                  <dt>IID</dt>
-                  <dd>#{detail.summary.milestoneIid}</dd>
-                </div>
-                <div>
-                  <dt>Stav</dt>
-                  <dd>{formatMilestoneState(detail.summary.state)}</dd>
-                </div>
-                <div>
-                  <dt>Termín</dt>
-                  <dd>{formatDate(detail.summary.dueDate)}</dd>
-                </div>
-                <div>
-                  <dt>Vykázané hodiny</dt>
-                  <dd>{formatDuration(detail.summary.totalTimeSpentSeconds)}</dd>
-                </div>
-                <div>
-                  <dt>Issues</dt>
-                  <dd>
-                    {detail.summary.closedIssues.toLocaleString('cs-CZ')} /{' '}
-                    {detail.summary.totalIssues.toLocaleString('cs-CZ')}
-                  </dd>
-                </div>
-              </dl>
+            <article className="projectReportProjectDetail__milestoneCard">
+              <p className="projectReportProjectDetail__milestoneDescription">
+                {detail.summary.description?.trim() || 'Milník nemá žádný popis.'}
+              </p>
             </article>
 
             <div

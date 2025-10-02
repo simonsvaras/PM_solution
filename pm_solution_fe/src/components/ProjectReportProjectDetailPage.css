@@ -72,49 +72,15 @@
   box-shadow: 0 20px 36px rgba(15, 23, 42, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.projectReportProjectDetail__milestoneCard h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
+  gap: 12px;
 }
 
 .projectReportProjectDetail__milestoneDescription {
-  margin: -8px 0 8px;
+  margin: 0;
   color: var(--color-text-muted);
   font-size: 0.95rem;
   line-height: 1.4;
   white-space: pre-line;
-}
-
-.projectReportProjectDetail__milestoneMeta {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px 16px;
-}
-
-.projectReportProjectDetail__milestoneMeta div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.projectReportProjectDetail__milestoneMeta dt {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.projectReportProjectDetail__milestoneMeta dd {
-  margin: 0;
-  font-weight: 600;
-  color: var(--color-text-primary);
 }
 
 .projectReportProjectDetail__chart {
