@@ -116,6 +116,8 @@ export type ProjectMilestoneIssueDetail = {
   issueId: number | null;
   issueIid: number | null;
   issueTitle: string;
+  issueWebUrl: string | null;
+  humanTimeEstimate: string | null;
   state: string | null;
   dueDate: string | null;
   assigneeUsername: string | null;
@@ -292,6 +294,8 @@ export type ProjectReportDetailIssue = {
   issueId: number | null;
   issueIid: number | null;
   issueTitle: string;
+  issueWebUrl: string | null;
+  humanTimeEstimate: string | null;
   internHours: ProjectReportDetailIssueCell[];
 };
 
@@ -306,6 +310,8 @@ export type ProjectReportInternDetailIssue = {
   issueId: number | null;
   issueIid: number | null;
   issueTitle: string;
+  issueWebUrl: string | null;
+  humanTimeEstimate: string | null;
   dueDate: string | null;
   createdAt: string | null;
   ageDays: number | null;
@@ -674,9 +680,14 @@ export async function getProjectReportInternDetail(
         typeof issue.ageDays === 'number' && Number.isFinite(issue.ageDays)
           ? Math.max(0, Math.floor(issue.ageDays))
           : null;
+      const normalizedWebUrl = issue.issueWebUrl && issue.issueWebUrl.trim() ? issue.issueWebUrl.trim() : null;
+      const normalizedHumanEstimate =
+        issue.humanTimeEstimate && issue.humanTimeEstimate.trim() ? issue.humanTimeEstimate.trim() : null;
 
       return {
         ...issue,
+        issueWebUrl: normalizedWebUrl,
+        humanTimeEstimate: normalizedHumanEstimate,
         dueDate: issue.dueDate ?? null,
         createdAt: issue.createdAt ?? null,
         ageDays: normalizedAgeDays,

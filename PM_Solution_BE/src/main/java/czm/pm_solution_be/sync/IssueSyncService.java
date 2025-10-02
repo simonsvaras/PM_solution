@@ -75,7 +75,9 @@ public class IssueSyncService {
                             is.milestone != null ? is.milestone.state : null,
                             is.dueDate,
                             is.createdAt,
-                            is.updatedAt
+                            is.updatedAt,
+                            is.webUrl,
+                            is.timeStats != null ? is.timeStats.humanTimeEstimate : null
                     );
                     if (upsert.inserted) summary.addInserted(1); else summary.addUpdated(1);
                 }

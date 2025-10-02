@@ -299,8 +299,10 @@ public class SyncDao {
                                                 String milestoneState,
                                                 String dueDate,
                                                 OffsetDateTime createdAt,
-                                                OffsetDateTime updatedAt) {
-        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, milestone_title=?, milestone_state=?, due_date=?::date, created_at=?, updated_at=? WHERE gitlab_issue_id=?",
+                                                OffsetDateTime updatedAt,
+                                                String webUrl,
+                                                String humanTimeEstimate) {
+        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, milestone_title=?, milestone_state=?, due_date=?::date, created_at=?, updated_at=?, web_url=?, human_time_estimate=? WHERE gitlab_issue_id=?",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setString(2, title);
@@ -316,11 +318,13 @@ public class SyncDao {
                     ps.setString(12, dueDate);
                     if (createdAt == null) ps.setNull(13, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(13, createdAt);
                     if (updatedAt == null) ps.setNull(14, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(14, updatedAt);
-                    ps.setLong(15, gitlabIssueId);
+                    ps.setString(15, webUrl);
+                    ps.setString(16, humanTimeEstimate);
+                    ps.setLong(17, gitlabIssueId);
                 });
         if (updated > 0) return new UpsertResult<>(null, false);
 
-        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?)",
+        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, created_at, updated_at, web_url, human_time_estimate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?,?,?,?)",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setLong(2, gitlabIssueId);
@@ -338,6 +342,8 @@ public class SyncDao {
                     ps.setString(14, dueDate);
                     if (createdAt == null) ps.setNull(15, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(15, createdAt);
                     if (updatedAt == null) ps.setNull(16, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(16, updatedAt);
+                    ps.setString(17, webUrl);
+                    ps.setString(18, humanTimeEstimate);
                 });
         return new UpsertResult<>(null, true);
     }
@@ -712,6 +718,8 @@ public class SyncDao {
                                          Long issueId,
                                          Long issueIid,
                                          String issueTitle,
+                                         String issueWebUrl,
+                                         String issueHumanTimeEstimate,
                                          long internId,
                                          String internUsername,
                                          String internFirstName,
@@ -724,6 +732,8 @@ public class SyncDao {
                                             Long issueId,
                                             Long issueIid,
                                             String issueTitle,
+                                            String issueWebUrl,
+                                            String issueHumanTimeEstimate,
                                             LocalDate dueDate,
                                             OffsetDateTime createdAt,
                                             long totalTimeSpentSeconds) {}
@@ -756,6 +766,8 @@ public class SyncDao {
     public record MilestoneIssueDetailRow(Long issueId,
                                           Long issueIid,
                                           String issueTitle,
+                                          String issueWebUrl,
+                                          String issueHumanTimeEstimate,
                                           String state,
                                           LocalDate dueDate,
                                           String assigneeUsername,
@@ -801,6 +813,8 @@ public class SyncDao {
                 "iss.id AS issue_id, " +
                 "r.iid AS issue_iid, " +
                 "iss.title AS issue_title, " +
+                "iss.web_url AS issue_web_url, " +
+                "iss.human_time_estimate AS issue_human_time_estimate, " +
                 "i.id AS intern_id, " +
                 "i.username AS intern_username, " +
                 "i.first_name AS intern_first_name, " +
@@ -831,7 +845,7 @@ public class SyncDao {
             params.add(internUsername);
         }
 
-        sql.append(" GROUP BY r.repository_id, repo.name, iss.id, r.iid, iss.title, i.id, i.username, i.first_name, i.last_name");
+        sql.append(" GROUP BY r.repository_id, repo.name, iss.id, r.iid, iss.title, iss.web_url, iss.human_time_estimate, i.id, i.username, i.first_name, i.last_name");
         sql.append(" ORDER BY repo.name, r.iid NULLS LAST, iss.title NULLS LAST, i.last_name, i.first_name, i.username");
 
         return jdbc.query(sql.toString(), (rs, rn) -> new ProjectReportDetailRow(
@@ -840,6 +854,8 @@ public class SyncDao {
                 (Long) rs.getObject("issue_id"),
                 (Long) rs.getObject("issue_iid"),
                 rs.getString("issue_title"),
+                rs.getString("issue_web_url"),
+                rs.getString("issue_human_time_estimate"),
                 rs.getLong("intern_id"),
                 rs.getString("intern_username"),
                 rs.getString("intern_first_name"),
@@ -860,6 +876,8 @@ public class SyncDao {
                        iss.id AS issue_id,
                        iss.iid AS issue_iid,
                        iss.title AS issue_title,
+                       iss.web_url AS issue_web_url,
+                       iss.human_time_estimate AS issue_human_time_estimate,
                        iss.due_date,
                        iss.created_at,
                        COALESCE(SUM(r.time_spent_seconds), 0) AS total_time_spent_seconds
@@ -873,7 +891,7 @@ public class SyncDao {
                 WHERE ptr.project_id = ?
                   AND iss.assignee_username = ?
                   AND iss.state = 'opened'
-                GROUP BY iss.repository_id, repo.name, iss.id, iss.iid, iss.title, iss.due_date, iss.created_at
+                GROUP BY iss.repository_id, repo.name, iss.id, iss.iid, iss.title, iss.web_url, iss.human_time_estimate, iss.due_date, iss.created_at
                 ORDER BY iss.due_date NULLS LAST, LOWER(iss.title), iss.iid
                 """;
 
@@ -897,6 +915,8 @@ public class SyncDao {
                     (Long) rs.getObject("issue_id"),
                     (Long) rs.getObject("issue_iid"),
                     title,
+                    rs.getString("issue_web_url"),
+                    rs.getString("issue_human_time_estimate"),
                     rs.getObject("due_date", LocalDate.class),
                     createdAt,
                     Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L)
@@ -1021,6 +1041,8 @@ public class SyncDao {
                     SELECT iss.id AS issue_id,
                            iss.iid AS issue_iid,
                            COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
+                           iss.web_url AS issue_web_url,
+                           iss.human_time_estimate AS issue_human_time_estimate,
                            iss.state,
                            iss.due_date,
                            iss.assignee_username,
@@ -1046,6 +1068,8 @@ public class SyncDao {
                     GROUP BY iss.id,
                              iss.iid,
                              iss.title,
+                             iss.web_url,
+                             iss.human_time_estimate,
                              iss.state,
                              iss.due_date,
                              iss.assignee_username,
@@ -1061,6 +1085,8 @@ public class SyncDao {
                 (Long) rs.getObject("issue_id"),
                 (Long) rs.getObject("issue_iid"),
                 rs.getString("issue_title"),
+                rs.getString("issue_web_url"),
+                rs.getString("issue_human_time_estimate"),
                 rs.getString("state"),
                 rs.getObject("due_date", LocalDate.class),
                 rs.getString("assignee_username"),

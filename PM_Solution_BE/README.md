@@ -97,6 +97,8 @@ Flyway migrations are located in `src/main/resources/db/migration`:
 - `V21__milestone_description.sql` – rozšíří tabulku `milestone` o sloupec `description` a začne ukládat textový popis z GitLabu.
 - `V10__report_username_nullable.sql` – povolí `NULL` v `report.username`, aby smazání stážisty pouze odpojilo jeho reporty.
 - `V11__report_username_nullable.sql` – opětovně aplikuje `ALTER TABLE report ALTER COLUMN username DROP NOT NULL;` pro instance, které migrovaly z verze bez předchozí opravy.
+- `V22__issue_created_at.sql` – ukládá `created_at` z GitLabu pro historické analýzy stáří issue.
+- `V23__issue_web_url_human_estimate.sql` – přidá `issue.web_url` a `issue.human_time_estimate`, aby FE dostal přímý odkaz na GitLab a textový odhad času.
 
 Logging & observability
 -----------------------

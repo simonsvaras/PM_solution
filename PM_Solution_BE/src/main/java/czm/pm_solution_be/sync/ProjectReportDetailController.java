@@ -36,6 +36,8 @@ public class ProjectReportDetailController {
                            Long issueId,
                            Long issueIid,
                            String issueTitle,
+                           String issueWebUrl,
+                           String humanTimeEstimate,
                            List<IssueInternHours> internHours) {}
 
     public record ProjectReportDetailResponse(List<InternSummary> interns, List<IssueRow> issues) {}
@@ -45,6 +47,8 @@ public class ProjectReportDetailController {
                                   Long issueId,
                                   Long issueIid,
                                   String issueTitle,
+                                  String issueWebUrl,
+                                  String humanTimeEstimate,
                                   String dueDate,
                                   String createdAt,
                                   Integer ageDays,
@@ -88,7 +92,9 @@ public class ProjectReportDetailController {
                     row.repositoryName(),
                     row.issueId(),
                     row.issueIid(),
-                    row.issueTitle()
+                    row.issueTitle(),
+                    row.issueWebUrl(),
+                    row.issueHumanTimeEstimate()
             ));
             builder.addEntry(row.internId(), row.hours(), row.cost());
         }
@@ -130,6 +136,8 @@ public class ProjectReportDetailController {
                             row.issueId(),
                             row.issueIid(),
                             row.issueTitle(),
+                            normalizeBlank(row.issueWebUrl()),
+                            normalizeBlank(row.issueHumanTimeEstimate()),
                             row.dueDate() != null ? row.dueDate().toString() : null,
                             row.createdAt() != null ? row.createdAt().toString() : null,
                             calculateIssueAgeDays(row.createdAt()),
@@ -151,15 +159,25 @@ public class ProjectReportDetailController {
         private final Long issueId;
         private final Long issueIid;
         private final String issueTitle;
+        private final String issueWebUrl;
+        private final String humanTimeEstimate;
         private final Map<Long, BigDecimal> hours = new LinkedHashMap<>();
         private final Map<Long, BigDecimal> costs = new LinkedHashMap<>();
 
-        IssueRowBuilder(long repositoryId, String repositoryName, Long issueId, Long issueIid, String issueTitle) {
+        IssueRowBuilder(long repositoryId,
+                        String repositoryName,
+                        Long issueId,
+                        Long issueIid,
+                        String issueTitle,
+                        String issueWebUrl,
+                        String humanTimeEstimate) {
             this.repositoryId = repositoryId;
             this.repositoryName = repositoryName;
             this.issueId = issueId;
             this.issueIid = issueIid;
             this.issueTitle = (issueTitle == null || issueTitle.isBlank()) ? "Bez názvu" : issueTitle;
+            this.issueWebUrl = normalizeBlank(issueWebUrl);
+            this.humanTimeEstimate = normalizeBlank(humanTimeEstimate);
         }
 
         void addEntry(long internId, BigDecimal hoursValue, BigDecimal costValue) {
@@ -175,8 +193,12 @@ public class ProjectReportDetailController {
             List<IssueInternHours> cells = hours.entrySet().stream()
                     .map(entry -> new IssueInternHours(entry.getKey(), entry.getValue(), costs.get(entry.getKey())))
                     .toList();
-            return new IssueRow(repositoryId, repositoryName, issueId, issueIid, issueTitle, cells);
+            return new IssueRow(repositoryId, repositoryName, issueId, issueIid, issueTitle, issueWebUrl, humanTimeEstimate, cells);
         }
+    }
+
+    private static String normalizeBlank(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     private static Integer calculateIssueAgeDays(OffsetDateTime createdAt) {

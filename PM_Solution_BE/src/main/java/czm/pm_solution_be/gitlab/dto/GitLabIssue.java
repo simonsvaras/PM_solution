@@ -13,6 +13,8 @@ public class GitLabIssue {
     public String title;
     public String state;
     public String description;
+    @JsonProperty("web_url")
+    public String webUrl;
     @JsonProperty("due_date")
     public String dueDate; // YYYY-MM-DD or null
     @JsonProperty("created_at")
@@ -32,6 +34,8 @@ public class GitLabIssue {
         public Integer timeEstimate; // seconds
         @JsonProperty("total_time_spent")
         public Integer totalTimeSpent; // seconds
+        @JsonProperty("human_time_estimate")
+        public String humanTimeEstimate;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
