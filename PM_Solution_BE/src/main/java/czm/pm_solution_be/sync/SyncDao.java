@@ -11,7 +11,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Types;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -711,6 +713,15 @@ public class SyncDao {
                                          BigDecimal hours,
                                          BigDecimal cost) {}
 
+    public record ProjectInternOpenIssueRow(long repositoryId,
+                                            String repositoryName,
+                                            Long issueId,
+                                            Long issueIid,
+                                            String issueTitle,
+                                            LocalDate dueDate,
+                                            OffsetDateTime createdAt,
+                                            long totalTimeSpentSeconds) {}
+
     public record ActiveMilestoneRow(long milestoneId,
                                      long milestoneIid,
                                      String title,
@@ -830,6 +841,61 @@ public class SyncDao {
                 rs.getBigDecimal("hours"),
                 rs.getBigDecimal("cost")
         ), params.toArray());
+    }
+
+    public List<ProjectInternOpenIssueRow> listProjectInternOpenIssues(long projectId, String internUsername) {
+        if (internUsername == null || internUsername.isBlank()) {
+            return List.of();
+        }
+
+        String sql = """
+                SELECT iss.repository_id,
+                       repo.name AS repository_name,
+                       iss.id AS issue_id,
+                       iss.iid AS issue_iid,
+                       iss.title AS issue_title,
+                       iss.due_date,
+                       iss.created_at,
+                       COALESCE(SUM(r.time_spent_seconds), 0) AS total_time_spent_seconds
+                FROM projects_to_repositorie ptr
+                JOIN issue iss ON iss.repository_id = ptr.repository_id
+                JOIN repository repo ON repo.id = ptr.repository_id
+                LEFT JOIN report r
+                       ON r.repository_id = iss.repository_id
+                      AND r.iid = iss.iid
+                      AND r.username = ?
+                WHERE ptr.project_id = ?
+                  AND iss.assignee_username = ?
+                  AND iss.state = 'opened'
+                GROUP BY iss.repository_id, repo.name, iss.id, iss.iid, iss.title, iss.due_date, iss.created_at
+                ORDER BY iss.due_date NULLS LAST, LOWER(iss.title), iss.iid
+                """;
+
+        return jdbc.query(sql, (rs, rn) -> {
+            OffsetDateTime createdAt = null;
+            Object createdAtRaw = rs.getObject("created_at");
+            if (createdAtRaw instanceof OffsetDateTime offset) {
+                createdAt = offset;
+            } else if (createdAtRaw instanceof LocalDateTime localDateTime) {
+                createdAt = localDateTime.atOffset(ZoneOffset.UTC);
+            }
+
+            String title = rs.getString("issue_title");
+            if (title == null || title.isBlank()) {
+                title = "Bez názvu";
+            }
+
+            return new ProjectInternOpenIssueRow(
+                    rs.getLong("repository_id"),
+                    rs.getString("repository_name"),
+                    (Long) rs.getObject("issue_id"),
+                    (Long) rs.getObject("issue_iid"),
+                    title,
+                    rs.getObject("due_date", LocalDate.class),
+                    createdAt,
+                    Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L)
+            );
+        }, internUsername, projectId, internUsername);
     }
 
     public List<ActiveMilestoneRow> listActiveMilestones(long projectId) {

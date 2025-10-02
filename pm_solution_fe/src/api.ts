@@ -299,6 +299,22 @@ export type ProjectReportDetailResponse = {
   issues: ProjectReportDetailIssue[];
 };
 
+export type ProjectReportInternDetailIssue = {
+  repositoryId: number;
+  repositoryName: string;
+  issueId: number | null;
+  issueIid: number | null;
+  issueTitle: string;
+  dueDate: string | null;
+  createdAt: string | null;
+  totalTimeSpentSeconds: number;
+};
+
+export type ProjectReportInternDetailResponse = {
+  interns: ProjectReportDetailIntern[];
+  issues: ProjectReportInternDetailIssue[];
+};
+
 export type ProjectReportDetailParams = {
   from?: string;
   to?: string;
@@ -633,6 +649,34 @@ export async function getProjectReportDetail(
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/reports/detail${query ? `?${query}` : ""}`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectReportDetailResponse>(res);
+}
+
+export async function getProjectReportInternDetail(
+  projectId: number,
+  internUsername: string | null,
+): Promise<ProjectReportInternDetailResponse> {
+  const qs = new URLSearchParams();
+  if (internUsername) {
+    qs.set("internUsername", internUsername);
+  }
+  const query = qs.toString();
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/reports/intern-detail${query ? `?${query}` : ""}`,
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<ProjectReportInternDetailResponse>(res);
+  return {
+    interns: data.interns.map(intern => ({ ...intern })),
+    issues: data.issues.map(issue => ({
+      ...issue,
+      dueDate: issue.dueDate ?? null,
+      createdAt: issue.createdAt ?? null,
+      totalTimeSpentSeconds: Number.isFinite(issue.totalTimeSpentSeconds)
+        ? issue.totalTimeSpentSeconds
+        : 0,
+      issueTitle: issue.issueTitle.trim() ? issue.issueTitle.trim() : 'Bez názvu',
+    })),
+  };
 }
 
 // (Legacy project-specific) Not used now, kept for compatibility
