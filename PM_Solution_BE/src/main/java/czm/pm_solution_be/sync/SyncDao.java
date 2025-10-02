@@ -939,30 +939,39 @@ public class SyncDao {
 
     private List<MilestoneIssueDetailRow> listMilestoneIssues(long projectId, long milestoneId) {
         String sql = """
-                SELECT DISTINCT
-                       iss.id AS issue_id,
-                       iss.iid AS issue_iid,
-                       COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
-                       iss.state,
-                       iss.due_date,
-                       iss.assignee_username,
-                       CASE
-                           WHEN i.first_name IS NOT NULL AND i.last_name IS NOT NULL THEN CONCAT(i.first_name, ' ', i.last_name)
-                           WHEN i.first_name IS NOT NULL THEN i.first_name
-                           WHEN i.last_name IS NOT NULL THEN i.last_name
-                           ELSE NULL
-                       END AS assignee_name
-                FROM milestone m
-                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
-                LEFT JOIN issue iss
-                       ON iss.repository_id = ptr.repository_id
-                      AND iss.milestone_title = m.title
-                LEFT JOIN intern i ON i.username = iss.assignee_username
-                WHERE m.project_id = ?
-                  AND m.milestone_id = ?
-                ORDER BY iss.due_date NULLS LAST,
-                         LOWER(COALESCE(NULLIF(iss.title, ''), 'Bez názvu')),
-                         iss.iid
+                SELECT issue_id,
+                       issue_iid,
+                       issue_title,
+                       state,
+                       due_date,
+                       assignee_username,
+                       assignee_name
+                FROM (
+                    SELECT DISTINCT
+                           iss.id AS issue_id,
+                           iss.iid AS issue_iid,
+                           COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
+                           iss.state,
+                           iss.due_date,
+                           iss.assignee_username,
+                           CASE
+                               WHEN i.first_name IS NOT NULL AND i.last_name IS NOT NULL THEN CONCAT(i.first_name, ' ', i.last_name)
+                               WHEN i.first_name IS NOT NULL THEN i.first_name
+                               WHEN i.last_name IS NOT NULL THEN i.last_name
+                               ELSE NULL
+                           END AS assignee_name
+                    FROM milestone m
+                    LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
+                    LEFT JOIN issue iss
+                           ON iss.repository_id = ptr.repository_id
+                          AND iss.milestone_title = m.title
+                    LEFT JOIN intern i ON i.username = iss.assignee_username
+                    WHERE m.project_id = ?
+                      AND m.milestone_id = ?
+                ) issue_rows
+                ORDER BY issue_rows.due_date NULLS LAST,
+                         LOWER(issue_rows.issue_title),
+                         issue_rows.issue_iid
                 """;
 
         return jdbc.query(sql, (rs, rn) -> new MilestoneIssueDetailRow(
