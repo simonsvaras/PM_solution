@@ -911,22 +911,14 @@ public class SyncDao {
 
     private BigDecimal fetchMilestoneTotalCost(long projectId, long milestoneId) {
         String sql = """
-                SELECT COALESCE(SUM(CASE
-                           WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN COALESCE(r.cost, 0)
-                           ELSE 0
-                       END), 0) AS total_cost
+                SELECT COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
                 FROM milestone m
-                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 LEFT JOIN issue iss
-                  ON iss.repository_id = ptr.repository_id
+                  ON iss.project_id = m.project_id
                  AND iss.milestone_title = m.title
                 LEFT JOIN report r
-                  ON r.repository_id = iss.repository_id
+                  ON r.project_id = iss.project_id
                  AND r.iid = iss.iid
-                LEFT JOIN intern i ON i.username = r.username
-                LEFT JOIN intern_project ip
-                  ON ip.intern_id = i.id
-                 AND ip.project_id = ptr.project_id
                 WHERE m.project_id = ?
                   AND m.milestone_id = ?
                 """;
@@ -1038,22 +1030,14 @@ public class SyncDao {
                        iss.id AS issue_id,
                        iss.iid AS issue_iid,
                        COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
-                       COALESCE(SUM(CASE
-                           WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN COALESCE(r.cost, 0)
-                           ELSE 0
-                       END), 0) AS total_cost
+                       COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
                 FROM milestone m
-                JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 JOIN issue iss
-                  ON iss.repository_id = ptr.repository_id
+                  ON iss.project_id = m.project_id
                  AND iss.milestone_title = m.title
                 LEFT JOIN report r
-                  ON r.repository_id = iss.repository_id
+                  ON r.project_id = iss.project_id
                  AND r.iid = iss.iid
-                LEFT JOIN intern i ON i.username = r.username
-                LEFT JOIN intern_project ip
-                  ON ip.intern_id = i.id
-                 AND ip.project_id = ptr.project_id
                 WHERE m.project_id = ?
                   AND m.state = 'active'
                   AND m.milestone_id IN (%s)
