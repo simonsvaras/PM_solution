@@ -8,7 +8,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -44,6 +47,7 @@ public class ProjectReportDetailController {
                                   String issueTitle,
                                   String dueDate,
                                   String createdAt,
+                                  Integer ageDays,
                                   long totalTimeSpentSeconds) {}
 
     public record ProjectReportInternDetailResponse(List<InternSummary> interns, List<InternOpenIssue> issues) {}
@@ -128,6 +132,7 @@ public class ProjectReportDetailController {
                             row.issueTitle(),
                             row.dueDate() != null ? row.dueDate().toString() : null,
                             row.createdAt() != null ? row.createdAt().toString() : null,
+                            calculateIssueAgeDays(row.createdAt()),
                             row.totalTimeSpentSeconds()))
                     .toList();
         }
@@ -172,6 +177,26 @@ public class ProjectReportDetailController {
                     .toList();
             return new IssueRow(repositoryId, repositoryName, issueId, issueIid, issueTitle, cells);
         }
+    }
+
+    private static Integer calculateIssueAgeDays(OffsetDateTime createdAt) {
+        if (createdAt == null) {
+            return null;
+        }
+
+        LocalDate createdDate = createdAt.toLocalDate();
+        LocalDate today = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate();
+        long diff = ChronoUnit.DAYS.between(createdDate, today);
+
+        if (diff < 0) {
+            diff = 0;
+        }
+
+        if (diff > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+
+        return (int) diff;
     }
 }
 

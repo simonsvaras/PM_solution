@@ -29,7 +29,12 @@ function formatDate(value: string | null): string {
   return date.toLocaleDateString('cs-CZ');
 }
 
-function formatIssueAge(createdAt: string | null): string {
+function formatIssueAge(ageDays: number | null, createdAt: string | null): string {
+  if (typeof ageDays === 'number' && Number.isFinite(ageDays)) {
+    const safeAge = Math.max(0, Math.floor(ageDays));
+    return safeAge.toLocaleString('cs-CZ');
+  }
+
   if (!createdAt) {
     return '—';
   }
@@ -303,7 +308,9 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
                           {formatHoursFromSeconds(issue.totalTimeSpentSeconds)}
                         </td>
                         <td>{formatDate(issue.dueDate)}</td>
-                        <td className="projectReportInternDetail__columnNumeric">{formatIssueAge(issue.createdAt)}</td>
+                        <td className="projectReportInternDetail__columnNumeric">
+                          {formatIssueAge(issue.ageDays, issue.createdAt)}
+                        </td>
                       </tr>
                     );
                   })}

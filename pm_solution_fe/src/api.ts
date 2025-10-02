@@ -307,6 +307,7 @@ export type ProjectReportInternDetailIssue = {
   issueTitle: string;
   dueDate: string | null;
   createdAt: string | null;
+  ageDays: number | null;
   totalTimeSpentSeconds: number;
 };
 
@@ -667,15 +668,23 @@ export async function getProjectReportInternDetail(
   const data = await parseJson<ProjectReportInternDetailResponse>(res);
   return {
     interns: data.interns.map(intern => ({ ...intern })),
-    issues: data.issues.map(issue => ({
-      ...issue,
-      dueDate: issue.dueDate ?? null,
-      createdAt: issue.createdAt ?? null,
-      totalTimeSpentSeconds: Number.isFinite(issue.totalTimeSpentSeconds)
-        ? issue.totalTimeSpentSeconds
-        : 0,
-      issueTitle: issue.issueTitle.trim() ? issue.issueTitle.trim() : 'Bez názvu',
-    })),
+    issues: data.issues.map(issue => {
+      const normalizedAgeDays =
+        typeof issue.ageDays === 'number' && Number.isFinite(issue.ageDays)
+          ? Math.max(0, Math.floor(issue.ageDays))
+          : null;
+
+      return {
+        ...issue,
+        dueDate: issue.dueDate ?? null,
+        createdAt: issue.createdAt ?? null,
+        ageDays: normalizedAgeDays,
+        totalTimeSpentSeconds: Number.isFinite(issue.totalTimeSpentSeconds)
+          ? issue.totalTimeSpentSeconds
+          : 0,
+        issueTitle: issue.issueTitle.trim() ? issue.issueTitle.trim() : 'Bez názvu',
+      };
+    }),
   };
 }
 
