@@ -224,7 +224,7 @@
 
 .projectReportProjectDetail__table {
   width: 100%;
-  min-width: 640px;
+  min-width: 760px;
   border-collapse: collapse;
 }
 
@@ -242,6 +242,12 @@
   text-transform: uppercase;
   font-size: 0.8rem;
   letter-spacing: 0.08em;
+}
+
+.projectReportProjectDetail__columnNumeric,
+.projectReportProjectDetail__cellNumber {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .projectReportProjectDetail__issueInfo {
@@ -290,6 +296,6 @@
 
 @media (max-width: 640px) {
   .projectReportProjectDetail__table {
-    min-width: 540px;
+    min-width: 600px;
   }
 }

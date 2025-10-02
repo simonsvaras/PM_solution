@@ -398,6 +398,8 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                       <th scope="col">Assignee</th>
                       <th scope="col">Stav</th>
                       <th scope="col">Termín</th>
+                      <th scope="col" className="projectReportProjectDetail__columnNumeric">Celkově vykázáno</th>
+                      <th scope="col" className="projectReportProjectDetail__columnNumeric">Celkové náklady</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -420,6 +422,12 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                           <td>{formatAssignee(issue.assigneeName, issue.assigneeUsername)}</td>
                           <td>{formatIssueState(issue.state)}</td>
                           <td>{formatDate(issue.dueDate)}</td>
+                          <td className="projectReportProjectDetail__cellNumber">
+                            {formatDuration(issue.totalTimeSpentSeconds)}
+                          </td>
+                          <td className="projectReportProjectDetail__cellNumber">
+                            {formatCost(issue.totalCost)}
+                          </td>
                         </tr>
                       );
                     })}

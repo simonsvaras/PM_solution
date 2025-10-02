@@ -117,6 +117,8 @@ export type ProjectMilestoneIssueDetail = {
   dueDate: string | null;
   assigneeUsername: string | null;
   assigneeName: string | null;
+  totalTimeSpentSeconds: number;
+  totalCost: number;
 };
 
 export type ProjectMilestoneInternContribution = {
