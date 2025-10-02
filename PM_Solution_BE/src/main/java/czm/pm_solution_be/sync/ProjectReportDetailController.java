@@ -37,6 +37,17 @@ public class ProjectReportDetailController {
 
     public record ProjectReportDetailResponse(List<InternSummary> interns, List<IssueRow> issues) {}
 
+    public record InternOpenIssue(long repositoryId,
+                                  String repositoryName,
+                                  Long issueId,
+                                  Long issueIid,
+                                  String issueTitle,
+                                  String dueDate,
+                                  String createdAt,
+                                  long totalTimeSpentSeconds) {}
+
+    public record ProjectReportInternDetailResponse(List<InternSummary> interns, List<InternOpenIssue> issues) {}
+
     @GetMapping("/{projectId}/reports/detail")
     public ProjectReportDetailResponse getProjectReportDetail(@PathVariable long projectId,
                                                               @RequestParam(required = false) OffsetDateTime from,
@@ -88,6 +99,45 @@ public class ProjectReportDetailController {
                 .toList();
 
         return new ProjectReportDetailResponse(interns, issues);
+    }
+
+    @GetMapping("/{projectId}/reports/intern-detail")
+    public ProjectReportInternDetailResponse getProjectReportInternDetail(@PathVariable long projectId,
+                                                                          @RequestParam(required = false)
+                                                                          String internUsername) {
+        String normalizedInternUsername = internUsername != null && !internUsername.isBlank()
+                ? internUsername.trim()
+                : null;
+
+        List<SyncDao.ProjectInternRow> projectInternRows = dao.listProjectInterns(projectId);
+        Map<Long, InternSummary> internMap = new LinkedHashMap<>();
+        for (SyncDao.ProjectInternRow row : projectInternRows) {
+            internMap.put(row.id(), new InternSummary(row.id(), row.username(), row.firstName(), row.lastName()));
+        }
+
+        List<InternOpenIssue> issues = List.of();
+        if (normalizedInternUsername != null) {
+            List<SyncDao.ProjectInternOpenIssueRow> rows =
+                    dao.listProjectInternOpenIssues(projectId, normalizedInternUsername);
+            issues = rows.stream()
+                    .map(row -> new InternOpenIssue(
+                            row.repositoryId(),
+                            row.repositoryName(),
+                            row.issueId(),
+                            row.issueIid(),
+                            row.issueTitle(),
+                            row.dueDate() != null ? row.dueDate().toString() : null,
+                            row.createdAt() != null ? row.createdAt().toString() : null,
+                            row.totalTimeSpentSeconds()))
+                    .toList();
+        }
+
+        List<InternSummary> interns = new ArrayList<>(internMap.values());
+        interns.sort(Comparator.comparing(InternSummary::lastName)
+                .thenComparing(InternSummary::firstName)
+                .thenComparing(InternSummary::username));
+
+        return new ProjectReportInternDetailResponse(interns, issues);
     }
 
     private static class IssueRowBuilder {
