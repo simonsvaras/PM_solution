@@ -24,7 +24,8 @@ public class ReportOverviewController {
                                      String repositoryName,
                                      String username,
                                      OffsetDateTime spentAt,
-                                     BigDecimal timeSpentHours) {}
+                                     BigDecimal timeSpentHours,
+                                     BigDecimal cost) {}
 
     @GetMapping("/overview")
     public List<ReportOverviewItem> overview(
@@ -42,7 +43,8 @@ public class ReportOverviewController {
                         row.repositoryName(),
                         row.resolvedUsername(),
                         row.spentAt(),
-                        row.timeSpentHours()
+                        row.timeSpentHours(),
+                        row.cost()
                 ))
                 .toList();
     }
