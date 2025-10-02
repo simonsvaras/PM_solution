@@ -913,11 +913,12 @@ public class SyncDao {
         String sql = """
                 SELECT COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
                 FROM milestone m
+                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 LEFT JOIN issue iss
-                  ON iss.project_id = m.project_id
+                  ON iss.repository_id = ptr.repository_id
                  AND iss.milestone_title = m.title
                 LEFT JOIN report r
-                  ON r.project_id = iss.project_id
+                  ON r.repository_id = iss.repository_id
                  AND r.iid = iss.iid
                 WHERE m.project_id = ?
                   AND m.milestone_id = ?
@@ -1032,11 +1033,12 @@ public class SyncDao {
                        COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
                        COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
                 FROM milestone m
+                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 JOIN issue iss
-                  ON iss.project_id = m.project_id
+                  ON iss.repository_id = ptr.repository_id
                  AND iss.milestone_title = m.title
                 LEFT JOIN report r
-                  ON r.project_id = iss.project_id
+                  ON r.repository_id = iss.repository_id
                  AND r.iid = iss.iid
                 WHERE m.project_id = ?
                   AND m.state = 'active'
