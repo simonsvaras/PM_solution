@@ -188,6 +188,91 @@
   font-size: 0.95rem;
 }
 
+.projectReportProjectDetail__issuesControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.projectReportProjectDetail__filterControl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: clamp(160px, 20vw, 220px);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.projectReportProjectDetail__filterControl input,
+.projectReportProjectDetail__filterControl select {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projectReportProjectDetail__filterControl input:focus,
+.projectReportProjectDetail__filterControl select:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.6);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.projectReportProjectDetail__stateFilter {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+  gap: 8px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.projectReportProjectDetail__stateFilter legend {
+  padding: 0 6px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.projectReportProjectDetail__stateFilter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.projectReportProjectDetail__stateFilter input[type='radio'] {
+  accent-color: #2563eb;
+}
+
+.projectReportProjectDetail__sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.projectReportProjectDetail__sortButton:hover,
+.projectReportProjectDetail__sortButton:focus-visible {
+  color: var(--color-text-primary);
+}
+
 .projectReportProjectDetail__tableWrapper {
   overflow-x: auto;
   border: 1px solid var(--color-border);

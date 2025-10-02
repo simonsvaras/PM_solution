@@ -105,6 +105,13 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
   const [detail, setDetail] = useState<ProjectMilestoneDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<ErrorResponse | null>(null);
+  const [issueSearch, setIssueSearch] = useState('');
+  const [issueAssignee, setIssueAssignee] = useState('all');
+  const [issueStateFilter, setIssueStateFilter] = useState<'all' | 'opened' | 'closed' | 'other'>('all');
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'time' | 'cost';
+    direction: 'asc' | 'desc';
+  } | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -179,6 +186,13 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     };
   }, [project.id, selectedMilestoneId]);
 
+  useEffect(() => {
+    setIssueSearch('');
+    setIssueAssignee('all');
+    setIssueStateFilter('all');
+    setSortConfig(null);
+  }, [detail?.summary.milestoneId]);
+
   const selectedSummary = detail?.summary ?? null;
 
   const internContributions = useMemo(() => detail?.internContributions ?? [], [detail]);
@@ -214,6 +228,87 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     }
     return { value: formatCost(selectedSummary.totalCost), description: 'Součet všech výkazů' };
   }, [selectedSummary]);
+
+  const assigneeOptions = useMemo(() => {
+    if (!detail) {
+      return [] as { value: string; label: string }[];
+    }
+    const map = new Map<string, string>();
+    detail.issues.forEach(issue => {
+      const username = issue.assigneeUsername?.trim();
+      const name = issue.assigneeName?.trim();
+      const key = username ? `username:${username}` : name ? `name:${name}` : 'unassigned';
+      if (!map.has(key)) {
+        const label = key === 'unassigned' ? 'Nepřiřazeno' : formatAssignee(issue.assigneeName, issue.assigneeUsername);
+        map.set(key, label);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'cs', { sensitivity: 'base' }));
+  }, [detail]);
+
+  const filteredIssues = useMemo(() => {
+    if (!detail) {
+      return [] as ProjectMilestoneDetail['issues'];
+    }
+    const normalizedSearch = issueSearch.trim().toLowerCase();
+    const filtered = detail.issues.filter(issue => {
+      if (normalizedSearch && !issue.issueTitle.toLowerCase().includes(normalizedSearch)) {
+        return false;
+      }
+
+      if (issueAssignee !== 'all') {
+        const username = issue.assigneeUsername?.trim();
+        const name = issue.assigneeName?.trim();
+        const key = username ? `username:${username}` : name ? `name:${name}` : 'unassigned';
+        if (key !== issueAssignee) {
+          return false;
+        }
+      }
+
+      if (issueStateFilter !== 'all') {
+        const normalizedState = issue.state?.toLowerCase();
+        if (issueStateFilter === 'other') {
+          if (!normalizedState || normalizedState === 'opened' || normalizedState === 'closed') {
+            return false;
+          }
+        } else if (normalizedState !== issueStateFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    if (!sortConfig) {
+      return filtered;
+    }
+
+    const { key, direction } = sortConfig;
+    const multiplier = direction === 'asc' ? 1 : -1;
+    const sorted = [...filtered].sort((a, b) => {
+      const first = key === 'time' ? a.totalTimeSpentSeconds : a.totalCost;
+      const second = key === 'time' ? b.totalTimeSpentSeconds : b.totalCost;
+      const safeFirst = first ?? -Infinity;
+      const safeSecond = second ?? -Infinity;
+      if (safeFirst === safeSecond) {
+        return (a.issueTitle || '').localeCompare(b.issueTitle || '', 'cs', { sensitivity: 'base' });
+      }
+      return safeFirst > safeSecond ? multiplier : -multiplier;
+    });
+
+    return sorted;
+  }, [detail, issueSearch, issueAssignee, issueStateFilter, sortConfig]);
+
+  const handleSortChange = (key: 'time' | 'cost') => {
+    setSortConfig(prev => {
+      if (!prev || prev.key !== key) {
+        return { key, direction: 'desc' };
+      }
+      return { key, direction: prev.direction === 'desc' ? 'asc' : 'desc' };
+    });
+  };
 
   return (
     <section className="projectReportProjectDetail" aria-label={`Milníky projektu ${project.name}`}>
@@ -349,50 +444,156 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
             {detail.issues.length === 0 ? (
               <p className="projectReportProjectDetail__status">Milník zatím neobsahuje žádné issues.</p>
             ) : (
-              <div className="projectReportProjectDetail__tableWrapper">
-                <table className="projectReportProjectDetail__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Issue</th>
-                      <th scope="col">Assignee</th>
-                      <th scope="col">Stav</th>
-                      <th scope="col">Termín</th>
-                      <th scope="col" className="projectReportProjectDetail__columnNumeric">Celkově vykázáno</th>
-                      <th scope="col" className="projectReportProjectDetail__columnNumeric">Celkové náklady</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.issues.map(issue => {
-                      const key = issue.issueId ?? issue.issueIid ?? issue.issueTitle;
-                      const meta: string[] = [];
-                      if (issue.issueIid != null) {
-                        meta.push(`#${issue.issueIid}`);
-                      }
-                      return (
-                        <tr key={key}>
-                          <td>
-                            <div className="projectReportProjectDetail__issueInfo">
-                              <span className="projectReportProjectDetail__issueTitle">{issue.issueTitle}</span>
-                              {meta.length > 0 ? (
-                                <span className="projectReportProjectDetail__issueMeta">{meta.join(' • ')}</span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>{formatAssignee(issue.assigneeName, issue.assigneeUsername)}</td>
-                          <td>{formatIssueState(issue.state)}</td>
-                          <td>{formatDate(issue.dueDate)}</td>
-                          <td className="projectReportProjectDetail__cellNumber">
-                            {formatDuration(issue.totalTimeSpentSeconds)}
-                          </td>
-                          <td className="projectReportProjectDetail__cellNumber">
-                            {formatCost(issue.totalCost)}
-                          </td>
+              <>
+                <div className="projectReportProjectDetail__issuesControls">
+                  <label className="projectReportProjectDetail__filterControl">
+                    <span>Issue</span>
+                    <input
+                      type="text"
+                      value={issueSearch}
+                      onChange={event => setIssueSearch(event.target.value)}
+                      placeholder="Hledat podle názvu"
+                    />
+                  </label>
+                  <label className="projectReportProjectDetail__filterControl">
+                    <span>Assignee</span>
+                    <select value={issueAssignee} onChange={event => setIssueAssignee(event.target.value)}>
+                      <option value="all">Všichni</option>
+                      {assigneeOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <fieldset className="projectReportProjectDetail__filterControl projectReportProjectDetail__stateFilter">
+                    <legend>Stav</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="issue-state"
+                        value="all"
+                        checked={issueStateFilter === 'all'}
+                        onChange={() => setIssueStateFilter('all')}
+                      />
+                      <span>Všechny</span>
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="issue-state"
+                        value="opened"
+                        checked={issueStateFilter === 'opened'}
+                        onChange={() => setIssueStateFilter('opened')}
+                      />
+                      <span>Otevřené</span>
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="issue-state"
+                        value="closed"
+                        checked={issueStateFilter === 'closed'}
+                        onChange={() => setIssueStateFilter('closed')}
+                      />
+                      <span>Uzavřené</span>
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="issue-state"
+                        value="other"
+                        checked={issueStateFilter === 'other'}
+                        onChange={() => setIssueStateFilter('other')}
+                      />
+                      <span>Ostatní</span>
+                    </label>
+                  </fieldset>
+                </div>
+
+                {filteredIssues.length === 0 ? (
+                  <p className="projectReportProjectDetail__status">
+                    Žádné issues neodpovídají zadaným filtrům.
+                  </p>
+                ) : (
+                  <div className="projectReportProjectDetail__tableWrapper">
+                    <table className="projectReportProjectDetail__table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Issue</th>
+                          <th scope="col">Assignee</th>
+                          <th scope="col">Stav</th>
+                          <th scope="col">Termín</th>
+                          <th scope="col" className="projectReportProjectDetail__columnNumeric">
+                            <button
+                              type="button"
+                              className="projectReportProjectDetail__sortButton"
+                              onClick={() => handleSortChange('time')}
+                              aria-label={`Seřadit podle celkově vykázáno (${sortConfig?.key === 'time' ? (sortConfig.direction === 'desc' ? 'sestupně' : 'vzestupně') : 'sestupně'})`}
+                            >
+                              Celkově vykázáno
+                              <span aria-hidden="true">
+                                {sortConfig?.key === 'time'
+                                  ? sortConfig.direction === 'desc'
+                                    ? ' ↓'
+                                    : ' ↑'
+                                  : ' ↕'}
+                              </span>
+                            </button>
+                          </th>
+                          <th scope="col" className="projectReportProjectDetail__columnNumeric">
+                            <button
+                              type="button"
+                              className="projectReportProjectDetail__sortButton"
+                              onClick={() => handleSortChange('cost')}
+                              aria-label={`Seřadit podle celkových nákladů (${sortConfig?.key === 'cost' ? (sortConfig.direction === 'desc' ? 'sestupně' : 'vzestupně') : 'sestupně'})`}
+                            >
+                              Celkové náklady
+                              <span aria-hidden="true">
+                                {sortConfig?.key === 'cost'
+                                  ? sortConfig.direction === 'desc'
+                                    ? ' ↓'
+                                    : ' ↑'
+                                  : ' ↕'}
+                              </span>
+                            </button>
+                          </th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {filteredIssues.map(issue => {
+                          const key = issue.issueId ?? issue.issueIid ?? issue.issueTitle;
+                          const meta: string[] = [];
+                          if (issue.issueIid != null) {
+                            meta.push(`#${issue.issueIid}`);
+                          }
+                          return (
+                            <tr key={key}>
+                              <td>
+                                <div className="projectReportProjectDetail__issueInfo">
+                                  <span className="projectReportProjectDetail__issueTitle">{issue.issueTitle}</span>
+                                  {meta.length > 0 ? (
+                                    <span className="projectReportProjectDetail__issueMeta">{meta.join(' • ')}</span>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td>{formatAssignee(issue.assigneeName, issue.assigneeUsername)}</td>
+                              <td>{formatIssueState(issue.state)}</td>
+                              <td>{formatDate(issue.dueDate)}</td>
+                              <td className="projectReportProjectDetail__cellNumber">
+                                {formatDuration(issue.totalTimeSpentSeconds)}
+                              </td>
+                              <td className="projectReportProjectDetail__cellNumber">
+                                {formatCost(issue.totalCost)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>
