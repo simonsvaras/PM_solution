@@ -96,6 +96,42 @@ export type ProjectMilestoneIssueCost = {
   issueTitle: string;
   totalCost: number;
 };
+
+export type ProjectMilestoneDetailSummary = {
+  milestoneId: number;
+  milestoneIid: number;
+  title: string;
+  state: string;
+  dueDate: string | null;
+  totalTimeSpentSeconds: number;
+  totalIssues: number;
+  closedIssues: number;
+  totalCost: number;
+};
+
+export type ProjectMilestoneIssueDetail = {
+  issueId: number | null;
+  issueIid: number | null;
+  issueTitle: string;
+  state: string | null;
+  dueDate: string | null;
+  assigneeUsername: string | null;
+  assigneeName: string | null;
+};
+
+export type ProjectMilestoneInternContribution = {
+  internId: number | null;
+  internUsername: string;
+  internFirstName: string | null;
+  internLastName: string | null;
+  totalTimeSpentSeconds: number;
+};
+
+export type ProjectMilestoneDetail = {
+  summary: ProjectMilestoneDetailSummary;
+  issues: ProjectMilestoneIssueDetail[];
+  internContributions: ProjectMilestoneInternContribution[];
+};
 export type ProjectBudgetPayload = {
   name: string;
   budget?: number | null;
@@ -543,6 +579,15 @@ export async function getProjectMilestoneIssueCosts(
   );
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectMilestoneIssueCost[]>(res);
+}
+
+export async function getProjectMilestoneDetail(
+  projectId: number,
+  milestoneId: number,
+): Promise<ProjectMilestoneDetail> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/${milestoneId}/detail`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectMilestoneDetail>(res);
 }
 
 export async function syncRepositories(): Promise<SyncSummary> {

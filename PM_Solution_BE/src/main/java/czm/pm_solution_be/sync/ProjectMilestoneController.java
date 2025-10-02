@@ -1,5 +1,6 @@
 package czm.pm_solution_be.sync;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,5 +39,15 @@ public class ProjectMilestoneController {
             return List.of();
         }
         return dao.listMilestoneIssueCosts(projectId, new ArrayList<>(normalized));
+    }
+
+    @GetMapping("/{projectId}/milestones/{milestoneId}/detail")
+    public ResponseEntity<SyncDao.MilestoneDetail> getMilestoneDetail(@PathVariable long projectId,
+                                                                      @PathVariable long milestoneId) {
+        SyncDao.MilestoneDetail detail = dao.getMilestoneDetail(projectId, milestoneId);
+        if (detail == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(detail);
     }
 }

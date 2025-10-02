@@ -413,8 +413,6 @@ function App() {
         'Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.';
     } else if (reportView === 'detail-intern') {
       headerDescription = 'Stránka detailu stážisty je ve vývoji.';
-    } else if (reportView === 'detail-project') {
-      headerDescription = 'Stránka detailu projektu je ve vývoji.';
     }
   } else if (isOnDemand) {
     headerDescription = 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.';
