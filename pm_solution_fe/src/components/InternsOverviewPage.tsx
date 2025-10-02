@@ -33,6 +33,30 @@ export default function InternsOverviewPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [groupFilter, setGroupFilter] = useState<number | 'all'>('all');
+  const [levelFilter, setLevelFilter] = useState<number | 'all'>('all');
+
+  const groupOptions = useMemo(() => {
+    const groups = new Map<number, { id: number; label: string }>();
+    interns.forEach(intern => {
+      intern.groups.forEach(group => {
+        if (!groups.has(group.id)) {
+          groups.set(group.id, { id: group.id, label: group.label });
+        }
+      });
+    });
+    return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label, 'cs'));
+  }, [interns]);
+
+  const levelOptions = useMemo(() => {
+    const levels = new Map<number, { id: number; label: string }>();
+    interns.forEach(intern => {
+      if (!levels.has(intern.levelId)) {
+        levels.set(intern.levelId, { id: intern.levelId, label: intern.levelLabel });
+      }
+    });
+    return Array.from(levels.values()).sort((a, b) => a.label.localeCompare(b.label, 'cs'));
+  }, [interns]);
 
   useEffect(() => {
     setLoading(true);
@@ -50,14 +74,21 @@ export default function InternsOverviewPage() {
 
   const filteredInterns = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return interns;
     return interns.filter(intern => {
+      if (groupFilter !== 'all' && !intern.groups.some(group => group.id === groupFilter)) {
+        return false;
+      }
+      if (levelFilter !== 'all' && intern.levelId !== levelFilter) {
+        return false;
+      }
+      if (!query) return true;
       const fullName = `${intern.firstName} ${intern.lastName}`.toLowerCase();
       return fullName.includes(query) || intern.username.toLowerCase().includes(query);
     });
-  }, [interns, search]);
+  }, [groupFilter, interns, levelFilter, search]);
 
   const visibleInterns = filteredInterns;
+  const isFiltered = Boolean(search.trim()) || groupFilter !== 'all' || levelFilter !== 'all';
 
   function openDetail(intern: InternOverview) {
     setSelected(intern);
@@ -93,7 +124,13 @@ export default function InternsOverviewPage() {
     content = (
       <div className="internsOverview__empty" role="status">
         <p>
-          Nenalezen žádný stážista odpovídající dotazu <strong>{search}</strong>.
+          Nenalezen žádný stážista odpovídající zadanému filtrování.
+          {search && (
+            <>
+              {' '}
+              (dotaz <strong>{search}</strong>)
+            </>
+          )}
         </p>
       </div>
     );
@@ -107,7 +144,7 @@ export default function InternsOverviewPage() {
               <strong>{formatHours(totalTrackedHours)}</strong>.
             </p>
             <p>
-              {search ? (
+              {isFiltered ? (
                 <>
                   Zobrazuje se <strong>{visibleInterns.length}</strong> z <strong>{interns.length}</strong> stážistů odpovídajících
                   filtru.
@@ -119,16 +156,54 @@ export default function InternsOverviewPage() {
               )}
             </p>
           </div>
-          <label className="internsOverview__searchLabel">
-            <span className="internsOverview__searchLabelText">Vyhledat podle jména nebo username</span>
-            <input
-              type="search"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Např. jana nebo jan.novak"
-              className="internsOverview__searchInput"
-            />
-          </label>
+          <div className="internsOverview__controls">
+            <label className="internsOverview__searchLabel">
+              <span className="internsOverview__searchLabelText">Vyhledat podle jména nebo username</span>
+              <input
+                type="search"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                placeholder="Např. jana nebo jan.novak"
+                className="internsOverview__searchInput"
+              />
+            </label>
+            <div className="internsOverview__filters">
+              <label className="internsOverview__filter">
+                <span className="internsOverview__filterLabel">Filtrovat podle skupiny</span>
+                <select
+                  value={groupFilter === 'all' ? 'all' : String(groupFilter)}
+                  onChange={event =>
+                    setGroupFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))
+                  }
+                  className="internsOverview__filterSelect"
+                >
+                  <option value="all">Všechny skupiny</option>
+                  {groupOptions.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="internsOverview__filter">
+                <span className="internsOverview__filterLabel">Filtrovat podle úrovně</span>
+                <select
+                  value={levelFilter === 'all' ? 'all' : String(levelFilter)}
+                  onChange={event =>
+                    setLevelFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))
+                  }
+                  className="internsOverview__filterSelect"
+                >
+                  <option value="all">Všechny úrovně</option>
+                  {levelOptions.map(level => (
+                    <option key={level.id} value={level.id}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
         </header>
         <div className="internsOverview__grid" role="list">
           {visibleInterns.map(intern => (
