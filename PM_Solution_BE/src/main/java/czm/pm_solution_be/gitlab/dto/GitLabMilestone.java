@@ -10,6 +10,7 @@ public class GitLabMilestone {
     public long iid;
     public String title;
     public String state;
+    public String description;
     @JsonProperty("due_date")
     public LocalDate dueDate;
     @JsonProperty("created_at")

@@ -86,6 +86,7 @@ export type ProjectMilestoneSummary = {
   milestoneIid: number;
   title: string;
   state: string;
+  description: string | null;
   dueDate: string | null;
   totalTimeSpentSeconds: number;
 };
@@ -102,6 +103,7 @@ export type ProjectMilestoneDetailSummary = {
   milestoneIid: number;
   title: string;
   state: string;
+  description: string | null;
   dueDate: string | null;
   totalTimeSpentSeconds: number;
   totalIssues: number;

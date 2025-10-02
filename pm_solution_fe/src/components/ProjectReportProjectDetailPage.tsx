@@ -257,6 +257,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
             >
               {milestones.map(milestone => {
                 const isActive = milestone.milestoneId === selectedMilestoneId;
+                const description = milestone.description?.trim();
                 return (
                   <button
                     type="button"
@@ -267,6 +268,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                     onClick={() => setSelectedMilestoneId(milestone.milestoneId)}
                     disabled={loadingDetail}
                     aria-pressed={isActive}
+                    title={description || undefined}
                   >
                     {milestone.title}
                   </button>
@@ -298,6 +300,11 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
               aria-label={`Detail milníku ${detail.summary.title}`}
             >
               <h3>{detail.summary.title}</h3>
+              {detail.summary.description?.trim() ? (
+                <p className="projectReportProjectDetail__milestoneDescription">
+                  {detail.summary.description.trim()}
+                </p>
+              ) : null}
               <dl className="projectReportProjectDetail__milestoneMeta">
                 <div>
                   <dt>IID</dt>
