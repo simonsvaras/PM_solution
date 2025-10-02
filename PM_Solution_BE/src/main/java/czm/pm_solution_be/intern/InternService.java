@@ -83,11 +83,11 @@ public class InternService {
 
         InternRow updated = dao.update(existing.id(), input.firstName(), input.lastName(), input.username(), level.id());
         dao.replaceInternGroups(updated.id(), input.groupIds());
+        dao.replaceLevelHistory(updated.id(), input.history().stream()
+                .map(entry -> new InternDao.LevelHistoryInput(entry.levelId(), entry.validFrom(), entry.validTo()))
+                .toList());
 
         if (existing.levelId() != level.id()) {
-            LocalDate today = LocalDate.now();
-            dao.closeOpenLevelHistory(existing.id(), today);
-            dao.insertLevelHistory(existing.id(), level.id(), today);
             int recalculated = syncDao.recomputeReportCostsForIntern(existing.id());
             log.info("Přepočítáno {} nákladů reportů pro stážistu {}", recalculated, updated.username());
         }
