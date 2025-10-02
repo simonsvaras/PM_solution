@@ -934,42 +934,45 @@ public class SyncDao {
 
     private List<MilestoneIssueDetailRow> listMilestoneIssues(long projectId, long milestoneId) {
         String sql = """
-                SELECT iss.id AS issue_id,
-                       iss.iid AS issue_iid,
-                       COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
-                       iss.state,
-                       iss.due_date,
-                       iss.assignee_username,
-                       CASE
-                           WHEN i.first_name IS NOT NULL AND i.last_name IS NOT NULL THEN CONCAT(i.first_name, ' ', i.last_name)
-                           WHEN i.first_name IS NOT NULL THEN i.first_name
-                           WHEN i.last_name IS NOT NULL THEN i.last_name
-                           ELSE NULL
-                       END AS assignee_name,
-                       COALESCE(SUM(COALESCE(r.time_spent_seconds, 0)), 0) AS total_time_spent_seconds,
-                       COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
-                FROM milestone m
-                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
-                LEFT JOIN issue iss
-                       ON iss.repository_id = ptr.repository_id
-                      AND iss.milestone_title = m.title
-                LEFT JOIN intern i ON i.username = iss.assignee_username
-                LEFT JOIN report r
-                       ON r.repository_id = iss.repository_id
-                      AND r.iid = iss.iid
-                WHERE m.project_id = ?
-                  AND m.milestone_id = ?
-                GROUP BY iss.id,
-                         iss.iid,
-                         issue_title,
-                         iss.state,
-                         iss.due_date,
-                         iss.assignee_username,
-                         i.first_name,
-                         i.last_name
-                ORDER BY iss.due_date NULLS LAST,
-                         LOWER(issue_title),
-                         iss.iid
+                SELECT *
+                FROM (
+                    SELECT iss.id AS issue_id,
+                           iss.iid AS issue_iid,
+                           COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
+                           iss.state,
+                           iss.due_date,
+                           iss.assignee_username,
+                           CASE
+                               WHEN i.first_name IS NOT NULL AND i.last_name IS NOT NULL THEN CONCAT(i.first_name, ' ', i.last_name)
+                               WHEN i.first_name IS NOT NULL THEN i.first_name
+                               WHEN i.last_name IS NOT NULL THEN i.last_name
+                               ELSE NULL
+                           END AS assignee_name,
+                           COALESCE(SUM(COALESCE(r.time_spent_seconds, 0)), 0) AS total_time_spent_seconds,
+                           COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
+                    FROM milestone m
+                    LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
+                    LEFT JOIN issue iss
+                           ON iss.repository_id = ptr.repository_id
+                          AND iss.milestone_title = m.title
+                    LEFT JOIN intern i ON i.username = iss.assignee_username
+                    LEFT JOIN report r
+                           ON r.repository_id = iss.repository_id
+                          AND r.iid = iss.iid
+                    WHERE m.project_id = ?
+                      AND m.milestone_id = ?
+                    GROUP BY iss.id,
+                             iss.iid,
+                             iss.title,
+                             iss.state,
+                             iss.due_date,
+                             iss.assignee_username,
+                             i.first_name,
+                             i.last_name
+                ) issue_rows
+                ORDER BY issue_rows.due_date NULLS LAST,
+                         LOWER(issue_rows.issue_title),
+                         issue_rows.issue_iid
                 """;
 
         return jdbc.query(sql, (rs, rn) -> new MilestoneIssueDetailRow(
