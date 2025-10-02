@@ -15,6 +15,8 @@ public class GitLabIssue {
     public String description;
     @JsonProperty("due_date")
     public String dueDate; // YYYY-MM-DD or null
+    @JsonProperty("created_at")
+    public OffsetDateTime createdAt;
     @JsonProperty("updated_at")
     public OffsetDateTime updatedAt;
     @JsonProperty("time_stats")
