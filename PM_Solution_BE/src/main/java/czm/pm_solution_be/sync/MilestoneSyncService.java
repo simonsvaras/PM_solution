@@ -51,6 +51,7 @@ public class MilestoneSyncService {
                             milestone.iid,
                             milestone.title,
                             milestone.state,
+                            milestone.description,
                             milestone.dueDate,
                             milestone.createdAt,
                             milestone.updatedAt

@@ -342,34 +342,37 @@ public class SyncDao {
                                               long milestoneIid,
                                               String title,
                                               String state,
+                                              String description,
                                               LocalDate dueDate,
                                               OffsetDateTime createdAt,
                                               OffsetDateTime updatedAt) {
-        int updated = jdbc.update("UPDATE milestone SET project_id=?, milestone_iid=?, title=?, state=?, due_date=?, created_at=?, updated_at=? WHERE milestone_id=?",
+        int updated = jdbc.update("UPDATE milestone SET project_id=?, milestone_iid=?, title=?, state=?, description=?, due_date=?, created_at=?, updated_at=? WHERE milestone_id=?",
                 ps -> {
                     ps.setLong(1, projectId);
                     ps.setLong(2, milestoneIid);
                     ps.setString(3, title);
                     ps.setString(4, state);
-                    if (dueDate == null) ps.setNull(5, Types.DATE); else ps.setObject(5, dueDate);
-                    if (createdAt == null) ps.setNull(6, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(6, createdAt);
-                    if (updatedAt == null) ps.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(7, updatedAt);
-                    ps.setLong(8, milestoneId);
+                    if (description == null) ps.setNull(5, Types.LONGVARCHAR); else ps.setString(5, description);
+                    if (dueDate == null) ps.setNull(6, Types.DATE); else ps.setObject(6, dueDate);
+                    if (createdAt == null) ps.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(7, createdAt);
+                    if (updatedAt == null) ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(8, updatedAt);
+                    ps.setLong(9, milestoneId);
                 });
         if (updated > 0) {
             return new UpsertResult<>(null, false);
         }
 
-        jdbc.update("INSERT INTO milestone (milestone_id, project_id, milestone_iid, title, state, due_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO milestone (milestone_id, project_id, milestone_iid, title, state, description, due_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
                 ps -> {
                     ps.setLong(1, milestoneId);
                     ps.setLong(2, projectId);
                     ps.setLong(3, milestoneIid);
                     ps.setString(4, title);
                     ps.setString(5, state);
-                    if (dueDate == null) ps.setNull(6, Types.DATE); else ps.setObject(6, dueDate);
-                    if (createdAt == null) ps.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(7, createdAt);
-                    if (updatedAt == null) ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(8, updatedAt);
+                    if (description == null) ps.setNull(6, Types.LONGVARCHAR); else ps.setString(6, description);
+                    if (dueDate == null) ps.setNull(7, Types.DATE); else ps.setObject(7, dueDate);
+                    if (createdAt == null) ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(8, createdAt);
+                    if (updatedAt == null) ps.setNull(9, Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(9, updatedAt);
                 });
         return new UpsertResult<>(null, true);
     }
@@ -712,6 +715,7 @@ public class SyncDao {
                                      long milestoneIid,
                                      String title,
                                      String state,
+                                     String description,
                                      LocalDate dueDate,
                                      long totalTimeSpentSeconds) {}
 
@@ -725,6 +729,7 @@ public class SyncDao {
                                          long milestoneIid,
                                          String title,
                                          String state,
+                                         String description,
                                          LocalDate dueDate,
                                          long totalTimeSpentSeconds,
                                          long totalIssues,
@@ -833,6 +838,7 @@ public class SyncDao {
                        m.milestone_iid,
                        m.title,
                        m.state,
+                       m.description,
                        m.due_date,
                        COALESCE(SUM(iss.total_time_spent_seconds), 0) AS total_time_spent_seconds
                 FROM milestone m
@@ -850,6 +856,7 @@ public class SyncDao {
                 rs.getLong("milestone_iid"),
                 rs.getString("title"),
                 rs.getString("state"),
+                rs.getString("description"),
                 rs.getObject("due_date", LocalDate.class),
                 ((Number) rs.getObject("total_time_spent_seconds")).longValue()
         ), projectId);
@@ -861,6 +868,7 @@ public class SyncDao {
                        m.milestone_iid,
                        m.title,
                        m.state,
+                       m.description,
                        m.due_date,
                        COALESCE(SUM(iss.total_time_spent_seconds), 0) AS total_time_spent_seconds,
                        COUNT(DISTINCT iss.id) AS total_issues,
@@ -880,6 +888,7 @@ public class SyncDao {
                 rs.getLong("milestone_iid"),
                 rs.getString("title"),
                 rs.getString("state"),
+                rs.getString("description"),
                 rs.getObject("due_date", LocalDate.class),
                 Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L),
                 rs.getLong("total_issues"),
@@ -898,6 +907,7 @@ public class SyncDao {
                 baseSummary.milestoneIid(),
                 baseSummary.title(),
                 baseSummary.state(),
+                baseSummary.description(),
                 baseSummary.dueDate(),
                 baseSummary.totalTimeSpentSeconds(),
                 baseSummary.totalIssues(),
