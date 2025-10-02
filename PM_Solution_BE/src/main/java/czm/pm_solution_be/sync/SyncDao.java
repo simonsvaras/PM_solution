@@ -298,8 +298,9 @@ public class SyncDao {
                                                 String milestoneTitle,
                                                 String milestoneState,
                                                 String dueDate,
+                                                OffsetDateTime createdAt,
                                                 OffsetDateTime updatedAt) {
-        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, milestone_title=?, milestone_state=?, due_date=?::date, updated_at=? WHERE gitlab_issue_id=?",
+        int updated = jdbc.update("UPDATE issue SET repository_id=?, title=?, state=?, assignee_id=?, assignee_username=?, author_name=?, labels=?, time_estimate_seconds=?, total_time_spent_seconds=?, milestone_title=?, milestone_state=?, due_date=?::date, created_at=?, updated_at=? WHERE gitlab_issue_id=?",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setString(2, title);
@@ -313,12 +314,13 @@ public class SyncDao {
                     ps.setString(10, milestoneTitle);
                     ps.setString(11, milestoneState);
                     ps.setString(12, dueDate);
-                    if (updatedAt == null) ps.setNull(13, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(13, updatedAt);
-                    ps.setLong(14, gitlabIssueId);
+                    if (createdAt == null) ps.setNull(13, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(13, createdAt);
+                    if (updatedAt == null) ps.setNull(14, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(14, updatedAt);
+                    ps.setLong(15, gitlabIssueId);
                 });
         if (updated > 0) return new UpsertResult<>(null, false);
 
-        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?)",
+        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?)",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setLong(2, gitlabIssueId);
@@ -334,7 +336,8 @@ public class SyncDao {
                     ps.setString(12, milestoneTitle);
                     ps.setString(13, milestoneState);
                     ps.setString(14, dueDate);
-                    if (updatedAt == null) ps.setNull(15, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(15, updatedAt);
+                    if (createdAt == null) ps.setNull(15, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(15, createdAt);
+                    if (updatedAt == null) ps.setNull(16, java.sql.Types.TIMESTAMP_WITH_TIMEZONE); else ps.setObject(16, updatedAt);
                 });
         return new UpsertResult<>(null, true);
     }

@@ -74,6 +74,7 @@ public class IssueSyncService {
                             is.milestone != null ? is.milestone.title : null,
                             is.milestone != null ? is.milestone.state : null,
                             is.dueDate,
+                            is.createdAt,
                             is.updatedAt
                     );
                     if (upsert.inserted) summary.addInserted(1); else summary.addUpdated(1);
