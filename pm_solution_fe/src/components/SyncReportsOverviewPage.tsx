@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import './SyncReportsOverviewPage.css';
 import { getSyncReportOverview, type ErrorResponse, type SyncReportOverviewRowDTO } from '../api';
 import { datetimeLocalToIso, getDefaultReportingPeriod } from '../config/reportingPeriod';
+import { utils, writeFile } from 'xlsx';
 
 type ReportRow = {
   issueTitle: string | null;
@@ -158,6 +159,32 @@ export default function SyncReportsOverviewPage() {
       .sort((a, b) => a.username.localeCompare(b.username, 'cs', { sensitivity: 'base' }));
   }, [rows]);
 
+  const handleExportClosures = useCallback(() => {
+    if (summaryRows.length === 0) {
+      return;
+    }
+
+    const exportRows = summaryRows.map(row => ({
+      Username: row.username,
+      'Celkové hodiny': row.totalHours ?? 0,
+      'Celkové náklady': row.totalCost ?? 0,
+    }));
+
+    const worksheet = utils.json_to_sheet(exportRows);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, 'Uzávěrka');
+
+    const sanitizeForFileName = (value: string | null | undefined) => {
+      if (!value) {
+        return 'nezadano';
+      }
+      return value.replace(/[^0-9A-Za-z]+/g, '-');
+    };
+
+    const fileName = `uzaverka_${sanitizeForFileName(from)}_${sanitizeForFileName(to)}.xlsx`;
+    writeFile(workbook, fileName);
+  }, [from, summaryRows, to]);
+
   return (
     <section className="panel">
       <div className="panel__body syncReportOverview">
@@ -195,6 +222,13 @@ export default function SyncReportsOverviewPage() {
         <div className="syncReportOverview__summaryToggle">
           <button type="button" onClick={() => setShowClosures(prev => !prev)}>
             {showClosures ? 'Skrýt uzávěrky' : 'Zobrazit uzávěrky'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportClosures}
+            disabled={loading || summaryRows.length === 0}
+          >
+            Export uzávěrky
           </button>
         </div>
 
