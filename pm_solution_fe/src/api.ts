@@ -72,6 +72,8 @@ export type ProjectDTO = {
   budgetFrom: string | null;
   budgetTo: string | null;
   reportedCost: number;
+  isExternal: boolean;
+  hourlyRateCzk: number | null;
 };
 export type ProjectOverviewDTO = {
   id: number;
@@ -82,6 +84,8 @@ export type ProjectOverviewDTO = {
   reportedCost: number;
   teamMembers: number;
   openIssues: number;
+  isExternal: boolean;
+  hourlyRateCzk: number | null;
 };
 export type ProjectMilestoneSummary = {
   milestoneId: number;
@@ -151,6 +155,8 @@ export type ProjectBudgetPayload = {
   budgetTo?: string | null;
   namespaceId?: number | null;
   namespaceName?: string | null;
+  isExternal?: boolean | null;
+  hourlyRateCzk?: number | null;
 };
 export type ProjectNamespaceOption = {
   namespaceId: number | null;
@@ -462,21 +468,33 @@ export async function getReportTeams(): Promise<TeamReportTeam[]> {
   return data.map(mapTeamReportTeam);
 }
 
+function serialiseProjectBudgetPayload(payload: ProjectBudgetPayload): ProjectBudgetPayload {
+  const isExternal = payload.isExternal ?? false;
+  const hourlyRate = isExternal ? payload.hourlyRateCzk ?? null : null;
+  return {
+    ...payload,
+    isExternal,
+    hourlyRateCzk: hourlyRate,
+  };
+}
+
 export async function createProjectByName(payload: ProjectBudgetPayload): Promise<ProjectDTO> {
+  const body = serialiseProjectBudgetPayload(payload);
   const res = await fetch(`${API_BASE}/api/projects/by-name`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO>(res);
 }
 
 export async function updateProject(id: number, payload: ProjectBudgetPayload): Promise<ProjectDTO> {
+  const body = serialiseProjectBudgetPayload(payload);
   const res = await fetch(`${API_BASE}/api/projects/${id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectDTO>(res);

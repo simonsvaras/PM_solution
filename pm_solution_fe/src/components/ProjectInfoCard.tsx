@@ -17,6 +17,10 @@ export default function ProjectInfoCard({ project, onSelect }: ProjectInfoCardPr
 
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
   const reportsOverviewLink = `?module=projects&submodule=projects-overview&projectId=${project.id}`;
+  const projectTypeLabel = project.isExternal ? 'Externí' : 'Interní';
+  const hourlyRateLabel = project.isExternal
+    ? `${currencyFormatter.format(project.hourlyRateCzk ?? 0)}/h`
+    : '—';
 
   function handleDetailClick(event: MouseEvent<HTMLAnchorElement>) {
     if (!onSelect) {
@@ -62,6 +66,14 @@ export default function ProjectInfoCard({ project, onSelect }: ProjectInfoCardPr
         <div className="projectInfoCard__stat">
           <dt>Otevřené issue</dt>
           <dd>{numberFormatter.format(project.openIssues)}</dd>
+        </div>
+        <div className="projectInfoCard__stat">
+          <dt>Typ projektu</dt>
+          <dd>{projectTypeLabel}</dd>
+        </div>
+        <div className="projectInfoCard__stat">
+          <dt>Hodinová sazba</dt>
+          <dd>{hourlyRateLabel}</dd>
         </div>
       </dl>
     </article>

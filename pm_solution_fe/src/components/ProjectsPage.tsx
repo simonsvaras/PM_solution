@@ -42,6 +42,9 @@ export default function ProjectsPage() {
   const [budgetFrom, setBudgetFrom] = useState('');
   const [budgetTo, setBudgetTo] = useState('');
   const [budgetRangeError, setBudgetRangeError] = useState<string | null>(null);
+  const [isExternal, setIsExternal] = useState(false);
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [hourlyRateError, setHourlyRateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ErrorResponse | null>(null);
   const [justCreated, setJustCreated] = useState<ProjectDTO | null>(null);
@@ -110,6 +113,9 @@ export default function ProjectsPage() {
     setBudgetFrom('');
     setBudgetTo('');
     setBudgetRangeError(null);
+    setIsExternal(false);
+    setHourlyRate('');
+    setHourlyRateError(null);
     setCreateError(null);
     setJustCreated(null);
     setEditing(null);
@@ -121,6 +127,7 @@ export default function ProjectsPage() {
     setCreateError(null);
     setBudgetError(null);
     setBudgetRangeError(null);
+    setHourlyRateError(null);
     const v = validateName(name);
     if (!v.ok) { setNameError(v.error); return; }
     setNameError(null);
@@ -142,6 +149,20 @@ export default function ProjectsPage() {
       return;
     }
 
+    let parsedHourlyRate: number | null = null;
+    if (isExternal) {
+      if (!hourlyRate.trim()) {
+        setHourlyRateError('Hodinová sazba je povinná pro externí projekt.');
+        return;
+      }
+      const num = Number(hourlyRate);
+      if (!Number.isFinite(num) || num < 0) {
+        setHourlyRateError('Hodinová sazba musí být nezáporné číslo.');
+        return;
+      }
+      parsedHourlyRate = num;
+    }
+
     const payload: ProjectBudgetPayload = {
       name: v.value,
       budget: parsedBudget,
@@ -149,6 +170,8 @@ export default function ProjectsPage() {
       budgetTo: normalizedTo,
       namespaceId: selectedNamespaceName ? selectedNamespaceId ?? null : null,
       namespaceName: selectedNamespaceName ?? null,
+      isExternal,
+      hourlyRateCzk: isExternal ? parsedHourlyRate : null,
     };
 
     setCreating(true);
@@ -165,6 +188,8 @@ export default function ProjectsPage() {
       setBudget('');
       setBudgetFrom('');
       setBudgetTo('');
+      setIsExternal(false);
+      setHourlyRate('');
       await reload();
     } catch (e) {
       setCreateError(e as ErrorResponse);
@@ -197,6 +222,9 @@ export default function ProjectsPage() {
     setCreateError(null);
     setSelectedNamespaceId(p.namespaceId ?? null);
     setSelectedNamespaceName(p.namespaceName ?? null);
+    setIsExternal(p.isExternal ?? false);
+    setHourlyRate(p.hourlyRateCzk != null ? String(p.hourlyRateCzk) : '');
+    setHourlyRateError(null);
   }
 
   function onManageRepos(p: ProjectDTO) {
@@ -231,6 +259,12 @@ export default function ProjectsPage() {
                 Rozpočet: {justCreated.budget !== null ? `${justCreated.budget.toLocaleString('cs-CZ')} Kč` : 'neuveden'}
                 <br />
                 Období: {justCreated.budgetFrom ?? '—'} – {justCreated.budgetTo ?? '—'}
+                <br />
+                Externí projekt: {justCreated.isExternal ? 'Ano' : 'Ne'}
+                <br />
+                Hodinová sazba: {justCreated.isExternal
+                  ? `${currencyFormatter.format(justCreated.hourlyRateCzk ?? 0)}/h`
+                  : '—'}
                 <br />
                 Vykázané náklady: {currencyFormatter.format(justCreated.reportedCost ?? 0)}
               </p>
@@ -280,6 +314,41 @@ export default function ProjectsPage() {
             />
             {budgetError && <div className="errorText">{budgetError}</div>}
           </div>
+          <div className="field field--checkbox">
+            <label htmlFor="project-is-external">
+              <input
+                id="project-is-external"
+                type="checkbox"
+                checked={isExternal}
+                onChange={e => {
+                  setIsExternal(e.target.checked);
+                  if (!e.target.checked) {
+                    setHourlyRate('');
+                    setHourlyRateError(null);
+                  }
+                }}
+              />
+              {' '}Je projekt externí?
+            </label>
+          </div>
+          {isExternal && (
+            <div className="field">
+              <label htmlFor="project-hourly-rate">Hodinová sazba (CZK/h)</label>
+              <input
+                id="project-hourly-rate"
+                type="number"
+                min="0"
+                step="1"
+                value={hourlyRate}
+                onChange={e => {
+                  setHourlyRate(e.target.value);
+                  setHourlyRateError(null);
+                }}
+                placeholder="Např. 1200"
+              />
+              {hourlyRateError && <div className="errorText">{hourlyRateError}</div>}
+            </div>
+          )}
           <div className="field field--inline">
             <div>
               <label htmlFor="project-budget-from">Rozpočet od</label>

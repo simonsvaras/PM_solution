@@ -82,6 +82,9 @@ export default function ProjectSettingsModal({
   const [budgetFrom, setBudgetFrom] = useState('');
   const [budgetTo, setBudgetTo] = useState('');
   const [budgetRangeError, setBudgetRangeError] = useState<string | null>(null);
+  const [isExternal, setIsExternal] = useState(false);
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [hourlyRateError, setHourlyRateError] = useState<string | null>(null);
   const [namespaceOptions, setNamespaceOptions] = useState<ProjectNamespaceOption[]>([]);
   const [namespaceLoading, setNamespaceLoading] = useState(false);
   const [namespaceError, setNamespaceError] = useState<string | null>(null);
@@ -114,6 +117,9 @@ export default function ProjectSettingsModal({
         setBudgetRangeError(null);
         setSelectedNamespaceId(match.namespaceId ?? null);
         setSelectedNamespaceName(match.namespaceName ?? null);
+        setIsExternal(match.isExternal ?? false);
+        setHourlyRate(match.hourlyRateCzk != null ? String(match.hourlyRateCzk) : '');
+        setHourlyRateError(null);
         setDetailState({ loading: false, error: null, saving: false, saveError: null });
       })
       .catch(err => {
@@ -161,6 +167,7 @@ export default function ProjectSettingsModal({
     setDetailState(prev => ({ ...prev, saving: true, saveError: null }));
     setBudgetError(null);
     setBudgetRangeError(null);
+    setHourlyRateError(null);
     const validation = validateName(name);
     if (!validation.ok) {
       setNameError(validation.error);
@@ -184,6 +191,22 @@ export default function ProjectSettingsModal({
       return;
     }
 
+    let parsedHourlyRate: number | null = null;
+    if (isExternal) {
+      if (!hourlyRate.trim()) {
+        setHourlyRateError('Hodinová sazba je povinná pro externí projekt.');
+        setDetailState(prev => ({ ...prev, saving: false }));
+        return;
+      }
+      const parsedRate = Number(hourlyRate);
+      if (!Number.isFinite(parsedRate) || parsedRate < 0) {
+        setHourlyRateError('Hodinová sazba musí být nezáporné číslo.');
+        setDetailState(prev => ({ ...prev, saving: false }));
+        return;
+      }
+      parsedHourlyRate = parsedRate;
+    }
+
     const payload: ProjectBudgetPayload = {
       name: validation.value,
       budget: parsedBudget.value,
@@ -191,11 +214,16 @@ export default function ProjectSettingsModal({
       budgetTo: normalizedTo,
       namespaceId: selectedNamespaceName ? selectedNamespaceId ?? null : null,
       namespaceName: selectedNamespaceName ?? null,
+      isExternal,
+      hourlyRateCzk: isExternal ? parsedHourlyRate : null,
     };
 
     try {
       const updated = await updateProject(projectDetail.id, payload);
       setProjectDetail(updated);
+      setIsExternal(updated.isExternal ?? false);
+      setHourlyRate(updated.hourlyRateCzk != null ? String(updated.hourlyRateCzk) : '');
+      setHourlyRateError(null);
       const overview: ProjectOverviewDTO = {
         id: project.id,
         name: updated.name,
@@ -205,6 +233,8 @@ export default function ProjectSettingsModal({
         reportedCost: project.reportedCost,
         teamMembers: project.teamMembers,
         openIssues: project.openIssues,
+        isExternal: updated.isExternal,
+        hourlyRateCzk: updated.hourlyRateCzk,
       };
       onProjectUpdated(overview);
       onClose();
@@ -298,6 +328,41 @@ export default function ProjectSettingsModal({
                     />
                     {budgetError && <div className="errorText">{budgetError}</div>}
                   </div>
+                  <div className="field field--checkbox">
+                    <label htmlFor="project-settings-is-external">
+                      <input
+                        id="project-settings-is-external"
+                        type="checkbox"
+                        checked={isExternal}
+                        onChange={event => {
+                          setIsExternal(event.target.checked);
+                          if (!event.target.checked) {
+                            setHourlyRate('');
+                            setHourlyRateError(null);
+                          }
+                        }}
+                      />
+                      {' '}Je projekt externí?
+                    </label>
+                  </div>
+                  {isExternal && (
+                    <div className="field">
+                      <label htmlFor="project-settings-hourly-rate">Hodinová sazba (CZK/h)</label>
+                      <input
+                        id="project-settings-hourly-rate"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={hourlyRate}
+                        onChange={event => {
+                          setHourlyRate(event.target.value);
+                          setHourlyRateError(null);
+                        }}
+                        placeholder="Např. 1200"
+                      />
+                      {hourlyRateError && <div className="errorText">{hourlyRateError}</div>}
+                    </div>
+                  )}
                   <div className="field field--inline">
                     <div>
                       <label htmlFor="project-settings-budget-from">Rozpočet od</label>

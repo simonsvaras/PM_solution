@@ -32,6 +32,10 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, 
   const namespaceLabel = project.namespaceName
     ? `${project.namespaceName}${typeof project.namespaceId === 'number' ? ` (ID ${project.namespaceId})` : ''}`
     : 'Neuvedeno';
+  const projectTypeLabel = project.isExternal ? 'Externí' : 'Interní';
+  const hourlyRateLabel = project.isExternal
+    ? `${currencyFormatter.format(project.hourlyRateCzk ?? 0)}/h`
+    : '—';
 
   return (
     <div className="projectCard" aria-label={`Projekt ${project.name}`}>
@@ -41,6 +45,8 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, 
         <div>Rozpočet: {budgetLabel}</div>
         <div>Období rozpočtu: {periodLabel}</div>
         <div>Vykázané náklady: {reportedCostLabel}</div>
+        <div>Typ projektu: {projectTypeLabel}</div>
+        <div>Hodinová sazba: {hourlyRateLabel}</div>
       </div>
       <div className="projectCard__actions">
         <button className="btn btn--danger" onClick={() => onDelete(project)}>Smazat</button>
