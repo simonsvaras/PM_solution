@@ -12,10 +12,13 @@ type ReportRow = {
   spentAt: string;
   timeSpentHours: number | null;
   cost: number | null;
+  projectIsExternal: boolean;
 };
 
 type SummaryRow = {
   username: string;
+  czmHours: number | null;
+  externalHours: number | null;
   totalHours: number | null;
   totalCost: number | null;
 };
@@ -39,6 +42,7 @@ function mapDto(row: SyncReportOverviewRowDTO): ReportRow {
     spentAt: row.spentAt,
     timeSpentHours: toNumber(row.timeSpentHours),
     cost: toNumber(row.cost),
+    projectIsExternal: Boolean(row.projectIsExternal),
   };
 }
 
@@ -139,13 +143,17 @@ export default function SyncReportsOverviewPage() {
       return [];
     }
 
-    const totals = new Map<string, { hours: number; cost: number }>();
+    const totals = new Map<string, { czmHours: number; externalHours: number; cost: number }>();
     for (const row of rows) {
       const key = row.username ?? '—';
-      const existing = totals.get(key) ?? { hours: 0, cost: 0 };
+      const existing = totals.get(key) ?? { czmHours: 0, externalHours: 0, cost: 0 };
       const hours = Number.isFinite(row.timeSpentHours ?? NaN) ? row.timeSpentHours ?? 0 : 0;
       const cost = Number.isFinite(row.cost ?? NaN) ? row.cost ?? 0 : 0;
-      existing.hours += hours;
+      if (row.projectIsExternal) {
+        existing.externalHours += hours;
+      } else {
+        existing.czmHours += hours;
+      }
       existing.cost += cost;
       totals.set(key, existing);
     }
@@ -153,7 +161,9 @@ export default function SyncReportsOverviewPage() {
     return Array.from(totals.entries())
       .map(([username, values]) => ({
         username,
-        totalHours: values.hours,
+        czmHours: values.czmHours,
+        externalHours: values.externalHours,
+        totalHours: values.czmHours + values.externalHours,
         totalCost: values.cost,
       }))
       .sort((a, b) => a.username.localeCompare(b.username, 'cs', { sensitivity: 'base' }));
@@ -166,6 +176,8 @@ export default function SyncReportsOverviewPage() {
 
     const exportRows = summaryRows.map(row => ({
       Username: row.username,
+      CZM: row.czmHours ?? 0,
+      Externí: row.externalHours ?? 0,
       'Celkové hodiny': row.totalHours ?? 0,
       'Celkové náklady': row.totalCost ?? 0,
     }));
@@ -238,6 +250,8 @@ export default function SyncReportsOverviewPage() {
               <thead>
                 <tr>
                   <th scope="col">Username</th>
+                  <th scope="col">CZM (h)</th>
+                  <th scope="col">Externí (h)</th>
                   <th scope="col">Celkové hodiny</th>
                   <th scope="col">Celkové náklady</th>
                 </tr>
@@ -245,13 +259,13 @@ export default function SyncReportsOverviewPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className="syncReportOverview__empty">
+                    <td colSpan={5} className="syncReportOverview__empty">
                       Načítám uzávěrky…
                     </td>
                   </tr>
                 ) : summaryRows.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="syncReportOverview__empty">
+                    <td colSpan={5} className="syncReportOverview__empty">
                       Žádná data pro uzávěrku.
                     </td>
                   </tr>
@@ -259,6 +273,8 @@ export default function SyncReportsOverviewPage() {
                   summaryRows.map(row => (
                     <tr key={row.username}>
                       <td>{row.username}</td>
+                      <td className="syncReportOverview__cell--numeric">{formatHours(row.czmHours)}</td>
+                      <td className="syncReportOverview__cell--numeric">{formatHours(row.externalHours)}</td>
                       <td className="syncReportOverview__cell--numeric">{formatHours(row.totalHours)}</td>
                       <td className="syncReportOverview__cell--numeric">{formatCost(row.totalCost)}</td>
                     </tr>

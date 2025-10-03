@@ -60,6 +60,7 @@ export type SyncReportOverviewRowDTO = {
   spentAt: string;
   timeSpentHours: number | string;
   cost: number | string | null;
+  projectIsExternal: boolean | null;
 };
 
 export type ProjectDTO = {
