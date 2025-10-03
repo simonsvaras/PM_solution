@@ -113,6 +113,9 @@ export type ProjectMilestoneDetailSummary = {
   totalCost: number;
 };
 
+/**
+ * Single milestone issue returned by the backend enriched with GitLab labels for local filtering.
+ */
 export type ProjectMilestoneIssueDetail = {
   issueId: number | null;
   issueIid: number | null;
@@ -123,6 +126,7 @@ export type ProjectMilestoneIssueDetail = {
   dueDate: string | null;
   assigneeUsername: string | null;
   assigneeName: string | null;
+  labels: string[];
   totalTimeSpentSeconds: number;
   totalCost: number;
 };
@@ -616,7 +620,14 @@ export async function getProjectMilestoneDetail(
 ): Promise<ProjectMilestoneDetail> {
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/${milestoneId}/detail`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
-  return parseJson<ProjectMilestoneDetail>(res);
+  const detail = await parseJson<ProjectMilestoneDetail>(res);
+  return {
+    ...detail,
+    issues: detail.issues.map(issue => ({
+      ...issue,
+      labels: (issue.labels ?? []).map(label => label.trim()).filter(label => label.length > 0),
+    })),
+  };
 }
 
 export async function syncRepositories(): Promise<SyncSummary> {

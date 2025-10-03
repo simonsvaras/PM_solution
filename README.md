@@ -31,6 +31,7 @@ Projektové reporty jsou dostupné přímo z modulu **Projekty → Přehled proj
 
 - **Souhrn projektu** otevřete z dlaždice projektu přes odkaz „Zobrazit detail“. Stránka ukazuje základní statistiky a umožňuje spustit synchronizaci výkazů pro zvolené období.
 - **Detailní report** nabízí přepínače pro jednotlivé sekce (obecný přehled, detail stážisty a detail projektu). Mezi sekcemi lze přecházet bez opuštění modulu „Projekty“.
+- **Detail projektu** nyní obsahuje přehled issues s možností filtrovat podle stavu, priority a týmu. Nové radio filtry „Priority“ a „Tým“ pracují nad GitLab štítky ve formátu `Priority: Hodnota` a `Team: Hodnota`.
 - **On-demand maintenance** (Synchronizace → On-demand) now contains a red "Smazat všechny reporty" panel. The action requires a confirmation dialog and calls `DELETE /api/sync/reports`, which permanently removes every row from the `report` table. Use it to reset the database before a full re-import.
 - **Synchronizace → Přehled reportů** nabízí tabulku všech uložených výkazů. Filtry „od“ a „do“ jsou předvyplněny podle vykazovacího období a můžete je kdykoliv upravit, než stisknete tlačítko „Získat“ pro načtení dat.
 
