@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import './ProjectReportInternDetailPage.css';
 import './ProjectReportDetailPage.css';
 import InfoCard from './InfoCard';
+import Badge from './Badge';
 import {
   getProjectReportInternDetail,
   type ErrorResponse,
@@ -50,6 +51,33 @@ function formatIssueAge(ageDays: number | null, createdAt: string | null): strin
   }
   const diffDays = Math.floor(diffMs / dayMs);
   return diffDays.toLocaleString('cs-CZ');
+}
+
+function getLabelValue(labels: readonly string[] | null | undefined, labelKey: string): string | null {
+  if (!labels || labels.length === 0) {
+    return null;
+  }
+  const normalizedKey = labelKey.trim().toLowerCase();
+  for (const label of labels) {
+    if (!label) {
+      continue;
+    }
+    const [rawKey, ...rawValueParts] = label.split(':');
+    if (!rawKey || rawValueParts.length === 0) {
+      continue;
+    }
+    if (rawKey.trim().toLowerCase() === normalizedKey) {
+      const value = rawValueParts.join(':').trim();
+      if (value.length > 0) {
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
+function getPriorityLabel(labels: readonly string[] | null | undefined): string | null {
+  return getLabelValue(labels, 'priorita') ?? getLabelValue(labels, 'priority');
 }
 
 function formatInternLabel(intern: ProjectReportDetailIntern): string {
@@ -280,7 +308,8 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
                 <thead>
                   <tr>
                     <th scope="col">Issue</th>
-                    <th scope="col" className="projectReportInternDetail__columnNumeric">Celkem vykázáno</th>
+                    <th scope="col">Priorita</th>
+                    <th scope="col" className="projectReportInternDetail__columnHours">Celkem vykázáno</th>
                     <th scope="col">Termín</th>
                     <th scope="col" className="projectReportInternDetail__columnNumeric">Stáří (dny)</th>
                   </tr>
@@ -318,7 +347,10 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
                             issueContent
                           )}
                         </th>
-                        <td className="projectReportInternDetail__columnNumeric">
+                        <td className="projectReportInternDetail__cellBadge">
+                          <Badge kind="priority" value={getPriorityLabel(issue.labels)} />
+                        </td>
+                        <td className="projectReportInternDetail__columnHours">
                           {formatHoursFromSeconds(issue.totalTimeSpentSeconds)}
                         </td>
                         <td>{formatDate(issue.dueDate)}</td>

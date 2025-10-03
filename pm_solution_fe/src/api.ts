@@ -326,6 +326,7 @@ export type ProjectReportInternDetailIssue = {
   issueTitle: string;
   issueWebUrl: string | null;
   humanTimeEstimate: string | null;
+  labels: string[];
   dueDate: string | null;
   createdAt: string | null;
   ageDays: number | null;
@@ -724,9 +725,13 @@ export async function getProjectReportInternDetail(
       const normalizedWebUrl = issue.issueWebUrl && issue.issueWebUrl.trim() ? issue.issueWebUrl.trim() : null;
       const normalizedHumanEstimate =
         issue.humanTimeEstimate && issue.humanTimeEstimate.trim() ? issue.humanTimeEstimate.trim() : null;
+      const normalizedLabels = issue.labels
+        .map(label => (typeof label === 'string' ? label.trim() : ''))
+        .filter(label => label.length > 0);
 
       return {
         ...issue,
+        labels: normalizedLabels,
         issueWebUrl: normalizedWebUrl,
         humanTimeEstimate: normalizedHumanEstimate,
         dueDate: issue.dueDate ?? null,
