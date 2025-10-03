@@ -132,6 +132,9 @@ public class SyncDao {
                                      BigDecimal reportedCost,
                                      Integer teamMembers,
                                      Integer openIssues) {}
+    public record ProjectMonthlyReportRow(OffsetDateTime monthStart,
+                                          BigDecimal hours,
+                                          BigDecimal cost) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
@@ -186,6 +189,23 @@ public class SyncDao {
                 rs.getBigDecimal("reported_cost"),
                 rs.getInt("team_members"),
                 rs.getInt("open_issues")));
+    }
+
+    public Optional<ProjectRow> findProjectById(long projectId) {
+        List<ProjectRow> rows = jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project WHERE id = ?",
+                (rs, rn) -> new ProjectRow(
+                        rs.getLong("id"),
+                        (Long) rs.getObject("namespace_id"),
+                        rs.getString("namespace_name"),
+                        rs.getString("name"),
+                        (Integer) rs.getObject("budget"),
+                        rs.getObject("budget_from", LocalDate.class),
+                        rs.getObject("budget_to", LocalDate.class),
+                        rs.getBoolean("is_external"),
+                        rs.getBigDecimal("hourly_rate_czk"),
+                        rs.getBigDecimal("reported_cost")),
+                projectId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
     public int deleteProject(long id) {
@@ -930,6 +950,58 @@ public class SyncDao {
                 rs.getBigDecimal("hours"),
                 rs.getBigDecimal("cost")
         ), params.toArray());
+    }
+
+    public List<ProjectMonthlyReportRow> listProjectMonthlyReport(long projectId,
+                                                                  OffsetDateTime from,
+                                                                  OffsetDateTime to) {
+        String sql = """
+                WITH month_series AS (
+                    SELECT generate_series(
+                               date_trunc('month', ?::timestamptz),
+                               date_trunc('month', (?::timestamptz - interval '1 second')),
+                               interval '1 month'
+                           ) AS month_start
+                ),
+                report_months AS (
+                    SELECT date_trunc('month', r.spent_at AT TIME ZONE 'UTC') AS month_start,
+                           SUM(r.time_spent_hours) AS hours,
+                           SUM(CASE
+                                   WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN
+                                       COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
+                                   ELSE 0
+                               END) AS cost
+                    FROM report r
+                    JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id
+                    JOIN project p ON p.id = ptr.project_id
+                    JOIN repository repo ON repo.id = r.repository_id
+                    JOIN intern i ON i.username = r.username
+                    LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ptr.project_id
+                    WHERE ptr.project_id = ?
+                      AND r.spent_at >= ?
+                      AND r.spent_at < ?
+                      AND (p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
+                      AND (p.budget_to IS NULL OR r.spent_at::date <= p.budget_to)
+                    GROUP BY 1
+                )
+                SELECT ms.month_start,
+                       COALESCE(rm.hours, 0) AS hours,
+                       COALESCE(rm.cost, 0) AS cost
+                FROM month_series ms
+                LEFT JOIN report_months rm ON rm.month_start = ms.month_start
+                ORDER BY ms.month_start
+                """;
+
+        return jdbc.query(sql,
+                (rs, rn) -> new ProjectMonthlyReportRow(
+                        rs.getObject("month_start", OffsetDateTime.class),
+                        rs.getBigDecimal("hours"),
+                        rs.getBigDecimal("cost")),
+                from,
+                to,
+                projectId,
+                from,
+                to);
     }
 
     public List<ProjectInternOpenIssueRow> listProjectInternOpenIssues(long projectId, String internUsername) {

@@ -9,9 +9,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -56,6 +58,23 @@ public class ProjectReportDetailController {
                                   long totalTimeSpentSeconds) {}
 
     public record ProjectReportInternDetailResponse(List<InternSummary> interns, List<InternOpenIssue> issues) {}
+
+    public record ProjectLongTermReportMeta(Integer budget,
+                                            LocalDate budgetFrom,
+                                            LocalDate budgetTo,
+                                            BigDecimal hourlyRate) {}
+
+    public record ProjectLongTermReportMonth(OffsetDateTime monthStart,
+                                             BigDecimal hours,
+                                             BigDecimal cost,
+                                             BigDecimal cumulativeHours,
+                                             BigDecimal cumulativeCost,
+                                             BigDecimal burnRatio) {}
+
+    public record ProjectLongTermReportResponse(ProjectLongTermReportMeta meta,
+                                                 BigDecimal totalHours,
+                                                 BigDecimal totalCost,
+                                                 List<ProjectLongTermReportMonth> months) {}
 
     @GetMapping("/{projectId}/reports/detail")
     public ProjectReportDetailResponse getProjectReportDetail(@PathVariable long projectId,
@@ -153,6 +172,71 @@ public class ProjectReportDetailController {
                 .thenComparing(InternSummary::username));
 
         return new ProjectReportInternDetailResponse(interns, issues);
+    }
+
+    @GetMapping("/{projectId}/reports/long-term")
+    public ProjectLongTermReportResponse getProjectLongTermReport(@PathVariable long projectId,
+                                                                  @RequestParam(required = false) LocalDate from,
+                                                                  @RequestParam(required = false) LocalDate to) {
+        LocalDate today = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate();
+        LocalDate defaultFrom = today.with(TemporalAdjusters.firstDayOfYear());
+        LocalDate defaultTo = today.with(TemporalAdjusters.lastDayOfYear());
+
+        LocalDate fromDate = from != null ? from : defaultFrom;
+        LocalDate toDate = to != null ? to : defaultTo;
+
+        if (toDate.isBefore(fromDate)) {
+            throw ApiException.validation("Datum \"Do\" nesmí být dříve než datum \"Od\".");
+        }
+
+        OffsetDateTime fromDateTime = fromDate.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime toDateTime = toDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        SyncDao.ProjectRow project = dao.findProjectById(projectId)
+                .orElseThrow(() -> ApiException.notFound("Projekt nebyl nalezen."));
+
+        List<SyncDao.ProjectMonthlyReportRow> rows = dao.listProjectMonthlyReport(projectId, fromDateTime, toDateTime);
+
+        BigDecimal cumulativeHours = BigDecimal.ZERO;
+        BigDecimal cumulativeCost = BigDecimal.ZERO;
+        BigDecimal budgetValue = project.budget() != null ? BigDecimal.valueOf(project.budget()) : null;
+
+        List<ProjectLongTermReportMonth> months = new ArrayList<>(rows.size());
+        for (SyncDao.ProjectMonthlyReportRow row : rows) {
+            BigDecimal hours = row.hours() != null ? row.hours() : BigDecimal.ZERO;
+            BigDecimal cost = row.cost() != null ? row.cost() : BigDecimal.ZERO;
+
+            cumulativeHours = cumulativeHours.add(hours);
+            cumulativeCost = cumulativeCost.add(cost);
+
+            BigDecimal burnRatio = null;
+            if (budgetValue != null && budgetValue.compareTo(BigDecimal.ZERO) > 0) {
+                burnRatio = cumulativeCost.divide(budgetValue, 4, RoundingMode.HALF_UP);
+            }
+
+            months.add(new ProjectLongTermReportMonth(
+                    row.monthStart(),
+                    hours,
+                    cost,
+                    cumulativeHours,
+                    cumulativeCost,
+                    burnRatio
+            ));
+        }
+
+        ProjectLongTermReportMeta meta = new ProjectLongTermReportMeta(
+                project.budget(),
+                project.budgetFrom(),
+                project.budgetTo(),
+                project.hourlyRateCzk()
+        );
+
+        return new ProjectLongTermReportResponse(
+                meta,
+                cumulativeHours,
+                cumulativeCost,
+                List.copyOf(months)
+        );
     }
 
     private static class IssueRowBuilder {

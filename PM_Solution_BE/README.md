@@ -40,6 +40,9 @@ Key REST endpoints
 - `GET /api/projects/{projectId}/reports/detail?from={iso?}&to={iso?}&internUsername={username?}` – aggregated timelog hours per
   issue/intern for the project's repositories within the optional time range. Passing `internUsername` narrows the aggregation to a
   single intern while still returning the complete list of assigned members for UI filters.
+- `GET /api/projects/{projectId}/reports/long-term?from={yyyy-MM-dd?}&to={yyyy-MM-dd?}` – monthly buckets of hours and costs for the selected project.
+  When parameters are omitted the current calendar year is used and the payload also contains budget metadata, totals, cumulative sums
+  and burn ratio per month.
 - `DELETE /api/sync/reports?projectId=1&projectId=2` – trvale odstraní uložené výkazy. Bez parametrů smaže vše, s opakovaným `projectId` zlikviduje jen záznamy repozitářů přiřazených k vybraným projektům. Volání vrací `{ "deleted": <počet_záznamů> }`.
 - `GET /api/sync/reports/overview?from={iso?}&to={iso?}` – vrátí jednotlivé záznamy z tabulky `report` včetně názvu issue, repozitáře, uživatele, času zápisu a počtu hodin. Parametry `from`/`to` jsou nepovinné a filtrují interval `spent_at`.
 
