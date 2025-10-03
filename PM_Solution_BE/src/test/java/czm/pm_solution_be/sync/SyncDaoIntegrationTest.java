@@ -5,6 +5,7 @@ import czm.pm_solution_be.intern.InternDao.InternRow;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.DockerClientFactory;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SyncDaoIntegrationTest {
 
@@ -67,28 +69,132 @@ class SyncDaoIntegrationTest {
                             OffsetDateTime.parse("2025-06-01T10:00:00Z"),
                             3600,
                             oneHour,
-                            intern.username()),
+                            intern.username(),
+                            null),
                     new SyncDao.ReportRow(
                             repositoryId,
                             101L,
                             OffsetDateTime.parse("2025-08-01T10:00:00Z"),
                             3600,
                             oneHour,
-                            intern.username())
+                            intern.username(),
+                            null)
             );
 
             SyncDao.ReportInsertStats stats = syncDao.insertReports(rows);
             assertThat(stats.inserted()).isEqualTo(2);
 
             List<Map<String, Object>> stored = jdbcTemplate.queryForList(
-                    "SELECT spent_at, cost FROM report ORDER BY spent_at ASC");
+                    "SELECT spent_at, cost, hourly_rate_czk FROM report ORDER BY spent_at ASC");
             assertThat(stored).hasSize(2);
             assertThat(((OffsetDateTime) stored.get(0).get("spent_at")).toLocalDate())
                     .isEqualTo(LocalDate.of(2025, 6, 1));
             assertThat(((BigDecimal) stored.get(0).get("cost"))).isEqualByComparingTo("160.00");
+            assertThat(((BigDecimal) stored.get(0).get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
             assertThat(((OffsetDateTime) stored.get(1).get("spent_at")).toLocalDate())
                     .isEqualTo(LocalDate.of(2025, 8, 1));
             assertThat(((BigDecimal) stored.get(1).get("cost"))).isEqualByComparingTo("180.00");
+            assertThat(((BigDecimal) stored.get(1).get("hourly_rate_czk"))).isEqualByComparingTo("180.00");
+        }
+    }
+
+    @Test
+    void insertReportsPrefersProjectHourlyRateWhenAvailable() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+            InternDao internDao = new InternDao(jdbcTemplate);
+
+            long repositoryId = insertRepository(jdbcTemplate);
+            long levelId = insertLevel(jdbcTemplate, "junior", BigDecimal.valueOf(160));
+
+            InternRow intern = internDao.insert("Leo", "Ortiz", uniqueUsername(), levelId);
+            deleteExistingHistory(jdbcTemplate, intern.id());
+            insertLevelHistory(jdbcTemplate, intern.id(), levelId,
+                    LocalDate.of(2024, 1, 1), null);
+
+            BigDecimal oneHour = BigDecimal.ONE.setScale(4, RoundingMode.UNNECESSARY);
+            BigDecimal projectRate = BigDecimal.valueOf(250);
+            Long projectId = syncDao.createProjectByName("Projekt-" + UUID.randomUUID(), null, null, null, null, null, true, projectRate);
+            syncDao.linkProjectRepository(projectId, repositoryId);
+
+            SyncDao.ReportInsertStats stats = syncDao.insertReports(List.of(
+                    new SyncDao.ReportRow(
+                            repositoryId,
+                            404L,
+                            OffsetDateTime.parse("2025-09-01T10:00:00Z"),
+                            3600,
+                            oneHour,
+                            intern.username(),
+                            projectRate)
+            ));
+
+            assertThat(stats.inserted()).isEqualTo(1);
+
+            Map<String, Object> stored = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE repository_id = ?",
+                    repositoryId);
+            assertThat(((BigDecimal) stored.get("cost"))).isEqualByComparingTo("250.00");
+            assertThat(((BigDecimal) stored.get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
+
+            BigDecimal cachedTotal = jdbcTemplate.queryForObject(
+                    "SELECT reported_cost FROM project WHERE id = ?",
+                    BigDecimal.class,
+                    projectId);
+            assertThat(cachedTotal).isEqualByComparingTo("250.00");
+        }
+    }
+
+    @Test
+    void createProjectByNameRejectsHourlyRateForInternalProject() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+
+            assertThatThrownBy(() -> syncDao.createProjectByName(
+                    "Internal-" + UUID.randomUUID(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    BigDecimal.valueOf(123)))
+                    .isInstanceOf(DataIntegrityViolationException.class);
         }
     }
 
@@ -124,7 +230,8 @@ class SyncDaoIntegrationTest {
                             OffsetDateTime.parse("2025-06-01T10:00:00Z"),
                             1800,
                             BigDecimal.valueOf(0.5).setScale(4, RoundingMode.UNNECESSARY),
-                            "ghost-user")
+                            "ghost-user",
+                            null)
             ));
 
             assertThat(stats.inserted()).isEqualTo(1);
@@ -132,10 +239,11 @@ class SyncDaoIntegrationTest {
             assertThat(stats.failed()).isZero();
             assertThat(stats.missingUsernames()).containsExactly("ghost-user");
 
-            Map<String, Object> row = jdbcTemplate.queryForMap("SELECT username, unregistered_username, cost FROM report");
+            Map<String, Object> row = jdbcTemplate.queryForMap("SELECT username, unregistered_username, cost, hourly_rate_czk FROM report");
             assertThat(row.get("username")).isNull();
             assertThat(row.get("unregistered_username")).isEqualTo("ghost-user");
             assertThat(row.get("cost")).isNull();
+            assertThat(row.get("hourly_rate_czk")).isNull();
         }
     }
 
@@ -180,15 +288,16 @@ class SyncDaoIntegrationTest {
                             OffsetDateTime.parse("2025-08-01T10:00:00Z"),
                             3600,
                             oneHour,
-                            intern.username())
+                            intern.username(),
+                            null)
             ));
             assertThat(stats.inserted()).isEqualTo(1);
 
-            BigDecimal initialCost = jdbcTemplate.queryForObject(
-                    "SELECT cost FROM report WHERE username = ?",
-                    BigDecimal.class,
+            Map<String, Object> initial = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ?",
                     intern.username());
-            assertThat(initialCost).isEqualByComparingTo("160.00");
+            assertThat(((BigDecimal) initial.get("cost"))).isEqualByComparingTo("160.00");
+            assertThat(((BigDecimal) initial.get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
 
             jdbcTemplate.update(
                     "UPDATE intern_level_history SET valid_to = ? WHERE intern_id = ? AND valid_to IS NULL",
@@ -201,11 +310,11 @@ class SyncDaoIntegrationTest {
             int recalculated = syncDao.recomputeReportCostsForIntern(intern.id());
             assertThat(recalculated).isEqualTo(1);
 
-            BigDecimal recomputedCost = jdbcTemplate.queryForObject(
-                    "SELECT cost FROM report WHERE username = ?",
-                    BigDecimal.class,
+            Map<String, Object> recomputed = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ?",
                     intern.username());
-            assertThat(recomputedCost).isEqualByComparingTo("180.00");
+            assertThat(((BigDecimal) recomputed.get("cost"))).isEqualByComparingTo("180.00");
+            assertThat(((BigDecimal) recomputed.get("hourly_rate_czk"))).isEqualByComparingTo("180.00");
         }
     }
 

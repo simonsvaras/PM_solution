@@ -120,7 +120,7 @@ public class ReportSyncService {
                     Long issueIid = node.issue() != null ? node.issue().iid() : null;
                     BigDecimal hours = BigDecimal.valueOf(seconds)
                             .divide(BigDecimal.valueOf(3600), 4, RoundingMode.HALF_UP);
-                    rows.add(new SyncDao.ReportRow(repo.repositoryId(), issueIid, spentAt, seconds, hours, username));
+                    rows.add(new SyncDao.ReportRow(repo.repositoryId(), issueIid, spentAt, seconds, hours, username, repo.projectHourlyRate()));
                 }
                 if (invalid > 0) {
                     summary.addSkipped(invalid);
