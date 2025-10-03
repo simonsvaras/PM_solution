@@ -567,15 +567,29 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                           if (issue.issueIid != null) {
                             meta.push(`#${issue.issueIid}`);
                           }
+                          const issueContent = (
+                            <div className="projectReportProjectDetail__issueInfo">
+                              <span className="projectReportProjectDetail__issueTitle">{issue.issueTitle}</span>
+                              {meta.length > 0 ? (
+                                <span className="projectReportProjectDetail__issueMeta">{meta.join(' • ')}</span>
+                              ) : null}
+                            </div>
+                          );
                           return (
                             <tr key={key}>
                               <td>
-                                <div className="projectReportProjectDetail__issueInfo">
-                                  <span className="projectReportProjectDetail__issueTitle">{issue.issueTitle}</span>
-                                  {meta.length > 0 ? (
-                                    <span className="projectReportProjectDetail__issueMeta">{meta.join(' • ')}</span>
-                                  ) : null}
-                                </div>
+                                {issue.issueWebUrl ? (
+                                  <a
+                                    href={issue.issueWebUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="projectReportProjectDetail__issueLink"
+                                  >
+                                    {issueContent}
+                                  </a>
+                                ) : (
+                                  issueContent
+                                )}
                               </td>
                               <td>{formatAssignee(issue.assigneeName, issue.assigneeUsername)}</td>
                               <td>{formatIssueState(issue.state)}</td>

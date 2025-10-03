@@ -504,16 +504,30 @@ export default function ProjectReportDetailPage({ project }: ProjectReportDetail
                       rowTotalCost += value.cost;
                     }
                     const issueLabel = issue.issueIid ? `#${issue.issueIid}` : 'Bez čísla';
+                    const issueContent = (
+                      <div className="projectReportDetail__issue">
+                        <span className="projectReportDetail__issueTitle">{issue.issueTitle}</span>
+                        <span className="projectReportDetail__issueMeta">
+                          {issue.repositoryName}
+                          {issue.issueIid ? ` • ${issueLabel}` : ''}
+                        </span>
+                      </div>
+                    );
                     return (
                       <tr key={key}>
                         <th scope="row">
-                          <div className="projectReportDetail__issue">
-                            <span className="projectReportDetail__issueTitle">{issue.issueTitle}</span>
-                            <span className="projectReportDetail__issueMeta">
-                              {issue.repositoryName}
-                              {issue.issueIid ? ` • ${issueLabel}` : ''}
-                            </span>
-                          </div>
+                          {issue.issueWebUrl ? (
+                            <a
+                              href={issue.issueWebUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="projectReportDetail__issueLink"
+                            >
+                              {issueContent}
+                            </a>
+                          ) : (
+                            issueContent
+                          )}
                         </th>
                         {visibleInterns.map(intern => {
                           const value = valuesByIntern.get(intern.id);

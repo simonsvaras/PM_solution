@@ -294,15 +294,29 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
                     if (issue.repositoryName) {
                       meta.push(issue.repositoryName);
                     }
+                    const issueContent = (
+                      <div className="projectReportInternDetail__issueInfo">
+                        <span className="projectReportInternDetail__issueTitle">{issue.issueTitle}</span>
+                        {meta.length > 0 ? (
+                          <span className="projectReportInternDetail__issueMeta">{meta.join(' • ')}</span>
+                        ) : null}
+                      </div>
+                    );
                     return (
                       <tr key={`${issue.repositoryId}:${issue.issueId ?? issue.issueIid ?? issue.issueTitle}`}>
                         <th scope="row">
-                          <div className="projectReportInternDetail__issueInfo">
-                            <span className="projectReportInternDetail__issueTitle">{issue.issueTitle}</span>
-                            {meta.length > 0 ? (
-                              <span className="projectReportInternDetail__issueMeta">{meta.join(' • ')}</span>
-                            ) : null}
-                          </div>
+                          {issue.issueWebUrl ? (
+                            <a
+                              href={issue.issueWebUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="projectReportInternDetail__issueLink"
+                            >
+                              {issueContent}
+                            </a>
+                          ) : (
+                            issueContent
+                          )}
                         </th>
                         <td className="projectReportInternDetail__columnNumeric">
                           {formatHoursFromSeconds(issue.totalTimeSpentSeconds)}
