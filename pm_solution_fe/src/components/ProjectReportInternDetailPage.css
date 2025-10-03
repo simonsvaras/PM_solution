@@ -123,6 +123,17 @@
   gap: 4px;
 }
 
+.projectReportInternDetail__issueLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.projectReportInternDetail__issueLink:hover .projectReportInternDetail__issueTitle,
+.projectReportInternDetail__issueLink:focus-visible .projectReportInternDetail__issueTitle {
+  text-decoration: underline;
+}
+
 .projectReportInternDetail__issueTitle {
   color: var(--color-text-primary);
   font-weight: 600;
