@@ -105,6 +105,7 @@
 .projectReportInternDetail__table tbody th {
   color: var(--color-text-primary);
   font-weight: 600;
+  text-align: left;
 }
 
 .projectReportInternDetail__table tbody tr:nth-child(even) td,
@@ -114,6 +115,15 @@
 
 .projectReportInternDetail__columnNumeric {
   text-align: right;
+  white-space: nowrap;
+}
+
+.projectReportInternDetail__columnHours {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.projectReportInternDetail__cellBadge {
   white-space: nowrap;
 }
 

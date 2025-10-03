@@ -793,6 +793,7 @@ public class SyncDao {
                                             String issueTitle,
                                             String issueWebUrl,
                                             String issueHumanTimeEstimate,
+                                            List<String> labels,
                                             LocalDate dueDate,
                                             OffsetDateTime createdAt,
                                             long totalTimeSpentSeconds) {}
@@ -943,6 +944,7 @@ public class SyncDao {
                        iss.title AS issue_title,
                        iss.web_url AS issue_web_url,
                        iss.human_time_estimate AS issue_human_time_estimate,
+                       iss.labels,
                        iss.due_date,
                        iss.created_at,
                        COALESCE(SUM(r.time_spent_seconds), 0) AS total_time_spent_seconds
@@ -956,7 +958,7 @@ public class SyncDao {
                 WHERE ptr.project_id = ?
                   AND iss.assignee_username = ?
                   AND iss.state = 'opened'
-                GROUP BY iss.repository_id, repo.name, iss.id, iss.iid, iss.title, iss.web_url, iss.human_time_estimate, iss.due_date, iss.created_at
+                GROUP BY iss.repository_id, repo.name, iss.id, iss.iid, iss.title, iss.web_url, iss.human_time_estimate, iss.labels, iss.due_date, iss.created_at
                 ORDER BY iss.due_date NULLS LAST, LOWER(iss.title), iss.iid
                 """;
 
@@ -982,6 +984,7 @@ public class SyncDao {
                     title,
                     rs.getString("issue_web_url"),
                     rs.getString("issue_human_time_estimate"),
+                    extractLabelArray(rs, "labels"),
                     rs.getObject("due_date", LocalDate.class),
                     createdAt,
                     Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L)
