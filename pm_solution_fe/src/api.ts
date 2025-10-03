@@ -88,15 +88,27 @@ export type ProjectOverviewDTO = {
   hourlyRateCzk: number | null;
 };
 
-export type ProjectLongTermReportBucket = {
-  month: string;
-  hours: number | null;
-  cost: number | null;
+export type ProjectLongTermReportMeta = {
+  budget: number | null;
+  budgetFrom: string | null;
+  budgetTo: string | null;
+  hourlyRate: number | null;
+};
+
+export type ProjectLongTermReportMonth = {
+  monthStart: string;
+  hours: number;
+  cost: number;
+  cumulativeHours: number;
+  cumulativeCost: number;
+  burnRatio: number | null;
 };
 
 export type ProjectLongTermReportResponse = {
-  project: ProjectOverviewDTO;
-  buckets: ProjectLongTermReportBucket[];
+  meta: ProjectLongTermReportMeta | null;
+  totalHours: number;
+  totalCost: number;
+  months: ProjectLongTermReportMonth[];
 };
 
 export type ProjectLongTermReportParams = {
@@ -789,17 +801,47 @@ export async function getProjectLongTermReport(
     return 0;
   };
 
-  const buckets = Array.isArray(data.buckets)
-    ? data.buckets.map(bucket => ({
-        month: typeof bucket.month === "string" ? bucket.month.trim() : "",
-        hours: sanitizeNumber(bucket.hours),
-        cost: sanitizeNumber(bucket.cost),
+  const sanitizeNullableNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = Number.parseFloat(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  };
+
+  const months = Array.isArray(data.months)
+    ? data.months.map(month => ({
+        monthStart: typeof month.monthStart === "string" ? month.monthStart.trim() : "",
+        hours: sanitizeNumber(month.hours),
+        cost: sanitizeNumber(month.cost),
+        cumulativeHours: sanitizeNumber(month.cumulativeHours),
+        cumulativeCost: sanitizeNumber(month.cumulativeCost),
+        burnRatio: sanitizeNullableNumber(month.burnRatio),
       }))
     : [];
 
+  const meta = data.meta
+    ? {
+        budget: sanitizeNullableNumber(data.meta.budget),
+        budgetFrom: data.meta.budgetFrom ?? null,
+        budgetTo: data.meta.budgetTo ?? null,
+        hourlyRate: sanitizeNullableNumber(data.meta.hourlyRate),
+      }
+    : null;
+
   return {
-    project: data.project,
-    buckets,
+    meta,
+    totalHours: sanitizeNumber(data.totalHours),
+    totalCost: sanitizeNumber(data.totalCost),
+    months,
   };
 }
 

@@ -2,7 +2,8 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import './ProjectReportLongTermPage.css';
 import type {
   ErrorResponse,
-  ProjectLongTermReportBucket,
+  ProjectLongTermReportMeta,
+  ProjectLongTermReportMonth,
   ProjectLongTermReportResponse,
   ProjectOverviewDTO,
 } from '../api';
@@ -128,15 +129,15 @@ function isNonNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
-function ensureBuckets(buckets: ProjectLongTermReportBucket[] | undefined): ProjectLongTermReportBucket[] {
-  if (!Array.isArray(buckets)) {
-    return [];
+function getMonthKeyFromMonthStart(value: string): string | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
   }
-  return buckets.map(bucket => ({
-    month: typeof bucket.month === 'string' ? bucket.month : '',
-    hours: typeof bucket.hours === 'number' && Number.isFinite(bucket.hours) ? bucket.hours : 0,
-    cost: typeof bucket.cost === 'number' && Number.isFinite(bucket.cost) ? bucket.cost : 0,
-  }));
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return formatMonthKey(date);
+  }
+  return normalizeMonthKey(value);
 }
 
 export default function ProjectReportLongTermPage({ project }: ProjectReportLongTermPageProps) {
@@ -146,20 +147,21 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [error, setError] = useState<ErrorResponse | null>(null);
-  const [reportBuckets, setReportBuckets] = useState<ProjectLongTermReportBucket[]>([]);
-  const [reportProject, setReportProject] = useState<ProjectOverviewDTO>(project);
+  const [reportMonths, setReportMonths] = useState<ProjectLongTermReportMonth[]>([]);
+  const [reportMeta, setReportMeta] = useState<ProjectLongTermReportMeta | null>(null);
+  const [totalHours, setTotalHours] = useState(0);
+  const [totalCost, setTotalCost] = useState(0);
   const chartTitleId = useId();
   const chartDescId = `${chartTitleId}-desc`;
   const projectId = project.id;
 
   useEffect(() => {
-    setReportProject(project);
-  }, [project]);
-
-  useEffect(() => {
     setFromValue(defaultRange.from);
     setToValue(defaultRange.to);
-    setReportBuckets([]);
+    setReportMonths([]);
+    setReportMeta(null);
+    setTotalHours(0);
+    setTotalCost(0);
     setValidationError(null);
     setError(null);
   }, [project.id, defaultRange.from, defaultRange.to]);
@@ -172,7 +174,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
       setValidationError('Zadejte období od a do.');
       setError(null);
       setLoading(false);
-      setReportBuckets([]);
+      setReportMonths([]);
+      setReportMeta(null);
+      setTotalHours(0);
+      setTotalCost(0);
       return;
     }
 
@@ -180,7 +185,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
       setValidationError('Datum musí být ve formátu RRRR-MM-DD.');
       setError(null);
       setLoading(false);
-      setReportBuckets([]);
+      setReportMonths([]);
+      setReportMeta(null);
+      setTotalHours(0);
+      setTotalCost(0);
       return;
     }
 
@@ -188,7 +196,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
       setValidationError('Datum "Od" nesmí být později než datum "Do".');
       setError(null);
       setLoading(false);
-      setReportBuckets([]);
+      setReportMonths([]);
+      setReportMeta(null);
+      setTotalHours(0);
+      setTotalCost(0);
       return;
     }
 
@@ -202,8 +213,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         if (ignore) {
           return;
         }
-        setReportProject(prev => (response.project ? response.project : prev));
-        setReportBuckets(ensureBuckets(response.buckets));
+        setReportMeta(response.meta ?? null);
+        setReportMonths(Array.isArray(response.months) ? response.months : []);
+        setTotalHours(typeof response.totalHours === 'number' ? response.totalHours : 0);
+        setTotalCost(typeof response.totalCost === 'number' ? response.totalCost : 0);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -222,7 +235,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         } else {
           setError(fallbackError);
         }
-        setReportBuckets([]);
+        setReportMonths([]);
+        setReportMeta(null);
+        setTotalHours(0);
+        setTotalCost(0);
         setLoading(false);
       });
 
@@ -247,52 +263,66 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return months;
   }, [fromValue, toValue]);
 
+  const resolvedBudget = useMemo(() => {
+    const metaBudget = reportMeta?.budget;
+    if (typeof metaBudget === 'number' && Number.isFinite(metaBudget) && metaBudget > 0) {
+      return metaBudget;
+    }
+    const projectBudget = project?.budget;
+    if (typeof projectBudget === 'number' && Number.isFinite(projectBudget) && projectBudget > 0) {
+      return projectBudget;
+    }
+    return null;
+  }, [reportMeta?.budget, project?.budget]);
+
   const chartPoints = useMemo<ChartPoint[]>(() => {
     if (monthRange.length === 0) {
       return [];
     }
-    const normalizedBuckets = new Map<string, { hours: number; cost: number }>();
-    for (const bucket of reportBuckets) {
-      const key = normalizeMonthKey(bucket.month);
+    const normalizedMonths = new Map<string, ProjectLongTermReportMonth>();
+    for (const month of reportMonths) {
+      const key = getMonthKeyFromMonthStart(month.monthStart);
       if (!key) {
         continue;
       }
-      normalizedBuckets.set(key, {
-        hours: typeof bucket.hours === 'number' && Number.isFinite(bucket.hours) ? bucket.hours : 0,
-        cost: typeof bucket.cost === 'number' && Number.isFinite(bucket.cost) ? bucket.cost : 0,
-      });
+      normalizedMonths.set(key, month);
     }
-    const budget = reportProject?.budget ?? null;
-    const hasBudget = typeof budget === 'number' && Number.isFinite(budget) && budget > 0;
-    let cumulativeCost = 0;
+    let previousCumulativeCost = 0;
+    let previousBurnRatio: number | null = null;
     return monthRange.map(monthKey => {
-      const entry = normalizedBuckets.get(monthKey);
+      const entry = normalizedMonths.get(monthKey);
       const hours = entry?.hours ?? 0;
       const cost = entry?.cost ?? 0;
-      cumulativeCost += cost;
-      const burnoutPercent = hasBudget && budget
-        ? (cumulativeCost / budget) * 100
-        : null;
+      const cumulativeCost = entry ? entry.cumulativeCost : previousCumulativeCost;
+      const burnRatio = entry ? entry.burnRatio : previousBurnRatio;
+      previousCumulativeCost = cumulativeCost;
+      previousBurnRatio = burnRatio;
+      const burnoutPercent =
+        resolvedBudget && resolvedBudget > 0
+          ? burnRatio !== null && Number.isFinite(burnRatio)
+            ? burnRatio * 100
+            : (cumulativeCost / resolvedBudget) * 100
+          : null;
       return {
         monthKey,
         monthLabel: formatMonthLabel(monthKey),
         hours,
         cost,
         cumulativeCost,
-        burnoutPercent: hasBudget ? burnoutPercent : null,
+        burnoutPercent: resolvedBudget ? burnoutPercent : null,
       };
     });
-  }, [monthRange, reportBuckets, reportProject?.budget]);
+  }, [monthRange, reportMonths, resolvedBudget]);
 
-  const totalHours = useMemo(() => chartPoints.reduce((sum, point) => sum + point.hours, 0), [chartPoints]);
-  const totalCost = useMemo(() => chartPoints.reduce((sum, point) => sum + point.cost, 0), [chartPoints]);
-
-  const budget = reportProject?.budget ?? null;
-  const hasBudget = typeof budget === 'number' && Number.isFinite(budget) && budget > 0;
-  const burnoutPercentTotal = hasBudget && budget ? Math.min((totalCost / budget) * 100, 999) : null;
+  const hasBudget = typeof resolvedBudget === 'number' && Number.isFinite(resolvedBudget) && resolvedBudget > 0;
+  const burnoutPercentTotal = hasBudget && resolvedBudget
+    ? Math.min((totalCost / resolvedBudget) * 100, 999)
+    : null;
 
   const hasHoursData = chartPoints.some(point => point.hours > 0);
-  const hasBurnoutData = chartPoints.some(point => (point.burnoutPercent ?? 0) > 0);
+  const hasBurnoutData = chartPoints.some(point =>
+    point.burnoutPercent !== null && Number.isFinite(point.burnoutPercent) && point.burnoutPercent > 0,
+  );
   const hasChartData = (hasHoursData || hasBurnoutData) && chartPoints.length > 0;
 
   const statusMessage: StatusMessage | null = validationError
@@ -440,7 +470,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
               style={{ width: chartWidth, maxWidth: '100%', height: 'auto' }}
               aria-labelledby={`${chartTitleId} ${chartDescId}`}
             >
-              <title id={chartTitleId}>{`Dlouhodobý report projektu ${reportProject.name}`}</title>
+              <title id={chartTitleId}>{`Dlouhodobý report projektu ${project.name}`}</title>
               <desc id={chartDescId}>
                 Sloupce zobrazují měsíční součty hodin, linie vyjadřuje kumulativní vyčerpání rozpočtu.
               </desc>

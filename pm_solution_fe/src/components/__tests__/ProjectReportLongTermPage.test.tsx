@@ -36,7 +36,12 @@ describe('ProjectReportLongTermPage', () => {
   });
 
   it('renders filters with default range for the current year', async () => {
-    mockedGetProjectLongTermReport.mockResolvedValue({ project: baseProject, buckets: [] });
+    mockedGetProjectLongTermReport.mockResolvedValue({
+      meta: null,
+      totalHours: 0,
+      totalCost: 0,
+      months: [],
+    });
 
     render(<ProjectReportLongTermPage project={baseProject} />);
 
@@ -52,10 +57,26 @@ describe('ProjectReportLongTermPage', () => {
 
   it('renders combined chart and summary when data is available', async () => {
     mockedGetProjectLongTermReport.mockResolvedValue({
-      project: { ...baseProject, budget: 120000 },
-      buckets: [
-        { month: '2025-01', hours: 24, cost: 18000 },
-        { month: '2025-02', hours: 32, cost: 22000 },
+      meta: { budget: 120000, budgetFrom: null, budgetTo: null, hourlyRate: null },
+      totalHours: 56,
+      totalCost: 40000,
+      months: [
+        {
+          monthStart: '2025-01-01T00:00:00Z',
+          hours: 24,
+          cost: 18000,
+          cumulativeHours: 24,
+          cumulativeCost: 18000,
+          burnRatio: 0.15,
+        },
+        {
+          monthStart: '2025-02-01T00:00:00Z',
+          hours: 32,
+          cost: 22000,
+          cumulativeHours: 56,
+          cumulativeCost: 40000,
+          burnRatio: 0.3333,
+        },
       ],
     });
 
@@ -64,16 +85,32 @@ describe('ProjectReportLongTermPage', () => {
     await waitFor(() => expect(screen.getByRole('img', { name: /Dlouhodobý report projektu Projekt Orion/ })).toBeInTheDocument());
 
     const hoursSummary = screen.getByText('Celkem hodin').closest('div');
-    expect(hoursSummary).toHaveTextContent('56');
+    expect(hoursSummary).toHaveTextContent('56,0');
     expect(screen.getByText('Kumulativní vyčerpání rozpočtu')).toBeInTheDocument();
   });
 
   it('shows empty state and budget fallback when months contain no data', async () => {
     mockedGetProjectLongTermReport.mockResolvedValue({
-      project: { ...baseProject, budget: null },
-      buckets: [
-        { month: '2025-01', hours: 0, cost: 0 },
-        { month: '2025-02', hours: 0, cost: 0 },
+      meta: { budget: null, budgetFrom: null, budgetTo: null, hourlyRate: null },
+      totalHours: 0,
+      totalCost: 0,
+      months: [
+        {
+          monthStart: '2025-01-01T00:00:00Z',
+          hours: 0,
+          cost: 0,
+          cumulativeHours: 0,
+          cumulativeCost: 0,
+          burnRatio: null,
+        },
+        {
+          monthStart: '2025-02-01T00:00:00Z',
+          hours: 0,
+          cost: 0,
+          cumulativeHours: 0,
+          cumulativeCost: 0,
+          burnRatio: null,
+        },
       ],
     });
 
