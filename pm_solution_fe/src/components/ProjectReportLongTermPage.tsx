@@ -356,6 +356,15 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     ? Math.max(100, Math.ceil(maxBurnout / 10) * 10 || 100)
     : 0;
 
+  const percentAxisTicks = useMemo(() => {
+    if (!hasBudget || burnoutScaleMax <= 0) {
+      return [] as number[];
+    }
+    const steps = 4;
+    const stepValue = burnoutScaleMax / steps;
+    return Array.from({ length: steps + 1 }, (_, index) => Number((stepValue * index).toFixed(1)));
+  }, [hasBudget, burnoutScaleMax]);
+
   const burnoutPath = hasBudget && hasChartData
     ? chartPoints
         .map((point, index) => {
@@ -502,6 +511,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                 const heightRatio = maxHours > 0 ? point.hours / maxHours : 0;
                 const barHeight = heightRatio * plotHeight;
                 const y = paddingY + (plotHeight - barHeight);
+                const labelY = Math.max(paddingY + 12, y - 8);
                 return (
                   <g key={`bar-${point.monthKey}`}>
                     <rect
@@ -515,6 +525,14 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                     >
                       <title>{`${point.monthLabel}: ${formatHours(point.hours)} hodin`}</title>
                     </rect>
+                    <text
+                      x={xCenter}
+                      y={labelY}
+                      textAnchor="middle"
+                      className="projectLongTerm__chartValue"
+                    >
+                      {`${formatHours(point.hours)} h`}
+                    </text>
                     <text
                       x={xCenter}
                       y={chartHeight - paddingY + 24}
@@ -536,6 +554,38 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
+                  <line
+                    x1={chartWidth - paddingX}
+                    x2={chartWidth - paddingX}
+                    y1={paddingY}
+                    y2={chartHeight - paddingY}
+                    stroke="rgba(15, 23, 42, 0.16)"
+                    strokeWidth={1}
+                  />
+                  {percentAxisTicks.map(tickValue => {
+                    const y =
+                      paddingY + (plotHeight - (Math.min(tickValue, burnoutScaleMax) / burnoutScaleMax) * plotHeight);
+                    return (
+                      <g key={`axis-tick-${tickValue}`}>
+                        <line
+                          x1={chartWidth - paddingX}
+                          x2={chartWidth - paddingX + 6}
+                          y1={y}
+                          y2={y}
+                          stroke="rgba(15, 23, 42, 0.24)"
+                          strokeWidth={1}
+                        />
+                        <text
+                          x={chartWidth - paddingX + 10}
+                          y={y + 4}
+                          textAnchor="start"
+                          className="projectLongTerm__axisLabel"
+                        >
+                          {`${formatPercent(tickValue)} %`}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {chartPoints.map((point, index) => {
                     const percent = point.burnoutPercent ?? 0;
                     const boundedPercent = Math.max(0, Math.min(percent, burnoutScaleMax));

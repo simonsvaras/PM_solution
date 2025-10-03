@@ -87,6 +87,8 @@ describe('ProjectReportLongTermPage', () => {
     const hoursSummary = screen.getByText('Celkem hodin').closest('div');
     expect(hoursSummary).toHaveTextContent('56,0');
     expect(screen.getByText('Kumulativní vyčerpání rozpočtu')).toBeInTheDocument();
+    expect(screen.getByText('24,0 h')).toBeInTheDocument();
+    expect(screen.getByText('100 %')).toBeInTheDocument();
   });
 
   it('shows empty state and budget fallback when months contain no data', async () => {

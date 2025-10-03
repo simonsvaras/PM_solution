@@ -158,6 +158,18 @@
   transform: translateY(6px);
 }
 
+.projectLongTerm__chartValue {
+  font-size: 0.78rem;
+  font-weight: 600;
+  fill: var(--color-text-primary);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.75);
+}
+
+.projectLongTerm__axisLabel {
+  font-size: 0.75rem;
+  fill: var(--color-text-muted);
+}
+
 .projectLongTerm__empty {
   margin: 0;
   font-size: 0.95rem;
