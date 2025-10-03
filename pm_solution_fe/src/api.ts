@@ -95,6 +95,7 @@ export type ProjectMilestoneSummary = {
   description: string | null;
   dueDate: string | null;
   totalTimeSpentSeconds: number;
+  totalCost: number;
 };
 export type ProjectMilestoneIssueCost = {
   milestoneId: number;

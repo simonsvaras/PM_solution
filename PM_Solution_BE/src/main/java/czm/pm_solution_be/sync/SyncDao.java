@@ -803,7 +803,8 @@ public class SyncDao {
                                      String state,
                                      String description,
                                      LocalDate dueDate,
-                                     long totalTimeSpentSeconds) {}
+                                     long totalTimeSpentSeconds,
+                                     BigDecimal totalCost) {}
 
     public record MilestoneIssueCostRow(long milestoneId,
                                         Long issueId,
@@ -997,15 +998,17 @@ public class SyncDao {
                        m.state,
                        m.description,
                        m.due_date,
-                       COALESCE(SUM(iss.total_time_spent_seconds), 0) AS total_time_spent_seconds
+                       COALESCE(SUM(iss.total_time_spent_seconds), 0) AS total_time_spent_seconds,
+                       COALESCE(mrc.total_cost, 0) AS total_cost
                 FROM milestone m
                 LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 LEFT JOIN issue iss
                        ON iss.repository_id = ptr.repository_id
                       AND iss.milestone_title = m.title
+                LEFT JOIN milestone_report_cost mrc ON mrc.milestone_id = m.milestone_id
                 WHERE m.project_id = ?
                   AND m.state = 'active'
-                GROUP BY m.milestone_id, m.milestone_iid, m.title, m.state, m.due_date
+                GROUP BY m.milestone_id, m.milestone_iid, m.title, m.state, m.due_date, mrc.total_cost
                 ORDER BY m.due_date NULLS LAST, LOWER(m.title)
                 """;
         return jdbc.query(sql, (rs, rn) -> new ActiveMilestoneRow(
@@ -1015,7 +1018,8 @@ public class SyncDao {
                 rs.getString("state"),
                 rs.getString("description"),
                 rs.getObject("due_date", LocalDate.class),
-                ((Number) rs.getObject("total_time_spent_seconds")).longValue()
+                ((Number) rs.getObject("total_time_spent_seconds")).longValue(),
+                Optional.ofNullable(rs.getBigDecimal("total_cost")).orElse(BigDecimal.ZERO)
         ), projectId);
     }
 
@@ -1029,15 +1033,17 @@ public class SyncDao {
                        m.due_date,
                        COALESCE(SUM(iss.total_time_spent_seconds), 0) AS total_time_spent_seconds,
                        COUNT(DISTINCT iss.id) AS total_issues,
-                       COUNT(DISTINCT CASE WHEN iss.state = 'closed' THEN iss.id END) AS closed_issues
+                       COUNT(DISTINCT CASE WHEN iss.state = 'closed' THEN iss.id END) AS closed_issues,
+                       COALESCE(mrc.total_cost, 0) AS total_cost
                 FROM milestone m
                 LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 LEFT JOIN issue iss
                        ON iss.repository_id = ptr.repository_id
                       AND iss.milestone_title = m.title
+                LEFT JOIN milestone_report_cost mrc ON mrc.milestone_id = m.milestone_id
                 WHERE m.project_id = ?
                   AND m.milestone_id = ?
-                GROUP BY m.milestone_id, m.milestone_iid, m.title, m.state, m.due_date
+                GROUP BY m.milestone_id, m.milestone_iid, m.title, m.state, m.due_date, mrc.total_cost
                 """;
 
         List<MilestoneDetailSummary> summaries = jdbc.query(summarySql, (rs, rn) -> new MilestoneDetailSummary(
@@ -1050,54 +1056,19 @@ public class SyncDao {
                 Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L),
                 rs.getLong("total_issues"),
                 rs.getLong("closed_issues"),
-                BigDecimal.ZERO
+                Optional.ofNullable(rs.getBigDecimal("total_cost")).orElse(BigDecimal.ZERO)
         ), projectId, milestoneId);
 
         if (summaries.isEmpty()) {
             return null;
         }
 
-        MilestoneDetailSummary baseSummary = summaries.get(0);
-        BigDecimal totalCost = fetchMilestoneTotalCost(projectId, milestoneId);
-        MilestoneDetailSummary summary = new MilestoneDetailSummary(
-                baseSummary.milestoneId(),
-                baseSummary.milestoneIid(),
-                baseSummary.title(),
-                baseSummary.state(),
-                baseSummary.description(),
-                baseSummary.dueDate(),
-                baseSummary.totalTimeSpentSeconds(),
-                baseSummary.totalIssues(),
-                baseSummary.closedIssues(),
-                totalCost
-        );
+        MilestoneDetailSummary summary = summaries.get(0);
 
         List<MilestoneIssueDetailRow> issues = listMilestoneIssues(projectId, milestoneId);
         List<MilestoneInternContributionRow> internContributions = listMilestoneInternContributions(projectId, milestoneId);
 
         return new MilestoneDetail(summary, issues, internContributions);
-    }
-
-    private BigDecimal fetchMilestoneTotalCost(long projectId, long milestoneId) {
-        String sql = """
-                SELECT COALESCE(SUM(COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)), 0) AS total_cost
-                FROM milestone m
-                JOIN project p ON p.id = m.project_id
-                LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
-                LEFT JOIN issue iss
-                  ON iss.repository_id = ptr.repository_id
-                 AND iss.milestone_title = m.title
-                LEFT JOIN report r
-                  ON r.repository_id = iss.repository_id
-                 AND r.iid = iss.iid
-                WHERE m.project_id = ?
-                  AND m.milestone_id = ?
-                """;
-
-        return jdbc.query(sql, (rs, rn) -> rs.getBigDecimal("total_cost"), projectId, milestoneId)
-                .stream()
-                .findFirst()
-                .orElse(BigDecimal.ZERO);
     }
 
     /**
