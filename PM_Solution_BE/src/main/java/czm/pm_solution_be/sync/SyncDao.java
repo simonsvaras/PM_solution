@@ -9,12 +9,16 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Array;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -763,6 +767,9 @@ public class SyncDao {
                                          long closedIssues,
                                          BigDecimal totalCost) {}
 
+    /**
+     * Detailed information about a milestone issue enriched with pre-normalised GitLab labels.
+     */
     public record MilestoneIssueDetailRow(Long issueId,
                                           Long issueIid,
                                           String issueTitle,
@@ -772,6 +779,7 @@ public class SyncDao {
                                           LocalDate dueDate,
                                           String assigneeUsername,
                                           String assigneeName,
+                                          List<String> labels,
                                           long totalTimeSpentSeconds,
                                           BigDecimal totalCost) {}
 
@@ -1034,6 +1042,10 @@ public class SyncDao {
                 .orElse(BigDecimal.ZERO);
     }
 
+    /**
+     * Returns issues linked with the given milestone together with basic metadata and raw GitLab labels.
+     * The labels are normalised to trimmed strings to simplify client-side filtering.
+     */
     private List<MilestoneIssueDetailRow> listMilestoneIssues(long projectId, long milestoneId) {
         String sql = """
                 SELECT *
@@ -1045,11 +1057,12 @@ public class SyncDao {
                            iss.human_time_estimate AS issue_human_time_estimate,
                            iss.state,
                            iss.due_date,
+                           iss.labels,
                            iss.assignee_username,
-                           CASE
-                               WHEN i.first_name IS NOT NULL AND i.last_name IS NOT NULL THEN CONCAT(i.first_name, ' ', i.last_name)
-                               WHEN i.first_name IS NOT NULL THEN i.first_name
-                               WHEN i.last_name IS NOT NULL THEN i.last_name
+                            CASE
+                                WHEN i.first_name IS NOT NULL AND i.last_name IS NOT NULL THEN CONCAT(i.first_name, ' ', i.last_name)
+                                WHEN i.first_name IS NOT NULL THEN i.first_name
+                                WHEN i.last_name IS NOT NULL THEN i.last_name
                                ELSE NULL
                            END AS assignee_name,
                            COALESCE(SUM(COALESCE(r.time_spent_seconds, 0)), 0) AS total_time_spent_seconds,
@@ -1072,6 +1085,7 @@ public class SyncDao {
                              iss.human_time_estimate,
                              iss.state,
                              iss.due_date,
+                             iss.labels,
                              iss.assignee_username,
                              i.first_name,
                              i.last_name
@@ -1091,9 +1105,38 @@ public class SyncDao {
                 rs.getObject("due_date", LocalDate.class),
                 rs.getString("assignee_username"),
                 rs.getString("assignee_name"),
+                extractLabelArray(rs, "labels"),
                 Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L),
                 Optional.ofNullable(rs.getBigDecimal("total_cost")).orElse(BigDecimal.ZERO)
         ), projectId, milestoneId);
+    }
+
+    private List<String> extractLabelArray(ResultSet rs, String column) throws SQLException {
+        Array array = rs.getArray(column);
+        if (array == null) {
+            return List.of();
+        }
+        try {
+            Object raw = array.getArray();
+            if (raw instanceof String[] stringArray) {
+                return Arrays.stream(stringArray)
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toUnmodifiableList());
+            }
+            if (raw instanceof Object[] objectArray) {
+                return Arrays.stream(objectArray)
+                        .map(obj -> obj == null ? null : obj.toString())
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toUnmodifiableList());
+            }
+            return List.of();
+        } finally {
+            array.free();
+        }
     }
 
     private List<MilestoneInternContributionRow> listMilestoneInternContributions(long projectId, long milestoneId) {

@@ -93,6 +93,52 @@ function formatShortHours(seconds: number): string {
   return `${hours.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} h`;
 }
 
+/**
+ * Reads the value part of a GitLab label in a tolerant way (ignores whitespace around the colon).
+ */
+function getLabelValue(labels: readonly string[] | null | undefined, labelKey: string): string | null {
+  if (!labels || labels.length === 0) {
+    return null;
+  }
+  const normalizedKey = labelKey.trim().toLowerCase();
+  for (const label of labels) {
+    if (!label) {
+      continue;
+    }
+    const [rawKey, ...rawValueParts] = label.split(':');
+    if (!rawKey || rawValueParts.length === 0) {
+      continue;
+    }
+    if (rawKey.trim().toLowerCase() === normalizedKey) {
+      const value = rawValueParts.join(':').trim();
+      if (value.length > 0) {
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Builds a unique list of label options that can be used by radio filters.
+ */
+function buildLabelOptions(issues: ProjectMilestoneDetail['issues'], labelKey: string) {
+  const seen = new Map<string, string>();
+  issues.forEach(issue => {
+    const value = getLabelValue(issue.labels, labelKey);
+    if (!value) {
+      return;
+    }
+    const normalizedValue = value.toLowerCase();
+    if (!seen.has(normalizedValue)) {
+      seen.set(normalizedValue, value);
+    }
+  });
+  return Array.from(seen.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'cs', { sensitivity: 'base' }));
+}
+
 type ProjectReportProjectDetailPageProps = {
   project: ProjectOverviewDTO;
 };
@@ -108,6 +154,11 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
   const [issueSearch, setIssueSearch] = useState('');
   const [issueAssignee, setIssueAssignee] = useState('all');
   const [issueStateFilter, setIssueStateFilter] = useState<'all' | 'opened' | 'closed' | 'other'>('all');
+  /**
+   * Stores selected label filters for priority and team. The "all" sentinel means no filtering.
+   */
+  const [issuePriorityFilter, setIssuePriorityFilter] = useState<string>('all');
+  const [issueTeamFilter, setIssueTeamFilter] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{
     key: 'time' | 'cost';
     direction: 'asc' | 'desc';
@@ -190,6 +241,8 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     setIssueSearch('');
     setIssueAssignee('all');
     setIssueStateFilter('all');
+    setIssuePriorityFilter('all');
+    setIssueTeamFilter('all');
     setSortConfig(null);
   }, [detail?.summary.milestoneId]);
 
@@ -248,6 +301,23 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
       .sort((a, b) => a.label.localeCompare(b.label, 'cs', { sensitivity: 'base' }));
   }, [detail]);
 
+  /**
+   * Available label filter values derived from the loaded milestone issues.
+   */
+  const priorityOptions = useMemo(() => {
+    if (!detail) {
+      return [] as { value: string; label: string }[];
+    }
+    return buildLabelOptions(detail.issues, 'priority');
+  }, [detail]);
+
+  const teamOptions = useMemo(() => {
+    if (!detail) {
+      return [] as { value: string; label: string }[];
+    }
+    return buildLabelOptions(detail.issues, 'team');
+  }, [detail]);
+
   const filteredIssues = useMemo(() => {
     if (!detail) {
       return [] as ProjectMilestoneDetail['issues'];
@@ -278,6 +348,20 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
         }
       }
 
+      if (issuePriorityFilter !== 'all') {
+        const priorityValue = getLabelValue(issue.labels, 'priority');
+        if (!priorityValue || priorityValue.toLowerCase() !== issuePriorityFilter) {
+          return false;
+        }
+      }
+
+      if (issueTeamFilter !== 'all') {
+        const teamValue = getLabelValue(issue.labels, 'team');
+        if (!teamValue || teamValue.toLowerCase() !== issueTeamFilter) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -299,7 +383,15 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     });
 
     return sorted;
-  }, [detail, issueSearch, issueAssignee, issueStateFilter, sortConfig]);
+  }, [
+    detail,
+    issueSearch,
+    issueAssignee,
+    issueStateFilter,
+    issuePriorityFilter,
+    issueTeamFilter,
+    sortConfig,
+  ]);
 
   const handleSortChange = (key: 'time' | 'cost') => {
     setSortConfig(prev => {
@@ -508,6 +600,56 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                       />
                       <span>Ostatní</span>
                     </label>
+                  </fieldset>
+                  <fieldset className="projectReportProjectDetail__filterControl projectReportProjectDetail__labelsFilter">
+                    <legend>Priority</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="issue-priority"
+                        value="all"
+                        checked={issuePriorityFilter === 'all'}
+                        onChange={() => setIssuePriorityFilter('all')}
+                      />
+                      <span>Všechny</span>
+                    </label>
+                    {priorityOptions.map(option => (
+                      <label key={option.value}>
+                        <input
+                          type="radio"
+                          name="issue-priority"
+                          value={option.value}
+                          checked={issuePriorityFilter === option.value}
+                          onChange={() => setIssuePriorityFilter(option.value)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  <fieldset className="projectReportProjectDetail__filterControl projectReportProjectDetail__labelsFilter">
+                    <legend>Tým</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="issue-team"
+                        value="all"
+                        checked={issueTeamFilter === 'all'}
+                        onChange={() => setIssueTeamFilter('all')}
+                      />
+                      <span>Všechny</span>
+                    </label>
+                    {teamOptions.map(option => (
+                      <label key={option.value}>
+                        <input
+                          type="radio"
+                          name="issue-team"
+                          value={option.value}
+                          checked={issueTeamFilter === option.value}
+                          onChange={() => setIssueTeamFilter(option.value)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
                   </fieldset>
                 </div>
 
