@@ -324,7 +324,7 @@ public class SyncDao {
                 });
         if (updated > 0) return new UpsertResult<>(null, false);
 
-        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, created_at, updated_at, web_url, human_time_estimate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?,?,?,?)",
+        jdbc.update("INSERT INTO issue (repository_id, gitlab_issue_id, iid, title, state, assignee_id, assignee_username, author_name, labels, time_estimate_seconds, total_time_spent_seconds, milestone_title, milestone_state, due_date, created_at, updated_at, web_url, human_time_estimate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?,?,?)",
                 (ps) -> {
                     if (repositoryId == null) ps.setNull(1, java.sql.Types.BIGINT); else ps.setLong(1, repositoryId);
                     ps.setLong(2, gitlabIssueId);
