@@ -21,19 +21,22 @@ public class ProjectAdminController {
                              Integer budget,
                              LocalDate budgetFrom,
                              LocalDate budgetTo,
+                             BigDecimal hourlyRateCzk,
                              BigDecimal reportedCost) {}
     public record CreateRequest(Long namespaceId,
                                 String namespaceName,
                                 String name,
                                 Integer budget,
                                 LocalDate budgetFrom,
-                                LocalDate budgetTo) {}
+                                LocalDate budgetTo,
+                                BigDecimal hourlyRateCzk) {}
     public record UpdateRequest(String name,
                                  Integer budget,
                                  LocalDate budgetFrom,
                                  LocalDate budgetTo,
                                  Long namespaceId,
-                                 String namespaceName) {}
+                                 String namespaceName,
+                                 BigDecimal hourlyRateCzk) {}
 
     @PostMapping
     public ResponseEntity<ProjectDto> create(@RequestBody CreateRequest req) {
@@ -41,8 +44,9 @@ public class ProjectAdminController {
             throw new IllegalArgumentException("namespaceId a name jsou povinné");
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
-        SyncDao.UpsertResult<Long> res = dao.upsertProject(req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo());
-        ProjectDto body = findProjectOrFallback(res.id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo());
+        validateHourlyRate(req.hourlyRateCzk());
+        SyncDao.UpsertResult<Long> res = dao.upsertProject(req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.hourlyRateCzk());
+        ProjectDto body = findProjectOrFallback(res.id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.hourlyRateCzk());
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -52,11 +56,12 @@ public class ProjectAdminController {
             throw new IllegalArgumentException("name je povinné");
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
-        dao.updateProject(id, req.name, req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName());
+        validateHourlyRate(req.hourlyRateCzk());
+        dao.updateProject(id, req.name, req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName(), req.hourlyRateCzk());
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
+                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.hourlyRateCzk(), p.reportedCost()))
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
     }
 
@@ -65,7 +70,8 @@ public class ProjectAdminController {
                                       LocalDate budgetFrom,
                                       LocalDate budgetTo,
                                       Long namespaceId,
-                                      String namespaceName) {}
+                                      String namespaceName,
+                                      BigDecimal hourlyRateCzk) {}
 
     @PostMapping("/by-name")
     public ResponseEntity<ProjectDto> createByName(@RequestBody CreateByNameRequest req) {
@@ -73,8 +79,9 @@ public class ProjectAdminController {
             throw new IllegalArgumentException("name je povinné");
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
-        Long id = dao.createProjectByName(req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName());
-        ProjectDto body = findProjectOrFallback(id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo());
+        validateHourlyRate(req.hourlyRateCzk());
+        Long id = dao.createProjectByName(req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName(), req.hourlyRateCzk());
+        ProjectDto body = findProjectOrFallback(id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.hourlyRateCzk());
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -93,20 +100,27 @@ public class ProjectAdminController {
         }
     }
 
+    private void validateHourlyRate(BigDecimal hourlyRateCzk) {
+        if (hourlyRateCzk != null && hourlyRateCzk.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("hourly_rate_czk nesmí být záporná");
+        }
+    }
+
     private ProjectDto findProjectOrFallback(Long id,
                                              Long namespaceId,
                                              String namespaceName,
                                              String name,
                                              Integer budget,
                                              LocalDate budgetFrom,
-                                             LocalDate budgetTo) {
+                                             LocalDate budgetTo,
+                                             BigDecimal hourlyRateCzk) {
         if (id == null) {
             throw new IllegalStateException("ID projektu nebylo vráceno databází");
         }
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.reportedCost()))
-                .orElse(new ProjectDto(id, namespaceId, namespaceName, name, budget, budgetFrom, budgetTo, BigDecimal.ZERO));
+                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.hourlyRateCzk(), p.reportedCost()))
+                .orElse(new ProjectDto(id, namespaceId, namespaceName, name, budget, budgetFrom, budgetTo, hourlyRateCzk, BigDecimal.ZERO));
     }
 }

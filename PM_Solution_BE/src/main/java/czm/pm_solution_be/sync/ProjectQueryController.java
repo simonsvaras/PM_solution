@@ -21,6 +21,7 @@ public class ProjectQueryController {
                              Integer budget,
                              java.time.LocalDate budgetFrom,
                              java.time.LocalDate budgetTo,
+                             BigDecimal hourlyRateCzk,
                              BigDecimal reportedCost) {}
 
     public record ProjectOverviewDto(Long id,
@@ -28,6 +29,7 @@ public class ProjectQueryController {
                                      Integer budget,
                                      java.time.LocalDate budgetFrom,
                                      java.time.LocalDate budgetTo,
+                                     BigDecimal hourlyRateCzk,
                                      BigDecimal reportedCost,
                                      Integer teamMembers,
                                      Integer openIssues) {}
@@ -35,7 +37,7 @@ public class ProjectQueryController {
     @GetMapping
     public List<ProjectDto> list() {
         return dao.listProjects().stream()
-                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.reportedCost()))
+                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.hourlyRateCzk(), r.reportedCost()))
                 .toList();
     }
 
@@ -48,6 +50,7 @@ public class ProjectQueryController {
                         r.budget(),
                         r.budgetFrom(),
                         r.budgetTo(),
+                        r.hourlyRateCzk(),
                         r.reportedCost(),
                         r.teamMembers(),
                         r.openIssues()))

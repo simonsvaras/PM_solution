@@ -49,16 +49,18 @@ public class SyncDao {
                                     LocalDate budgetFrom,
                                     LocalDate budgetTo,
                                     Long namespaceId,
-                                    String namespaceName) {
+                                    String namespaceName,
+                                    BigDecimal hourlyRateCzk) {
         return jdbc.queryForObject(
-                "INSERT INTO project (name, budget, budget_from, budget_to, namespace_id, namespace_name) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+                "INSERT INTO project (name, budget, budget_from, budget_to, namespace_id, namespace_name, hourly_rate_czk) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
                 Long.class,
                 name,
                 budget,
                 budgetFrom,
                 budgetTo,
                 namespaceId,
-                namespaceName);
+                namespaceName,
+                hourlyRateCzk);
     }
 
     public UpsertResult<Long> upsertProject(Long namespaceId,
@@ -66,15 +68,17 @@ public class SyncDao {
                                             String name,
                                             Integer budget,
                                             LocalDate budgetFrom,
-                                            LocalDate budgetTo) {
+                                            LocalDate budgetTo,
+                                            BigDecimal hourlyRateCzk) {
         int updated = 0;
         if (namespaceId != null) {
-            updated = jdbc.update("UPDATE project SET name = ?, namespace_name = ?, budget = ?, budget_from = ?, budget_to = ? WHERE namespace_id = ?",
+            updated = jdbc.update("UPDATE project SET name = ?, namespace_name = ?, budget = ?, budget_from = ?, budget_to = ?, hourly_rate_czk = ? WHERE namespace_id = ?",
                     name,
                     namespaceName,
                     budget,
                     budgetFrom,
                     budgetTo,
+                    hourlyRateCzk,
                     namespaceId);
             if (updated > 0) {
                 Long id = jdbc.queryForObject("SELECT id FROM project WHERE namespace_id = ?", Long.class, namespaceId);
@@ -82,14 +86,15 @@ public class SyncDao {
             }
         }
         Long id = jdbc.queryForObject(
-                "INSERT INTO project (namespace_id, namespace_name, name, budget, budget_from, budget_to) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+                "INSERT INTO project (namespace_id, namespace_name, name, budget, budget_from, budget_to, hourly_rate_czk) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
                 Long.class,
                 namespaceId,
                 namespaceName,
                 name,
                 budget,
                 budgetFrom,
-                budgetTo);
+                budgetTo,
+                hourlyRateCzk);
         return new UpsertResult<>(id, true);
     }
 
@@ -105,17 +110,19 @@ public class SyncDao {
                              Integer budget,
                              LocalDate budgetFrom,
                              LocalDate budgetTo,
+                             BigDecimal hourlyRateCzk,
                              BigDecimal reportedCost) {}
     public record ProjectOverviewRow(Long id,
                                      String name,
                                      Integer budget,
                                      LocalDate budgetFrom,
                                      LocalDate budgetTo,
+                                     BigDecimal hourlyRateCzk,
                                      BigDecimal reportedCost,
                                      Integer teamMembers,
                                      Integer openIssues) {}
     public List<ProjectRow> listProjects() {
-        return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, reported_cost FROM project ORDER BY name",
+        return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, hourly_rate_czk, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
                         rs.getLong("id"),
                         (Long) rs.getObject("namespace_id"),
@@ -124,6 +131,7 @@ public class SyncDao {
                         (Integer) rs.getObject("budget"),
                         rs.getObject("budget_from", LocalDate.class),
                         rs.getObject("budget_to", LocalDate.class),
+                        rs.getBigDecimal("hourly_rate_czk"),
                         rs.getBigDecimal("reported_cost")));
     }
 
@@ -134,6 +142,7 @@ public class SyncDao {
                        p.budget,
                        p.budget_from,
                        p.budget_to,
+                       p.hourly_rate_czk,
                        p.reported_cost,
                        COALESCE(team_counts.team_members, 0) AS team_members,
                        COALESCE(issue_counts.open_issues, 0) AS open_issues
@@ -159,6 +168,7 @@ public class SyncDao {
                 (Integer) rs.getObject("budget"),
                 rs.getObject("budget_from", LocalDate.class),
                 rs.getObject("budget_to", LocalDate.class),
+                rs.getBigDecimal("hourly_rate_czk"),
                 rs.getBigDecimal("reported_cost"),
                 rs.getInt("team_members"),
                 rs.getInt("open_issues")));
@@ -209,16 +219,28 @@ public class SyncDao {
 
     public record RepositoryAssignment(Long id, Long gitlabRepoId, String name, String nameWithNamespace, boolean assigned) {}
 
-    public record ProjectRepositoryLink(long repositoryId, Long gitlabRepoId, String name) {}
+    public record ProjectRepositoryLink(long repositoryId, Long gitlabRepoId, String name, BigDecimal projectHourlyRate) {}
 
     public List<ProjectRepositoryLink> listAllRepositoriesForSync() {
-        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
-                "FROM repository r " +
-                "ORDER BY r.name";
+        String sql = """
+                SELECT r.id AS repository_id,
+                       r.gitlab_repo_id,
+                       r.name,
+                       agg.hourly_rate_czk
+                FROM repository r
+                LEFT JOIN LATERAL (
+                    SELECT MAX(p.hourly_rate_czk) AS hourly_rate_czk
+                    FROM projects_to_repositorie ptr
+                    JOIN project p ON p.id = ptr.project_id
+                    WHERE ptr.repository_id = r.id
+                ) AS agg ON TRUE
+                ORDER BY r.name
+                """;
         return jdbc.query(sql, (rs, rn) -> new ProjectRepositoryLink(
                 rs.getLong("repository_id"),
                 (Long) rs.getObject("gitlab_repo_id"),
-                rs.getString("name")
+                rs.getString("name"),
+                rs.getBigDecimal("hourly_rate_czk")
         ));
     }
 
@@ -251,15 +273,17 @@ public class SyncDao {
      * id that must be used when calling the GraphQL API.
      */
     public List<ProjectRepositoryLink> listProjectRepositories(long projectId) {
-        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name " +
+        String sql = "SELECT r.id AS repository_id, r.gitlab_repo_id, r.name, p.hourly_rate_czk " +
                 "FROM repository r " +
                 "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.id " +
+                "JOIN project p ON p.id = ptr.project_id " +
                 "WHERE ptr.project_id = ? " +
                 "ORDER BY r.name";
         return jdbc.query(sql, (rs, rn) -> new ProjectRepositoryLink(
                 rs.getLong("repository_id"),
                 (Long) rs.getObject("gitlab_repo_id"),
-                rs.getString("name")
+                rs.getString("name"),
+                rs.getBigDecimal("hourly_rate_czk")
         ), projectId);
     }
 
@@ -430,7 +454,8 @@ public class SyncDao {
                             OffsetDateTime spentAt,
                             int timeSpentSeconds,
                             BigDecimal timeSpentHours,
-                            String username) {}
+                            String username,
+                            BigDecimal projectHourlyRate) {}
 
     public record ReportInsertStats(int inserted, int duplicates, int failed, List<String> missingUsernames) {}
 
@@ -474,16 +499,18 @@ public class SyncDao {
                 continue;
             }
             LocalDate spentDate = row.spentAt().toLocalDate();
-            BigDecimal hourlyRate = resolveHourlyRate(slices, spentDate);
-            if (hourlyRate == null) {
+            BigDecimal internHourlyRate = resolveHourlyRate(slices, spentDate);
+            BigDecimal projectHourlyRate = row.projectHourlyRate();
+            BigDecimal effectiveRate = projectHourlyRate != null ? projectHourlyRate : internHourlyRate;
+            if (effectiveRate == null) {
                 failed++;
                 log.warn("Nenalezena sazba pro uživatele {} k datu {} – záznam nebyl uložen.", row.username(), spentDate);
                 continue;
             }
-            BigDecimal cost = row.timeSpentHours().multiply(hourlyRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal cost = row.timeSpentHours().multiply(effectiveRate).setScale(2, RoundingMode.HALF_UP);
             try {
-                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost, unregistered_username) " +
-                                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username_fallback, spent_at, time_spent_seconds) DO NOTHING",
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost, hourly_rate_czk, unregistered_username) " +
+                                "VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username_fallback, spent_at, time_spent_seconds) DO NOTHING",
                         ps -> {
                             ps.setLong(1, row.repositoryId());
                             if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
@@ -491,8 +518,9 @@ public class SyncDao {
                             ps.setInt(4, row.timeSpentSeconds());
                             ps.setBigDecimal(5, row.timeSpentHours());
                             ps.setString(6, row.username());
-                            ps.setBigDecimal(7, cost);
-                            ps.setNull(8, Types.VARCHAR);
+                            if (cost == null) ps.setNull(7, Types.NUMERIC); else ps.setBigDecimal(7, cost);
+                            if (internHourlyRate == null) ps.setNull(8, Types.NUMERIC); else ps.setBigDecimal(8, internHourlyRate);
+                            ps.setNull(9, Types.VARCHAR);
                         });
                 if (result > 0) inserted += result; else duplicates++;
             } catch (DataIntegrityViolationException ex) {
@@ -502,8 +530,10 @@ public class SyncDao {
         }
         for (ReportRow row : orphanCandidates) {
             try {
-                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost, unregistered_username) " +
-                                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username_fallback, spent_at, time_spent_seconds) DO NOTHING",
+                BigDecimal projectHourlyRate = row.projectHourlyRate();
+                BigDecimal cost = projectHourlyRate == null ? null : row.timeSpentHours().multiply(projectHourlyRate).setScale(2, RoundingMode.HALF_UP);
+                int result = jdbc.update("INSERT INTO report (repository_id, iid, spent_at, time_spent_seconds, time_spent_hours, username, cost, hourly_rate_czk, unregistered_username) " +
+                                "VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (repository_id, iid, username_fallback, spent_at, time_spent_seconds) DO NOTHING",
                         ps -> {
                             ps.setLong(1, row.repositoryId());
                             if (row.issueIid() == null) ps.setNull(2, java.sql.Types.BIGINT); else ps.setLong(2, row.issueIid());
@@ -511,8 +541,9 @@ public class SyncDao {
                             ps.setInt(4, row.timeSpentSeconds());
                             ps.setBigDecimal(5, row.timeSpentHours());
                             ps.setNull(6, Types.VARCHAR);
-                            ps.setNull(7, Types.NUMERIC);
-                            ps.setString(8, row.username());
+                            if (cost == null) ps.setNull(7, Types.NUMERIC); else ps.setBigDecimal(7, cost);
+                            ps.setNull(8, Types.NUMERIC);
+                            ps.setString(9, row.username());
                         });
                 if (result > 0) {
                     inserted += result;
@@ -632,14 +663,16 @@ public class SyncDao {
                               LocalDate budgetFrom,
                               LocalDate budgetTo,
                               Long namespaceId,
-                              String namespaceName) {
-        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ?, namespace_id = ?, namespace_name = ? WHERE id = ?",
+                              String namespaceName,
+                              BigDecimal hourlyRateCzk) {
+        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ?, namespace_id = ?, namespace_name = ?, hourly_rate_czk = ? WHERE id = ?",
                 name,
                 budget,
                 budgetFrom,
                 budgetTo,
                 namespaceId,
                 namespaceName,
+                hourlyRateCzk,
                 id);
     }
 
@@ -820,9 +853,11 @@ public class SyncDao {
                 "i.first_name AS intern_first_name, " +
                 "i.last_name AS intern_last_name, " +
                 "SUM(r.time_spent_hours) AS hours, " +
-                "SUM(CASE WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN COALESCE(r.cost, 0) ELSE 0 END) AS cost " +
+                "SUM(CASE WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN " +
+                "COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0) ELSE 0 END) AS cost " +
                 "FROM report r " +
                 "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id " +
+                "JOIN project p ON p.id = ptr.project_id " +
                 "JOIN repository repo ON repo.id = r.repository_id " +
                 "JOIN intern i ON i.username = r.username " +
                 "LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ptr.project_id " +
@@ -1015,8 +1050,9 @@ public class SyncDao {
 
     private BigDecimal fetchMilestoneTotalCost(long projectId, long milestoneId) {
         String sql = """
-                SELECT COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
+                SELECT COALESCE(SUM(COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)), 0) AS total_cost
                 FROM milestone m
+                JOIN project p ON p.id = m.project_id
                 LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 LEFT JOIN issue iss
                   ON iss.repository_id = ptr.repository_id
@@ -1053,8 +1089,9 @@ public class SyncDao {
                                ELSE NULL
                            END AS assignee_name,
                            COALESCE(SUM(COALESCE(r.time_spent_seconds, 0)), 0) AS total_time_spent_seconds,
-                           COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
+                           COALESCE(SUM(COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)), 0) AS total_cost
                     FROM milestone m
+                    JOIN project p ON p.id = m.project_id
                     LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                     LEFT JOIN issue iss
                            ON iss.repository_id = ptr.repository_id
@@ -1149,8 +1186,9 @@ public class SyncDao {
                        iss.id AS issue_id,
                        iss.iid AS issue_iid,
                        COALESCE(NULLIF(iss.title, ''), 'Bez názvu') AS issue_title,
-                       COALESCE(SUM(COALESCE(r.cost, 0)), 0) AS total_cost
+                       COALESCE(SUM(COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)), 0) AS total_cost
                 FROM milestone m
+                JOIN project p ON p.id = m.project_id
                 LEFT JOIN projects_to_repositorie ptr ON ptr.project_id = m.project_id
                 JOIN issue iss
                   ON iss.repository_id = ptr.repository_id
@@ -1181,10 +1219,20 @@ public class SyncDao {
     public int recomputeReportCostsForIntern(long internId) {
         String sql = """
                 UPDATE report r
-                SET cost = ROUND(l.hourly_rate_czk * r.time_spent_hours, 2)
+                SET cost = CASE
+                        WHEN COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) IS NULL THEN NULL
+                        ELSE ROUND(COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) * r.time_spent_hours, 2)
+                    END,
+                    hourly_rate_czk = l.hourly_rate_czk
                 FROM intern i
                 JOIN intern_level_history h ON h.intern_id = i.id
                 JOIN level l ON l.id = h.level_id
+                LEFT JOIN LATERAL (
+                    SELECT MAX(p.hourly_rate_czk) AS hourly_rate_czk
+                    FROM projects_to_repositorie ptr
+                    JOIN project p ON p.id = ptr.project_id
+                    WHERE ptr.repository_id = r.repository_id
+                ) AS project_rate ON TRUE
                 WHERE i.id = ?
                   AND r.username = i.username
                   AND r.spent_at::date >= h.valid_from
