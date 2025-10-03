@@ -287,7 +287,7 @@
 
 .projectReportProjectDetail__table {
   width: 100%;
-  min-width: 760px;
+  min-width: 920px;
   border-collapse: collapse;
 }
 
@@ -297,6 +297,10 @@
   text-align: left;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
+}
+
+.projectReportProjectDetail__cellBadge {
+  white-space: nowrap;
 }
 
 .projectReportProjectDetail__table th {

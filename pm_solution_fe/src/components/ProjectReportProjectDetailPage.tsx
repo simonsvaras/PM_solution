@@ -9,6 +9,7 @@ import {
   type ProjectOverviewDTO,
 } from '../api';
 import InfoCard from './InfoCard';
+import Badge from './Badge';
 
 function formatDuration(seconds?: number | null): string {
   if (seconds == null || Number.isNaN(seconds)) {
@@ -51,16 +52,13 @@ function formatIssueState(value?: string | null): string {
 }
 
 function formatAssignee(name?: string | null, username?: string | null): string {
-  const trimmedName = name?.trim();
   const trimmedUsername = username?.trim();
-  if (trimmedName && trimmedUsername) {
-    return `${trimmedName} (@${trimmedUsername})`;
-  }
-  if (trimmedName) {
-    return trimmedName;
-  }
   if (trimmedUsername) {
     return `@${trimmedUsername}`;
+  }
+  const trimmedName = name?.trim();
+  if (trimmedName) {
+    return trimmedName;
   }
   return '—';
 }
@@ -664,6 +662,8 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                         <tr>
                           <th scope="col">Issue</th>
                           <th scope="col">Assignee</th>
+                          <th scope="col">Priorita</th>
+                          <th scope="col">Tým</th>
                           <th scope="col">Stav</th>
                           <th scope="col">Termín</th>
                           <th scope="col" className="projectReportProjectDetail__columnNumeric">
@@ -734,6 +734,12 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                                 )}
                               </td>
                               <td>{formatAssignee(issue.assigneeName, issue.assigneeUsername)}</td>
+                              <td className="projectReportProjectDetail__cellBadge">
+                                <Badge kind="priority" value={getLabelValue(issue.labels, 'priority')} />
+                              </td>
+                              <td className="projectReportProjectDetail__cellBadge">
+                                <Badge kind="team" value={getLabelValue(issue.labels, 'team')} />
+                              </td>
                               <td>{formatIssueState(issue.state)}</td>
                               <td>{formatDate(issue.dueDate)}</td>
                               <td className="projectReportProjectDetail__cellNumber">
