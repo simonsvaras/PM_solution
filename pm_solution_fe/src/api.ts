@@ -656,7 +656,15 @@ export async function getProjectReportDetail(
   const query = qs.toString();
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/reports/detail${query ? `?${query}` : ""}`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
-  return parseJson<ProjectReportDetailResponse>(res);
+  const data = await parseJson<ProjectReportDetailResponse>(res);
+  return {
+    interns: data.interns.map(intern => ({ ...intern })),
+    issues: data.issues.map(issue => ({
+      ...issue,
+      issueWebUrl:
+        issue.issueWebUrl && issue.issueWebUrl.trim() ? issue.issueWebUrl.trim() : null,
+    })),
+  };
 }
 
 export async function getProjectReportInternDetail(
