@@ -224,6 +224,11 @@
   text-align: left;
 }
 
+.projectReportDetail__metaHeader {
+  text-align: left;
+  min-width: 120px;
+}
+
 .projectReportDetail__table tbody th {
   text-align: left;
   padding: 14px 16px;
@@ -237,6 +242,21 @@
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   font-variant-numeric: tabular-nums;
+}
+
+.projectReportDetail__table tbody td.projectReportDetail__metaCell {
+  text-align: left;
+  font-variant-numeric: normal;
+}
+
+.projectReportDetail__metaCell {
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.projectReportDetail__metaCell--assignee {
+  font-family: 'JetBrains Mono', 'Fira Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.85rem;
 }
 
 .projectReportDetail__table tbody tr:nth-child(even) td {

@@ -305,6 +305,8 @@ export type ProjectReportDetailIssue = {
   issueId: number | null;
   issueIid: number | null;
   issueTitle: string;
+  assigneeUsername: string | null;
+  labels: string[];
   issueWebUrl: string | null;
   humanTimeEstimate: string | null;
   internHours: ProjectReportDetailIssueCell[];
