@@ -713,7 +713,8 @@ public class SyncDao {
                                     OffsetDateTime spentAt,
                                     BigDecimal timeSpentHours,
                                     String resolvedUsername,
-                                    BigDecimal cost) {}
+                                    BigDecimal cost,
+                                    Boolean projectIsExternal) {}
 
     public List<ReportOverviewRow> listReportOverview(OffsetDateTime from, OffsetDateTime to, boolean untrackedOnly) {
         StringBuilder sql = new StringBuilder("SELECT r.repository_id, " +
@@ -723,10 +724,17 @@ public class SyncDao {
                 "r.spent_at, " +
                 "r.time_spent_hours, " +
                 "r.cost, " +
-                "COALESCE(r.username, r.unregistered_username) AS resolved_username " +
+                "COALESCE(r.username, r.unregistered_username) AS resolved_username, " +
+                "COALESCE(flag.is_external, FALSE) AS project_is_external " +
                 "FROM report r " +
                 "JOIN repository repo ON repo.id = r.repository_id " +
                 "LEFT JOIN issue iss ON iss.repository_id = r.repository_id AND iss.iid = r.iid " +
+                "LEFT JOIN (" +
+                "    SELECT ptr.repository_id, BOOL_OR(p.is_external) AS is_external " +
+                "    FROM projects_to_repositorie ptr " +
+                "    JOIN project p ON p.id = ptr.project_id " +
+                "    GROUP BY ptr.repository_id" +
+                ") flag ON flag.repository_id = r.repository_id " +
                 "WHERE 1 = 1");
 
         List<Object> params = new ArrayList<>();
@@ -753,7 +761,8 @@ public class SyncDao {
                 rs.getObject("spent_at", OffsetDateTime.class),
                 rs.getBigDecimal("time_spent_hours"),
                 rs.getString("resolved_username"),
-                rs.getBigDecimal("cost")
+                rs.getBigDecimal("cost"),
+                rs.getObject("project_is_external", Boolean.class)
         ), params.toArray());
     }
 

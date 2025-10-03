@@ -25,7 +25,8 @@ public class ReportOverviewController {
                                      String username,
                                      OffsetDateTime spentAt,
                                      BigDecimal timeSpentHours,
-                                     BigDecimal cost) {}
+                                     BigDecimal cost,
+                                     Boolean projectIsExternal) {}
 
     @GetMapping("/overview")
     public List<ReportOverviewItem> overview(
@@ -44,7 +45,8 @@ public class ReportOverviewController {
                         row.resolvedUsername(),
                         row.spentAt(),
                         row.timeSpentHours(),
-                        row.cost()
+                        row.cost(),
+                        row.projectIsExternal()
                 ))
                 .toList();
     }
