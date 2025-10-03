@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Array;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -557,6 +559,8 @@ public class SyncDao {
                                          Long issueId,
                                          Long issueIid,
                                          String issueTitle,
+                                         String issueAssigneeUsername,
+                                         List<String> issueLabels,
                                          long internId,
                                          String internUsername,
                                          String internFirstName,
@@ -592,6 +596,8 @@ public class SyncDao {
                 "iss.id AS issue_id, " +
                 "r.iid AS issue_iid, " +
                 "iss.title AS issue_title, " +
+                "iss.assignee_username AS issue_assignee_username, " +
+                "iss.labels AS issue_labels, " +
                 "i.id AS intern_id, " +
                 "i.username AS intern_username, " +
                 "i.first_name AS intern_first_name, " +
@@ -622,7 +628,7 @@ public class SyncDao {
             params.add(internUsername);
         }
 
-        sql.append(" GROUP BY r.repository_id, repo.name, iss.id, r.iid, iss.title, i.id, i.username, i.first_name, i.last_name");
+        sql.append(" GROUP BY r.repository_id, repo.name, iss.id, r.iid, iss.title, iss.assignee_username, iss.labels, i.id, i.username, i.first_name, i.last_name");
         sql.append(" ORDER BY repo.name, r.iid NULLS LAST, iss.title NULLS LAST, i.last_name, i.first_name, i.username");
 
         return jdbc.query(sql.toString(), (rs, rn) -> new ProjectReportDetailRow(
@@ -631,6 +637,8 @@ public class SyncDao {
                 (Long) rs.getObject("issue_id"),
                 (Long) rs.getObject("issue_iid"),
                 rs.getString("issue_title"),
+                rs.getString("issue_assignee_username"),
+                extractIssueLabels(rs.getArray("issue_labels")),
                 rs.getLong("intern_id"),
                 rs.getString("intern_username"),
                 rs.getString("intern_first_name"),
@@ -638,6 +646,21 @@ public class SyncDao {
                 rs.getBigDecimal("hours"),
                 rs.getBigDecimal("cost")
         ), params.toArray());
+    }
+
+    private List<String> extractIssueLabels(Array sqlArray) {
+        if (sqlArray == null) {
+            return List.of();
+        }
+        try {
+            Object array = sqlArray.getArray();
+            if (array instanceof String[] strings) {
+                return List.copyOf(Arrays.asList(strings));
+            }
+        } catch (Exception e) {
+            log.warn("Nebylo možné načíst štítky issue", e);
+        }
+        return List.of();
     }
 
     public int recomputeReportCostsForIntern(long internId) {

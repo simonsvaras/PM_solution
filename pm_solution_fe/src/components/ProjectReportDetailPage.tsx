@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import './ProjectReportDetailPage.css';
 import InfoCard from './InfoCard';
+import Badge from './Badge';
 import type {
   ErrorResponse,
   ProjectOverviewDTO,
@@ -34,6 +35,48 @@ function formatCost(value?: number | null): string {
     return '—';
   }
   return value.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' });
+}
+
+const PRIORITY_PREFIXES = ['priority::', 'priorita::', 'priority:', 'priorita:'];
+const TEAM_PREFIXES = ['team::', 'team:', 'tým::', 'tym::'];
+const PRIORITY_DISPLAY_MAP: Record<string, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
+const TEAM_DISPLAY_MAP: Record<string, string> = {
+  analyst: 'Analyst',
+  backend: 'BackEnd',
+  frontend: 'FrontEnd',
+};
+
+function extractLabelValue(labels: string[], prefixes: string[], knownValues: Record<string, string>): string | null {
+  for (const label of labels) {
+    if (!label) continue;
+    const trimmed = label.trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    for (const prefix of prefixes) {
+      if (lower.startsWith(prefix)) {
+        const value = trimmed.slice(prefix.length).trim();
+        if (!value) continue;
+        const normalized = value.toLowerCase();
+        return knownValues[normalized] ?? value;
+      }
+    }
+    if (knownValues[lower]) {
+      return knownValues[lower];
+    }
+  }
+  return null;
+}
+
+function getPriorityLabel(labels: string[]): string | null {
+  return extractLabelValue(labels, PRIORITY_PREFIXES, PRIORITY_DISPLAY_MAP);
+}
+
+function getTeamLabel(labels: string[]): string | null {
+  return extractLabelValue(labels, TEAM_PREFIXES, TEAM_DISPLAY_MAP);
 }
 
 function formatDayCount(value: number): string {
@@ -484,6 +527,9 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                 <thead>
                   <tr>
                     <th scope="col">Issue</th>
+                    <th scope="col" className="projectReportDetail__metaHeader">Priorita</th>
+                    <th scope="col" className="projectReportDetail__metaHeader">Team</th>
+                    <th scope="col" className="projectReportDetail__metaHeader">Assignee</th>
                     {visibleInterns.map(intern => (
                       <th scope="col" key={intern.id}>
                         <span className="projectReportDetail__internName">{intern.firstName} {intern.lastName}</span>
@@ -514,6 +560,9 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                       rowTotalCost += value.cost;
                     }
                     const issueLabel = issue.issueIid ? `#${issue.issueIid}` : 'Bez čísla';
+                    const priorityLabel = getPriorityLabel(issue.labels ?? []);
+                    const teamLabel = getTeamLabel(issue.labels ?? []);
+                    const assigneeDisplay = issue.assigneeUsername?.trim() || '—';
                     return (
                       <tr key={key}>
                         <th scope="row">
@@ -525,6 +574,15 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                             </span>
                           </div>
                         </th>
+                        <td className="projectReportDetail__metaCell">
+                          <Badge kind="priority" value={priorityLabel} />
+                        </td>
+                        <td className="projectReportDetail__metaCell">
+                          <Badge kind="team" value={teamLabel} />
+                        </td>
+                        <td className="projectReportDetail__metaCell projectReportDetail__metaCell--assignee">
+                          {assigneeDisplay}
+                        </td>
                         {visibleInterns.map(intern => {
                           const value = valuesByIntern.get(intern.id);
                           return <td key={intern.id}>{renderCell(value?.hours, value?.cost)}</td>;
@@ -538,6 +596,7 @@ export default function ProjectReportDetailPage({ project, onBack, onCloseDetail
                   <tfoot>
                     <tr>
                       <th scope="row">Celkem</th>
+                      <td className="projectReportDetail__metaCell" colSpan={3} />
                       {visibleInterns.map(intern => (
                         <td key={intern.id}>
                           {renderCell(totals.perInternHours.get(intern.id), totals.perInternCost.get(intern.id))}

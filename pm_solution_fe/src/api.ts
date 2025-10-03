@@ -221,6 +221,8 @@ export type ProjectReportDetailIssue = {
   issueId: number | null;
   issueIid: number | null;
   issueTitle: string;
+  assigneeUsername: string | null;
+  labels: string[];
   internHours: ProjectReportDetailIssueCell[];
 };
 

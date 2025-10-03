@@ -33,6 +33,8 @@ public class ProjectReportDetailController {
                            Long issueId,
                            Long issueIid,
                            String issueTitle,
+                           String assigneeUsername,
+                           List<String> labels,
                            List<IssueInternHours> internHours) {}
 
     public record ProjectReportDetailResponse(List<InternSummary> interns, List<IssueRow> issues) {}
@@ -73,8 +75,11 @@ public class ProjectReportDetailController {
                     row.repositoryName(),
                     row.issueId(),
                     row.issueIid(),
-                    row.issueTitle()
+                    row.issueTitle(),
+                    row.issueAssigneeUsername(),
+                    row.issueLabels()
             ));
+            builder.updateMetadata(row.issueAssigneeUsername(), row.issueLabels());
             builder.addEntry(row.internId(), row.hours(), row.cost());
         }
 
@@ -98,13 +103,22 @@ public class ProjectReportDetailController {
         private final String issueTitle;
         private final Map<Long, BigDecimal> hours = new LinkedHashMap<>();
         private final Map<Long, BigDecimal> costs = new LinkedHashMap<>();
+        private String assigneeUsername;
+        private List<String> labels;
 
-        IssueRowBuilder(long repositoryId, String repositoryName, Long issueId, Long issueIid, String issueTitle) {
+        IssueRowBuilder(long repositoryId,
+                        String repositoryName,
+                        Long issueId,
+                        Long issueIid,
+                        String issueTitle,
+                        String assigneeUsername,
+                        List<String> labels) {
             this.repositoryId = repositoryId;
             this.repositoryName = repositoryName;
             this.issueId = issueId;
             this.issueIid = issueIid;
             this.issueTitle = (issueTitle == null || issueTitle.isBlank()) ? "Bez názvu" : issueTitle;
+            updateMetadata(assigneeUsername, labels);
         }
 
         void addEntry(long internId, BigDecimal hoursValue, BigDecimal costValue) {
@@ -116,11 +130,21 @@ public class ProjectReportDetailController {
             }
         }
 
+        void updateMetadata(String assigneeUsername, List<String> labels) {
+            if (this.assigneeUsername == null && assigneeUsername != null && !assigneeUsername.isBlank()) {
+                this.assigneeUsername = assigneeUsername.trim();
+            }
+            if ((this.labels == null || this.labels.isEmpty()) && labels != null && !labels.isEmpty()) {
+                this.labels = List.copyOf(labels);
+            }
+        }
+
         IssueRow build() {
             List<IssueInternHours> cells = hours.entrySet().stream()
                     .map(entry -> new IssueInternHours(entry.getKey(), entry.getValue(), costs.get(entry.getKey())))
                     .toList();
-            return new IssueRow(repositoryId, repositoryName, issueId, issueIid, issueTitle, cells);
+            List<String> metadataLabels = labels == null ? List.of() : List.copyOf(labels);
+            return new IssueRow(repositoryId, repositoryName, issueId, issueIid, issueTitle, assigneeUsername, metadataLabels, cells);
         }
     }
 }
