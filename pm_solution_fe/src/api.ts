@@ -87,6 +87,22 @@ export type ProjectOverviewDTO = {
   isExternal: boolean;
   hourlyRateCzk: number | null;
 };
+
+export type ProjectLongTermReportBucket = {
+  month: string;
+  hours: number | null;
+  cost: number | null;
+};
+
+export type ProjectLongTermReportResponse = {
+  project: ProjectOverviewDTO;
+  buckets: ProjectLongTermReportBucket[];
+};
+
+export type ProjectLongTermReportParams = {
+  from: string;
+  to: string;
+};
 export type ProjectMilestoneSummary = {
   milestoneId: number;
   milestoneIid: number;
@@ -743,6 +759,47 @@ export async function getProjectReportInternDetail(
         issueTitle: issue.issueTitle.trim() ? issue.issueTitle.trim() : 'Bez názvu',
       };
     }),
+  };
+}
+
+export async function getProjectLongTermReport(
+  projectId: number,
+  params: ProjectLongTermReportParams,
+): Promise<ProjectLongTermReportResponse> {
+  const qs = new URLSearchParams();
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  const query = qs.toString();
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/reports/long-term${query ? `?${query}` : ""}`,
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<ProjectLongTermReportResponse>(res);
+
+  const sanitizeNumber = (value: unknown): number => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = Number.parseFloat(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return 0;
+  };
+
+  const buckets = Array.isArray(data.buckets)
+    ? data.buckets.map(bucket => ({
+        month: typeof bucket.month === "string" ? bucket.month.trim() : "",
+        hours: sanitizeNumber(bucket.hours),
+        cost: sanitizeNumber(bucket.cost),
+      }))
+    : [];
+
+  return {
+    project: data.project,
+    buckets,
   };
 }
 

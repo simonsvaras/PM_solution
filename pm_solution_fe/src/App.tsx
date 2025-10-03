@@ -7,6 +7,7 @@ import ProjectReportPage from './components/ProjectReportPage';
 import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import ProjectReportInternDetailPage from './components/ProjectReportInternDetailPage';
 import ProjectReportProjectDetailPage from './components/ProjectReportProjectDetailPage';
+import ProjectReportLongTermPage from './components/ProjectReportLongTermPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
@@ -68,12 +69,18 @@ const modules: Module[] = [
   },
 ];
 
-type ReportDetailView = 'summary' | 'detail' | 'detail-intern' | 'detail-project';
+type ReportDetailView = 'summary' | 'detail' | 'detail-long-term' | 'detail-intern' | 'detail-project';
 
 type DetailSectionView = Exclude<ReportDetailView, 'summary'>;
 
 function isReportDetailView(value: string | null): value is ReportDetailView {
-  return value === 'summary' || value === 'detail' || value === 'detail-intern' || value === 'detail-project';
+  return (
+    value === 'summary' ||
+    value === 'detail' ||
+    value === 'detail-long-term' ||
+    value === 'detail-intern' ||
+    value === 'detail-project'
+  );
 }
 
 type ParsedRoute = {
@@ -398,6 +405,8 @@ function App() {
   if (isProjectReportDetail) {
     if (reportView === 'detail') {
       headerTitle = 'Detailní report';
+    } else if (reportView === 'detail-long-term') {
+      headerTitle = 'Dlouhodobý report';
     } else if (reportView === 'detail-intern') {
       headerTitle = 'Detail stážisty';
     } else if (reportView === 'detail-project') {
@@ -411,6 +420,8 @@ function App() {
     if (reportView === 'detail') {
       headerDescription =
         'Vyberte časové období a načtěte sumu odpracovaných hodin podle issue a stážistů pro všechny repozitáře projektu.';
+    } else if (reportView === 'detail-long-term') {
+      headerDescription = 'Analyzujte dlouhodobý vývoj hodin a vyčerpání rozpočtu projektu po jednotlivých měsících.';
     } else if (reportView === 'detail-intern') {
       headerDescription = 'Stránka detailu stážisty je ve vývoji.';
     }
@@ -442,6 +453,7 @@ function App() {
 
   const detailNavigationItems: { view: DetailSectionView; label: string }[] = [
     { view: 'detail', label: 'Obecný report' },
+    { view: 'detail-long-term', label: 'Dlouhodobý report' },
     { view: 'detail-intern', label: 'Detail stážisty' },
     { view: 'detail-project', label: 'Detail projektu' },
   ];
@@ -929,14 +941,16 @@ function App() {
             reportView && reportView !== 'summary' ? (
               reportView === 'detail' ? (
                 <ProjectReportDetailPage project={selectedReportProject} />
+              ) : reportView === 'detail-long-term' ? (
+                <ProjectReportLongTermPage project={selectedReportProject} />
               ) : reportView === 'detail-intern' ? (
                 <ProjectReportInternDetailPage project={selectedReportProject} />
               ) : (
                 <ProjectReportProjectDetailPage project={selectedReportProject} />
               )
-              ) : (
-                <ProjectReportPage
-                  project={selectedReportProject}
+            ) : (
+              <ProjectReportPage
+                project={selectedReportProject}
                   namespaceId={selectedProjectNamespaceId}
                   namespaceName={selectedProjectNamespaceName}
                   onShowDetail={handleShowReportDetail}
