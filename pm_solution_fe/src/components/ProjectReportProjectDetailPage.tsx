@@ -488,7 +488,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                 <div className="projectReportProjectDetail__chartBars">
                   {internContributions.map(contribution => {
                     const percentage = maxContributionSeconds > 0
-                      ? Math.max((contribution.totalTimeSpentSeconds / maxContributionSeconds) * 100, 6)
+                      ? (contribution.totalTimeSpentSeconds / maxContributionSeconds) * 100
                       : 0;
                     const labelParts: string[] = [];
                     if (contribution.internFirstName || contribution.internLastName) {
