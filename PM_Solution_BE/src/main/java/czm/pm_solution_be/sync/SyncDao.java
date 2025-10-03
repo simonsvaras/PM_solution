@@ -50,9 +50,10 @@ public class SyncDao {
                                     LocalDate budgetTo,
                                     Long namespaceId,
                                     String namespaceName,
+                                    boolean isExternal,
                                     BigDecimal hourlyRateCzk) {
         return jdbc.queryForObject(
-                "INSERT INTO project (name, budget, budget_from, budget_to, namespace_id, namespace_name, hourly_rate_czk) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                "INSERT INTO project (name, budget, budget_from, budget_to, namespace_id, namespace_name, is_external, hourly_rate_czk) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
                 Long.class,
                 name,
                 budget,
@@ -60,6 +61,7 @@ public class SyncDao {
                 budgetTo,
                 namespaceId,
                 namespaceName,
+                isExternal,
                 hourlyRateCzk);
     }
 
@@ -69,15 +71,17 @@ public class SyncDao {
                                             Integer budget,
                                             LocalDate budgetFrom,
                                             LocalDate budgetTo,
+                                            boolean isExternal,
                                             BigDecimal hourlyRateCzk) {
         int updated = 0;
         if (namespaceId != null) {
-            updated = jdbc.update("UPDATE project SET name = ?, namespace_name = ?, budget = ?, budget_from = ?, budget_to = ?, hourly_rate_czk = ? WHERE namespace_id = ?",
+            updated = jdbc.update("UPDATE project SET name = ?, namespace_name = ?, budget = ?, budget_from = ?, budget_to = ?, is_external = ?, hourly_rate_czk = ? WHERE namespace_id = ?",
                     name,
                     namespaceName,
                     budget,
                     budgetFrom,
                     budgetTo,
+                    isExternal,
                     hourlyRateCzk,
                     namespaceId);
             if (updated > 0) {
@@ -86,7 +90,7 @@ public class SyncDao {
             }
         }
         Long id = jdbc.queryForObject(
-                "INSERT INTO project (namespace_id, namespace_name, name, budget, budget_from, budget_to, hourly_rate_czk) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                "INSERT INTO project (namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
                 Long.class,
                 namespaceId,
                 namespaceName,
@@ -94,6 +98,7 @@ public class SyncDao {
                 budget,
                 budgetFrom,
                 budgetTo,
+                isExternal,
                 hourlyRateCzk);
         return new UpsertResult<>(id, true);
     }
@@ -110,6 +115,7 @@ public class SyncDao {
                              Integer budget,
                              LocalDate budgetFrom,
                              LocalDate budgetTo,
+                             boolean isExternal,
                              BigDecimal hourlyRateCzk,
                              BigDecimal reportedCost) {}
     public record ProjectOverviewRow(Long id,
@@ -117,12 +123,13 @@ public class SyncDao {
                                      Integer budget,
                                      LocalDate budgetFrom,
                                      LocalDate budgetTo,
+                                     boolean isExternal,
                                      BigDecimal hourlyRateCzk,
                                      BigDecimal reportedCost,
                                      Integer teamMembers,
                                      Integer openIssues) {}
     public List<ProjectRow> listProjects() {
-        return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, hourly_rate_czk, reported_cost FROM project ORDER BY name",
+        return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
                         rs.getLong("id"),
                         (Long) rs.getObject("namespace_id"),
@@ -131,6 +138,7 @@ public class SyncDao {
                         (Integer) rs.getObject("budget"),
                         rs.getObject("budget_from", LocalDate.class),
                         rs.getObject("budget_to", LocalDate.class),
+                        rs.getBoolean("is_external"),
                         rs.getBigDecimal("hourly_rate_czk"),
                         rs.getBigDecimal("reported_cost")));
     }
@@ -142,6 +150,7 @@ public class SyncDao {
                        p.budget,
                        p.budget_from,
                        p.budget_to,
+                       p.is_external,
                        p.hourly_rate_czk,
                        p.reported_cost,
                        COALESCE(team_counts.team_members, 0) AS team_members,
@@ -168,6 +177,7 @@ public class SyncDao {
                 (Integer) rs.getObject("budget"),
                 rs.getObject("budget_from", LocalDate.class),
                 rs.getObject("budget_to", LocalDate.class),
+                rs.getBoolean("is_external"),
                 rs.getBigDecimal("hourly_rate_czk"),
                 rs.getBigDecimal("reported_cost"),
                 rs.getInt("team_members"),
@@ -233,6 +243,7 @@ public class SyncDao {
                     FROM projects_to_repositorie ptr
                     JOIN project p ON p.id = ptr.project_id
                     WHERE ptr.repository_id = r.id
+                      AND p.is_external
                 ) AS agg ON TRUE
                 ORDER BY r.name
                 """;
@@ -664,14 +675,16 @@ public class SyncDao {
                               LocalDate budgetTo,
                               Long namespaceId,
                               String namespaceName,
+                              boolean isExternal,
                               BigDecimal hourlyRateCzk) {
-        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ?, namespace_id = ?, namespace_name = ?, hourly_rate_czk = ? WHERE id = ?",
+        jdbc.update("UPDATE project SET name = ?, budget = ?, budget_from = ?, budget_to = ?, namespace_id = ?, namespace_name = ?, is_external = ?, hourly_rate_czk = ? WHERE id = ?",
                 name,
                 budget,
                 budgetFrom,
                 budgetTo,
                 namespaceId,
                 namespaceName,
+                isExternal,
                 hourlyRateCzk,
                 id);
     }

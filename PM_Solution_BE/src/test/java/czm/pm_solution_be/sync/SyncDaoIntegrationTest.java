@@ -5,6 +5,7 @@ import czm.pm_solution_be.intern.InternDao.InternRow;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.DockerClientFactory;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SyncDaoIntegrationTest {
 
@@ -130,7 +132,7 @@ class SyncDaoIntegrationTest {
 
             BigDecimal oneHour = BigDecimal.ONE.setScale(4, RoundingMode.UNNECESSARY);
             BigDecimal projectRate = BigDecimal.valueOf(250);
-            Long projectId = syncDao.createProjectByName("Projekt-" + UUID.randomUUID(), null, null, null, null, null, projectRate);
+            Long projectId = syncDao.createProjectByName("Projekt-" + UUID.randomUUID(), null, null, null, null, null, true, projectRate);
             syncDao.linkProjectRepository(projectId, repositoryId);
 
             SyncDao.ReportInsertStats stats = syncDao.insertReports(List.of(
@@ -157,6 +159,42 @@ class SyncDaoIntegrationTest {
                     BigDecimal.class,
                     projectId);
             assertThat(cachedTotal).isEqualByComparingTo("250.00");
+        }
+    }
+
+    @Test
+    void createProjectByNameRejectsHourlyRateForInternalProject() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+
+            assertThatThrownBy(() -> syncDao.createProjectByName(
+                    "Internal-" + UUID.randomUUID(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    BigDecimal.valueOf(123)))
+                    .isInstanceOf(DataIntegrityViolationException.class);
         }
     }
 

@@ -21,6 +21,7 @@ public class ProjectQueryController {
                              Integer budget,
                              java.time.LocalDate budgetFrom,
                              java.time.LocalDate budgetTo,
+                             boolean isExternal,
                              BigDecimal hourlyRateCzk,
                              BigDecimal reportedCost) {}
 
@@ -29,6 +30,7 @@ public class ProjectQueryController {
                                      Integer budget,
                                      java.time.LocalDate budgetFrom,
                                      java.time.LocalDate budgetTo,
+                                     boolean isExternal,
                                      BigDecimal hourlyRateCzk,
                                      BigDecimal reportedCost,
                                      Integer teamMembers,
@@ -37,7 +39,7 @@ public class ProjectQueryController {
     @GetMapping
     public List<ProjectDto> list() {
         return dao.listProjects().stream()
-                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.hourlyRateCzk(), r.reportedCost()))
+                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.isExternal(), r.hourlyRateCzk(), r.reportedCost()))
                 .toList();
     }
 
@@ -50,6 +52,7 @@ public class ProjectQueryController {
                         r.budget(),
                         r.budgetFrom(),
                         r.budgetTo(),
+                        r.isExternal(),
                         r.hourlyRateCzk(),
                         r.reportedCost(),
                         r.teamMembers(),

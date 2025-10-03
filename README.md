@@ -44,6 +44,12 @@ Each synchronisation triggers the backend endpoint `POST /api/sync/projects/{pro
 
 The backend deduplicates entries with an `ON CONFLICT` clause on `(repository_id, iid, username, spent_at, time_spent_seconds)` and reports usernames that do not exist in the `intern` table so the UI can inform operators. If an intern account is deleted, Flyway migration `V11__report_username_nullable.sql` keeps the referential integrity intact by allowing `report.username` to be set to `NULL` so the `ON DELETE SET NULL` rule can run before the maintenance purge.
 
+### Projektové sazby
+
+- Projekty mají nový příznak `project.is_external` (výchozí `FALSE`). Pouze externí projekty mohou uchovávat projektovou hodinovou sazbu (`project.hourly_rate_czk`).
+- REST API rozšiřuje DTO o pole `isExternal`. Pokud je hodnota `false` nebo chybí, backend sazbu ignoruje a uloží `NULL`. Pokus o nastavení sazby pro interní projekt skončí validační chybou.
+- Přepočty výkazů a cache (`project.reported_cost`) používají projektovou sazbu pouze tehdy, když je projekt označen jako externí.
+
 ### API reference
 
 Swagger UI is available at `http://localhost:8081/swagger-ui/index.html` when the backend is running. The documentation now includes the detailed description of the report synchronisation endpoint together with request/response schemas.
