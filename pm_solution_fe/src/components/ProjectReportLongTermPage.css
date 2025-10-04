@@ -95,6 +95,46 @@
   box-shadow: 0 22px 40px rgba(15, 23, 42, 0.08);
 }
 
+.projectLongTerm__comparisonCard {
+  gap: 24px;
+}
+
+.projectLongTerm__comparisonControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.projectLongTerm__milestoneSelectLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: min(100%, 360px);
+}
+
+.projectLongTerm__milestoneSelectLabel span {
+  font-size: 0.9rem;
+}
+
+.projectLongTerm__milestoneSelect {
+  min-height: 180px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: rgba(15, 23, 42, 0.02);
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+  resize: vertical;
+}
+
+.projectLongTerm__milestoneSelect:disabled {
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--color-text-muted);
+}
+
 .projectLongTerm__chartHeader {
   display: flex;
   flex-wrap: wrap;

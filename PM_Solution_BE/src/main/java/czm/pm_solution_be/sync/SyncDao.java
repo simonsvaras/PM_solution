@@ -827,6 +827,13 @@ public class SyncDao {
                                      long totalTimeSpentSeconds,
                                      BigDecimal totalCost) {}
 
+    public record MilestoneCostSummaryRow(long milestoneId,
+                                          long milestoneIid,
+                                          String title,
+                                          String state,
+                                          LocalDate dueDate,
+                                          BigDecimal totalCost) {}
+
     public record MilestoneIssueCostRow(long milestoneId,
                                         Long issueId,
                                         Long issueIid,
@@ -1077,6 +1084,37 @@ public class SyncDao {
                     Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L)
             );
         }, internUsername, projectId, internUsername);
+    }
+
+    /**
+     * Fetches the pre-aggregated milestone cost totals for a single project. The query relies on the
+     * {@code milestone_report_cost} materialised view that already combines report data across
+     * repositories which keeps the Java layer lightweight.
+     *
+     * @param projectId identifier of the project whose milestone totals should be listed
+     * @return ordered list of milestone summaries with a zero-cost fallback for missing data
+     */
+    public List<MilestoneCostSummaryRow> listProjectMilestoneCosts(long projectId) {
+        String sql = """
+                SELECT m.milestone_id,
+                       m.milestone_iid,
+                       m.title,
+                       m.state,
+                       m.due_date,
+                       COALESCE(mrc.total_cost, 0) AS total_cost
+                FROM milestone m
+                LEFT JOIN milestone_report_cost mrc ON mrc.milestone_id = m.milestone_id
+                WHERE m.project_id = ?
+                ORDER BY m.due_date NULLS LAST, LOWER(m.title)
+                """;
+        return jdbc.query(sql, (rs, rn) -> new MilestoneCostSummaryRow(
+                rs.getLong("milestone_id"),
+                rs.getLong("milestone_iid"),
+                rs.getString("title"),
+                rs.getString("state"),
+                rs.getObject("due_date", LocalDate.class),
+                Optional.ofNullable(rs.getBigDecimal("total_cost")).orElse(BigDecimal.ZERO)
+        ), projectId);
     }
 
     public List<ActiveMilestoneRow> listActiveMilestones(long projectId) {
