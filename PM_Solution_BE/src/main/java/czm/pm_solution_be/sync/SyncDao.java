@@ -1468,6 +1468,13 @@ public class SyncDao {
 
     public int recomputeReportCostsForIntern(long internId) {
         String sql = """
+                WITH project_rate AS (
+                    SELECT ptr.repository_id,
+                           MAX(p.hourly_rate_czk) AS hourly_rate_czk
+                    FROM projects_to_repositorie ptr
+                    JOIN project p ON p.id = ptr.project_id
+                    GROUP BY ptr.repository_id
+                )
                 UPDATE report r
                 SET cost = CASE
                         WHEN COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) IS NULL THEN NULL
@@ -1477,12 +1484,7 @@ public class SyncDao {
                 FROM intern i
                 JOIN intern_level_history h ON h.intern_id = i.id
                 JOIN level l ON l.id = h.level_id
-                LEFT JOIN LATERAL (
-                    SELECT MAX(p.hourly_rate_czk) AS hourly_rate_czk
-                    FROM projects_to_repositorie ptr
-                    JOIN project p ON p.id = ptr.project_id
-                    WHERE ptr.repository_id = r.repository_id
-                ) AS project_rate ON TRUE
+                LEFT JOIN project_rate ON project_rate.repository_id = r.repository_id
                 WHERE i.id = ?
                   AND r.username = i.username
                   AND r.spent_at::date >= h.valid_from

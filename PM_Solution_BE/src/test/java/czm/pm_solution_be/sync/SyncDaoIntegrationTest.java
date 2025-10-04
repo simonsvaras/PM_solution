@@ -444,7 +444,8 @@ class SyncDaoIntegrationTest {
             SyncDao syncDao = new SyncDao(jdbcTemplate);
             InternDao internDao = new InternDao(jdbcTemplate);
 
-            long repositoryId = insertRepository(jdbcTemplate);
+            long repositoryWithoutProject = insertRepository(jdbcTemplate);
+            long repositoryWithProject = insertRepository(jdbcTemplate);
             long juniorLevelId = insertLevel(jdbcTemplate, "junior", BigDecimal.valueOf(160));
             long mediorLevelId = insertLevel(jdbcTemplate, "medior", BigDecimal.valueOf(180));
 
@@ -453,24 +454,52 @@ class SyncDaoIntegrationTest {
             insertLevelHistory(jdbcTemplate, intern.id(), juniorLevelId,
                     LocalDate.of(2024, 3, 1), null);
 
+            BigDecimal projectRate = BigDecimal.valueOf(250);
+            Long projectId = syncDao.createProjectByName(
+                    "Projekt-" + UUID.randomUUID(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    true,
+                    projectRate);
+            syncDao.linkProjectRepository(projectId, repositoryWithProject);
+
             BigDecimal oneHour = BigDecimal.ONE.setScale(4, RoundingMode.UNNECESSARY);
             SyncDao.ReportInsertStats stats = syncDao.insertReports(List.of(
                     new SyncDao.ReportRow(
-                            repositoryId,
+                            repositoryWithoutProject,
                             101L,
+                            OffsetDateTime.parse("2025-06-01T10:00:00Z"),
+                            3600,
+                            oneHour,
+                            intern.username(),
+                            null),
+                    new SyncDao.ReportRow(
+                            repositoryWithProject,
+                            202L,
                             OffsetDateTime.parse("2025-08-01T10:00:00Z"),
                             3600,
                             oneHour,
                             intern.username(),
-                            null)
+                            projectRate)
             ));
-            assertThat(stats.inserted()).isEqualTo(1);
+            assertThat(stats.inserted()).isEqualTo(2);
 
-            Map<String, Object> initial = jdbcTemplate.queryForMap(
-                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ?",
-                    intern.username());
-            assertThat(((BigDecimal) initial.get("cost"))).isEqualByComparingTo("160.00");
-            assertThat(((BigDecimal) initial.get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
+            Map<String, Object> initialWithoutProject = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ? AND repository_id = ?",
+                    intern.username(),
+                    repositoryWithoutProject);
+            assertThat(((BigDecimal) initialWithoutProject.get("cost"))).isEqualByComparingTo("160.00");
+            assertThat(((BigDecimal) initialWithoutProject.get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
+
+            Map<String, Object> initialWithProject = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ? AND repository_id = ?",
+                    intern.username(),
+                    repositoryWithProject);
+            assertThat(((BigDecimal) initialWithProject.get("cost"))).isEqualByComparingTo("250.00");
+            assertThat(((BigDecimal) initialWithProject.get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
 
             jdbcTemplate.update(
                     "UPDATE intern_level_history SET valid_to = ? WHERE intern_id = ? AND valid_to IS NULL",
@@ -481,13 +510,21 @@ class SyncDaoIntegrationTest {
             jdbcTemplate.update("UPDATE intern SET level_id = ? WHERE id = ?", mediorLevelId, intern.id());
 
             int recalculated = syncDao.recomputeReportCostsForIntern(intern.id());
-            assertThat(recalculated).isEqualTo(1);
+            assertThat(recalculated).isEqualTo(2);
 
-            Map<String, Object> recomputed = jdbcTemplate.queryForMap(
-                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ?",
-                    intern.username());
-            assertThat(((BigDecimal) recomputed.get("cost"))).isEqualByComparingTo("180.00");
-            assertThat(((BigDecimal) recomputed.get("hourly_rate_czk"))).isEqualByComparingTo("180.00");
+            Map<String, Object> recomputedWithoutProject = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ? AND repository_id = ?",
+                    intern.username(),
+                    repositoryWithoutProject);
+            assertThat(((BigDecimal) recomputedWithoutProject.get("cost"))).isEqualByComparingTo("160.00");
+            assertThat(((BigDecimal) recomputedWithoutProject.get("hourly_rate_czk"))).isEqualByComparingTo("160.00");
+
+            Map<String, Object> recomputedWithProject = jdbcTemplate.queryForMap(
+                    "SELECT cost, hourly_rate_czk FROM report WHERE username = ? AND repository_id = ?",
+                    intern.username(),
+                    repositoryWithProject);
+            assertThat(((BigDecimal) recomputedWithProject.get("cost"))).isEqualByComparingTo("250.00");
+            assertThat(((BigDecimal) recomputedWithProject.get("hourly_rate_czk"))).isEqualByComparingTo("180.00");
         }
     }
 
