@@ -1086,6 +1086,14 @@ public class SyncDao {
         }, internUsername, projectId, internUsername);
     }
 
+    /**
+     * Fetches the pre-aggregated milestone cost totals for a single project. The query relies on the
+     * {@code milestone_report_cost} materialised view that already combines report data across
+     * repositories which keeps the Java layer lightweight.
+     *
+     * @param projectId identifier of the project whose milestone totals should be listed
+     * @return ordered list of milestone summaries with a zero-cost fallback for missing data
+     */
     public List<MilestoneCostSummaryRow> listProjectMilestoneCosts(long projectId) {
         String sql = """
                 SELECT m.milestone_id,
