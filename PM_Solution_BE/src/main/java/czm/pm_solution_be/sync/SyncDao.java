@@ -142,7 +142,10 @@ public class SyncDao {
                                         String lastName,
                                         OffsetDateTime monthStart,
                                         BigDecimal hours,
-                                        BigDecimal cost) {}
+                                        BigDecimal cost,
+                                        Long levelId,
+                                        String levelCode,
+                                        String levelLabel) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
@@ -1090,10 +1093,25 @@ public class SyncDao {
                        i.last_name,
                        ms.month_start,
                        COALESCE(rm.hours, 0) AS hours,
-                       COALESCE(rm.cost, 0) AS cost
+                       COALESCE(rm.cost, 0) AS cost,
+                       level_for_month.level_id,
+                       level_for_month.level_code,
+                       level_for_month.level_label
                 FROM intern i
                 CROSS JOIN month_series ms
                 LEFT JOIN report_months rm ON rm.intern_id = i.id AND rm.month_start = ms.month_start
+                LEFT JOIN LATERAL (
+                    SELECT lvl.id AS level_id,
+                           lvl.code AS level_code,
+                           lvl.label AS level_label
+                    FROM intern_level_history ilh_month
+                    JOIN level lvl ON lvl.id = ilh_month.level_id
+                    WHERE ilh_month.intern_id = i.id
+                      AND ilh_month.valid_from <= ms.month_start::date
+                      AND (ilh_month.valid_to IS NULL OR ilh_month.valid_to >= ms.month_start::date)
+                    ORDER BY ilh_month.valid_from DESC
+                    LIMIT 1
+                ) AS level_for_month ON TRUE
                 ORDER BY LOWER(i.last_name), LOWER(i.first_name), i.username, ms.month_start
                 """;
 
@@ -1105,7 +1123,10 @@ public class SyncDao {
                         rs.getString("last_name"),
                         rs.getObject("month_start", OffsetDateTime.class),
                         rs.getBigDecimal("hours"),
-                        rs.getBigDecimal("cost")),
+                        rs.getBigDecimal("cost"),
+                        (Long) rs.getObject("level_id"),
+                        rs.getString("level_code"),
+                        rs.getString("level_label")),
                 from,
                 to,
                 from,

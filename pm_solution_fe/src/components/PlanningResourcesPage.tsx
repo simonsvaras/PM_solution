@@ -129,9 +129,14 @@ function PlanningResourcesPage() {
     [rowsByYear, selectedYear],
   );
 
+  const eligibleRowsForSelectedYear = useMemo(
+    () => rowsForSelectedYear.filter(row => !isEmployeeLevel(row)),
+    [rowsForSelectedYear],
+  );
+
   const interns = useMemo<InternNormalizedRow[]>(() => {
     const map = new Map<number, InternHoursAccumulator>();
-    rowsForSelectedYear.forEach(row => {
+    eligibleRowsForSelectedYear.forEach(row => {
       const monthIndex = Number.isFinite(row.month) ? row.month - 1 : -1;
       if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
         return;
@@ -161,7 +166,7 @@ function PlanningResourcesPage() {
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-  }, [rowsForSelectedYear]);
+  }, [eligibleRowsForSelectedYear]);
 
   const averageNormalizedCapacity = useMemo(() => {
     if (interns.length === 0) {
@@ -182,7 +187,7 @@ function PlanningResourcesPage() {
     [averageNormalizedCapacity],
   );
 
-  const hasData = selectedYear != null && rowsForSelectedYear.length > 0;
+  const hasData = selectedYear != null && interns.length > 0;
 
   const selectedYearLabel = typeof selectedYear === 'number' ? selectedYear.toString() : null;
   const yearRangeDescription = sortedYearsAsc.length === 0
@@ -201,7 +206,8 @@ function PlanningResourcesPage() {
         <p className="planning-resources__intro">
           Normalizovaná kapacita vyjadřuje poměr vykázaných hodin v&nbsp;daném měsíci vůči nejvyššímu počtu hodin,
           které stážista ve vybraném roce zaznamenal. Pro každého stážistu se tedy nejvytíženější měsíc bere jako 100&nbsp;%
-          a&nbsp;ostatní hodnoty se přepočítají na procenta. Data jsou k&nbsp;dispozici za {yearRangeDescription}.
+          a&nbsp;ostatní hodnoty se přepočítají na procenta. Do výpočtu se zahrnují pouze stážisti, kteří nemají úroveň
+          „zaměstnanec“. Data jsou k&nbsp;dispozici za {yearRangeDescription}.
           Pomocí přepínače vpravo zvolte rok, pro který chcete kapacitu zobrazit.
         </p>
         <div className="planning-resources__yearSelector" role="group" aria-label="Výběr roku">
@@ -238,7 +244,7 @@ function PlanningResourcesPage() {
             <NormalizedCapacityChart data={chartPoints} year={selectedYear} />
           ) : (
             <p className="planning-resources__status">
-              Pro vybraný rok zatím nejsou k&nbsp;dispozici žádné záznamy.
+              Pro vybraný rok zatím nejsou k&nbsp;dispozici žádné záznamy pro stážisty s&nbsp;úrovní odlišnou od „zaměstnanec“.
             </p>
           )}
         </div>
@@ -303,10 +309,13 @@ function PlanningResourcesPage() {
               </table>
             </div>
           ) : (
-            <p className="planning-resources__status">Tabulka se zobrazí po načtení dat.</p>
+            <p className="planning-resources__status">
+              Pro vybraný rok zatím nejsou k&nbsp;dispozici žádné záznamy pro stážisty s&nbsp;úrovní odlišnou od „zaměstnanec“.
+            </p>
           )}
           <p className="planning-resources__note">
-            Procentuální hodnoty odpovídají poměru vůči individuálnímu maximu každého stážisty {selectedYearText}.
+            Procentuální hodnoty odpovídají poměru vůči individuálnímu maximu každého stážisty {selectedYearText}. Do tabulky se
+            zahrnují pouze stážisti, kteří nemají úroveň „zaměstnanec“.
           </p>
         </div>
       </section>
@@ -322,6 +331,19 @@ function buildInternName(row: InternMonthlyHoursRow): string {
     return parts.join(' ');
   }
   return row.username;
+}
+
+function normaliseLower(value: string | null | undefined, locale: string): string {
+  return value ? value.toLocaleLowerCase(locale) : '';
+}
+
+function isEmployeeLevel(row: InternMonthlyHoursRow): boolean {
+  const levelCode = normaliseLower(row.levelCode, 'en');
+  if (levelCode === 'employee') {
+    return true;
+  }
+  const levelLabel = normaliseLower(row.levelLabel, 'cs');
+  return levelLabel === 'zaměstnanec' || levelLabel === 'zamestnanec';
 }
 
 function NormalizedCapacityChart({ data, year }: { data: ChartPoint[]; year: number | null }) {

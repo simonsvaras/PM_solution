@@ -164,7 +164,10 @@ public class InternService {
                             year,
                             month,
                             row.hours() != null ? row.hours() : BigDecimal.ZERO,
-                            row.cost() != null ? row.cost() : BigDecimal.ZERO);
+                            row.cost() != null ? row.cost() : BigDecimal.ZERO,
+                            row.levelId(),
+                            row.levelCode(),
+                            row.levelLabel());
                 })
                 .toList();
     }
@@ -570,7 +573,10 @@ public class InternService {
                                              int year,
                                              int month,
                                              BigDecimal hours,
-                                             BigDecimal cost) {}
+                                             BigDecimal cost,
+                                             Long levelId,
+                                             String levelCode,
+                                             String levelLabel) {}
 }
 
 

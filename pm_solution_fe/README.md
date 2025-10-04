@@ -44,7 +44,8 @@ Key modules
 - **Plánování / Plánování zdrojů** – vizualizuje normalizovanou kapacitu stážistů. Z endpointu `/api/interns/monthly-hours` načte
   vykázané hodiny za poslední dva roky, pro každého stážistu najde maximum v příslušném roce, přepočte ostatní měsíce na procenta
   a zobrazí průměr v čárovém grafu doplněném o tabulku s hodinami i procentuální hodnotou pro jednotlivé měsíce. Přepínač v horní
-  části stránky umožní rychle přepnout mezi dostupnými roky.
+  části stránky umožní rychle přepnout mezi dostupnými roky a graf ignoruje stážisty s úrovní „zaměstnanec“, aby normalizace
+  odrážela pouze aktivní stážisty.
 
 API usage
 ---------

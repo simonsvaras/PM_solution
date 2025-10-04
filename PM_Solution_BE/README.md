@@ -59,7 +59,7 @@ Key REST endpoints
 
 ### Intern registry
 - `GET /api/interns/overview` – non-paginated overview of all interns including aggregated tracked hours.
-- `GET /api/interns/monthly-hours?from={yyyy-MM-dd}&to={yyyy-MM-dd}` – month-bucketed aggregation of intern hours and costs for the inclusive interval (used by the overview filter). Každý řádek vrací také pole `year` a `month`, takže FE snadno oddělí poslední dva sledované roky bez dalšího parsování datumu.
+- `GET /api/interns/monthly-hours?from={yyyy-MM-dd}&to={yyyy-MM-dd}` – month-bucketed aggregation of intern hours and costs for the inclusive interval (used by the overview filter). Každý řádek vrací také pole `year`, `month` a identifikaci úrovně (`levelId`, `levelCode`, `levelLabel`), takže FE snadno oddělí poslední dva sledované roky bez dalšího parsování datumu a může filtrovat zaměstnance mimo výpočet normalizované kapacity.
 - `GET /api/interns/{id}/detail` – overview for a single intern with project workload allocations.
 - `GET /api/levels` – list level reference data (id, code, label).
 - `GET /api/groups` – list intern groups (id, code, label).

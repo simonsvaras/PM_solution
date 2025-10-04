@@ -287,6 +287,9 @@ export type InternMonthlyHoursRowDTO = {
   month: number;
   hours: number | string;
   cost: number | string | null;
+  levelId: number | null;
+  levelCode: string | null;
+  levelLabel: string | null;
 };
 
 export type InternMonthlyHoursRow = {
@@ -299,6 +302,9 @@ export type InternMonthlyHoursRow = {
   month: number;
   hours: number;
   cost: number | null;
+  levelId: number | null;
+  levelCode: string | null;
+  levelLabel: string | null;
 };
 
 export type TeamReportInternDTO = {
@@ -510,6 +516,9 @@ function mapInternMonthlyHoursRow(dto: InternMonthlyHoursRowDTO): InternMonthlyH
     month: dto.month,
     hours: Number.isNaN(hoursRaw) ? 0 : hoursRaw,
     cost: Number.isNaN(costRaw) ? null : costRaw,
+    levelId: dto.levelId ?? null,
+    levelCode: dto.levelCode ?? null,
+    levelLabel: dto.levelLabel ?? null,
   };
 }
 

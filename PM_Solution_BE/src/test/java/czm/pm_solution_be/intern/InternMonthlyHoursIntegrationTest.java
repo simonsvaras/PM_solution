@@ -132,6 +132,12 @@ class InternMonthlyHoursIntegrationTest {
             assertThat(juniorRows.get(0).cost()).isEqualByComparingTo(projectRate.multiply(BigDecimal.valueOf(2)));
             assertThat(juniorRows.get(1).hours()).isEqualByComparingTo(twoHours);
             assertThat(juniorRows.get(1).cost()).isEqualByComparingTo(projectRate.multiply(BigDecimal.valueOf(2)));
+            assertThat(juniorRows)
+                    .allSatisfy(row -> {
+                        assertThat(row.levelId()).isEqualTo(juniorLevelId);
+                        assertThat(row.levelCode()).isEqualTo("junior");
+                        assertThat(row.levelLabel()).isEqualTo("Level junior");
+                    });
 
             List<InternMonthlyHoursRow> employeeRows = rowsByIntern.get(employeeIntern.id());
             assertThat(employeeRows).extracting(row -> row.monthStart().toLocalDate())
@@ -140,6 +146,12 @@ class InternMonthlyHoursIntegrationTest {
             assertThat(employeeRows.get(0).cost()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(employeeRows.get(1).hours()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(employeeRows.get(1).cost()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(employeeRows)
+                    .allSatisfy(row -> {
+                        assertThat(row.levelId()).isEqualTo(employeeLevelId);
+                        assertThat(row.levelCode()).isEqualTo("employee");
+                        assertThat(row.levelLabel()).isEqualTo("Level employee");
+                    });
 
             List<InternMonthlyHoursRow> idleRows = rowsByIntern.get(idleIntern.id());
             assertThat(idleRows).extracting(row -> row.monthStart().toLocalDate())
@@ -148,6 +160,12 @@ class InternMonthlyHoursIntegrationTest {
             assertThat(idleRows.get(1).hours()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(idleRows.get(0).cost()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(idleRows.get(1).cost()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(idleRows)
+                    .allSatisfy(row -> {
+                        assertThat(row.levelId()).isEqualTo(juniorLevelId);
+                        assertThat(row.levelCode()).isEqualTo("junior");
+                        assertThat(row.levelLabel()).isEqualTo("Level junior");
+                    });
         }
     }
 
