@@ -33,21 +33,21 @@ type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'REPORTS';
 
 const modules: Module[] = [
   {
-    key: 'sync',
-    name: 'Synchronizace',
-    submodules: [
-      { key: 'sync-on-demand', name: 'On-demand' },
-      { key: 'sync-report-overview', name: 'Přehled reportů' },
-      { key: 'sync-history', name: 'Historie' },
-    ],
-  },
-  {
     key: 'projects',
     name: 'Projekty',
     submodules: [
       { key: 'projects-overview', name: 'Přehled projektů' },
       { key: 'projects-teams', name: 'Týmy' },
       { key: 'projects-admin', name: 'Správa projektů' },
+    ],
+  },
+  {
+    key: 'sync',
+    name: 'Synchronizace',
+    submodules: [
+      { key: 'sync-on-demand', name: 'On-demand' },
+      { key: 'sync-report-overview', name: 'Přehled reportů' },
+      { key: 'sync-history', name: 'Historie' },
     ],
   },
   {
@@ -455,9 +455,9 @@ function App() {
 
   const detailNavigationItems: { view: DetailSectionView; label: string }[] = [
     { view: 'detail', label: 'Obecný report' },
-    { view: 'detail-long-term', label: 'Dlouhodobý report' },
     { view: 'detail-intern', label: 'Detail stážisty' },
     { view: 'detail-project', label: 'Detail projektu' },
+    { view: 'detail-long-term', label: 'Dlouhodobý report' },
   ];
 
   const detailNavigation = isProjectReportDetail ? (
