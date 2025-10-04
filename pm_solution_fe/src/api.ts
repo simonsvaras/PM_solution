@@ -653,6 +653,10 @@ export async function getProjectActiveMilestones(projectId: number): Promise<Pro
   return parseJson<ProjectMilestoneSummary[]>(res);
 }
 
+/**
+ * Fetches aggregated cost totals for every milestone within the selected project. The endpoint
+ * returns a flat list so the consumer can build arbitrary comparisons without further API calls.
+ */
 export async function getProjectMilestoneCostSummary(
   projectId: number,
 ): Promise<ProjectMilestoneCostSummary[]> {
@@ -661,6 +665,11 @@ export async function getProjectMilestoneCostSummary(
   return parseJson<ProjectMilestoneCostSummary[]>(res);
 }
 
+/**
+ * Loads per-issue cost totals for a whitelist of milestone identifiers. The helper defensively
+ * filters duplicate and non-numeric values to avoid unnecessary backend work and to keep the
+ * generated query string compact.
+ */
 export async function getProjectMilestoneIssueCosts(
   projectId: number,
   milestoneIds: number[],

@@ -24,6 +24,9 @@ const baseProject: ProjectOverviewDTO = {
   hourlyRateCzk: null,
 };
 
+/**
+ * Formats a native Date object to the YYYY-MM-DD string representation expected by the form inputs.
+ */
 function formatDateValue(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -181,8 +184,10 @@ describe('ProjectReportLongTermPage', () => {
     const heading = await screen.findByRole('heading', { name: 'Srovnání milestones' });
     expect(heading).toBeInTheDocument();
 
-    const select = screen.getByLabelText('Vyberte milníky') as HTMLSelectElement;
-    const selectedValues = Array.from(select.selectedOptions).map(option => option.value);
-    expect(new Set(selectedValues)).toEqual(new Set(['10', '11']));
+    await waitFor(() => {
+      const select = screen.getByLabelText('Vyberte milníky') as HTMLSelectElement;
+      const selectedValues = Array.from(select.selectedOptions).map(option => option.value);
+      expect(new Set(selectedValues)).toEqual(new Set(['10', '11']));
+    });
   });
 });

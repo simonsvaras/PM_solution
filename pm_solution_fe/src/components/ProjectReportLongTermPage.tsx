@@ -131,12 +131,20 @@ function isNonNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
+/**
+ * Creates a stable label for the milestone multi-select that combines IID with a sanitized title
+ * so that users can quickly orient themselves even when titles are missing.
+ */
 function formatMilestoneOptionLabel(milestone: ProjectMilestoneCostSummary): string {
   const trimmedTitle = milestone.title?.trim();
   const title = trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : 'Bez názvu';
   return `#${milestone.milestoneIid} — ${title}`;
 }
 
+/**
+ * Normalises a month string received from the backend to the YYYY-MM format used within chart
+ * calculations. Handles both ISO timestamps and already normalised keys.
+ */
 function getMonthKeyFromMonthStart(value: string): string | null {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
@@ -148,6 +156,11 @@ function getMonthKeyFromMonthStart(value: string): string | null {
   return normalizeMonthKey(value);
 }
 
+/**
+ * Combines the long-term monthly report view with milestone cost comparisons for a single project.
+ * The component orchestrates data loading and renders SVG visualisations without external chart
+ * dependencies to keep the bundle size small.
+ */
 export default function ProjectReportLongTermPage({ project }: ProjectReportLongTermPageProps) {
   const defaultRange = useMemo(() => getCurrentYearRange(), []);
   const [fromValue, setFromValue] = useState(defaultRange.from);
@@ -170,6 +183,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const milestoneSelectId = useId();
   const projectId = project.id;
 
+  // Reset the local state whenever the project changes so that the date range and derived caches
+  // always reflect the newly selected project without carrying over previous data.
   useEffect(() => {
     setFromValue(defaultRange.from);
     setToValue(defaultRange.to);
@@ -184,6 +199,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     setMilestoneCostError(null);
   }, [project.id, defaultRange.from, defaultRange.to]);
 
+  // Fetch the long-term project report for the currently selected date interval. Validation happens
+  // on the client before issuing the request to provide immediate feedback.
   useEffect(() => {
     const parsedFrom = parseDateInput(fromValue);
     const parsedTo = parseDateInput(toValue);
@@ -265,6 +282,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     };
   }, [projectId, fromValue, toValue]);
 
+  // Keep the milestone cost dataset in sync with the project selection and preserve any previously
+  // selected milestone IDs when they are still present in the refreshed payload.
   useEffect(() => {
     let ignore = false;
     setLoadingMilestoneCosts(true);
@@ -457,6 +476,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     [hasBudget],
   );
 
+  // Resolve the currently selected milestone summaries so downstream calculations can work with the
+  // denormalised objects rather than repeating set lookups.
   const selectedMilestoneSummaries = useMemo(() => {
     if (milestoneCosts.length === 0 || selectedMilestoneIds.length === 0) {
       return [] as ProjectMilestoneCostSummary[];
@@ -465,11 +486,15 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return milestoneCosts.filter(item => allowed.has(item.milestoneId));
   }, [milestoneCosts, selectedMilestoneIds]);
 
+  // Calculate the maximum cost to scale the comparison bars even when the API returns numeric
+  // strings (e.g. from JSON serialisation of decimals).
   const maxMilestoneCost = selectedMilestoneSummaries.reduce((max, item) => {
     const costValue = typeof item.totalCost === 'number' ? item.totalCost : Number(item.totalCost ?? 0);
     return Math.max(max, Number.isFinite(costValue) ? costValue : 0);
   }, 0);
 
+  // Determine whether any of the selected milestones contain a meaningful cost so we can toggle the
+  // empty state versus the SVG rendering.
   const hasMilestoneCostData = selectedMilestoneSummaries.some(item => {
     const costValue = typeof item.totalCost === 'number' ? item.totalCost : Number(item.totalCost ?? 0);
     return Number.isFinite(costValue) && costValue > 0;
@@ -515,8 +540,13 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const milestoneChartEmptyState =
     !loadingMilestoneCosts && selectedMilestoneSummaries.length > 0 && !hasMilestoneCostData;
 
+  // Size the multi-select depending on available milestones while keeping the control manageable.
   const milestoneSelectSize = Math.min(10, Math.max(4, milestoneCosts.length || 4));
 
+  /**
+   * Updates the selected milestone ID list from the multi-select element while ignoring empty or
+   * unparsable values. The component state stores numeric IDs for easier comparisons later on.
+   */
   const handleMilestoneSelectionChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const values = Array.from(event.target.selectedOptions)
       .map(option => Number.parseInt(option.value, 10))
@@ -860,8 +890,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                       y={milestoneChartHeight - milestonePaddingY + 24}
                       textAnchor="middle"
                       className="projectLongTerm__chartLabel"
-                      title={optionLabel}
                     >
+                      <title>{optionLabel}</title>
                       {chartLabel}
                     </text>
                   </g>
