@@ -33,21 +33,21 @@ type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'REPORTS';
 
 const modules: Module[] = [
   {
-    key: 'sync',
-    name: 'Synchronizace',
-    submodules: [
-      { key: 'sync-on-demand', name: 'On-demand' },
-      { key: 'sync-report-overview', name: 'Přehled reportů' },
-      { key: 'sync-history', name: 'Historie' },
-    ],
-  },
-  {
     key: 'projects',
     name: 'Projekty',
     submodules: [
       { key: 'projects-overview', name: 'Přehled projektů' },
       { key: 'projects-teams', name: 'Týmy' },
       { key: 'projects-admin', name: 'Správa projektů' },
+    ],
+  },
+  {
+    key: 'sync',
+    name: 'Synchronizace',
+    submodules: [
+      { key: 'sync-on-demand', name: 'On-demand' },
+      { key: 'sync-report-overview', name: 'Přehled reportů' },
+      { key: 'sync-history', name: 'Historie' },
     ],
   },
   {
