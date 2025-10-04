@@ -890,8 +890,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                       y={milestoneChartHeight - milestonePaddingY + 24}
                       textAnchor="middle"
                       className="projectLongTerm__chartLabel"
-                      title={optionLabel}
                     >
+                      <title>{optionLabel}</title>
                       {chartLabel}
                     </text>
                   </g>
