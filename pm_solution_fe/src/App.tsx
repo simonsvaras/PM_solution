@@ -17,7 +17,6 @@ import {
   deleteReports,
   getProjects,
   getProjectsOverview,
-  syncAllGlobal,
   syncIssuesAll,
   syncRepositories,
   syncReportsAll,
@@ -28,9 +27,9 @@ import {
   datetimeLocalToIso,
   getDefaultReportingPeriod,
 } from './config/reportingPeriod';
-import type { AllResult, ErrorResponse, ProjectDTO, ProjectOverviewDTO, SyncSummary } from './api';
+import type { ErrorResponse, ProjectDTO, ProjectOverviewDTO, SyncSummary } from './api';
 
-type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'ALL' | 'REPORTS';
+type ActionKind = 'REPOSITORIES' | 'ISSUES' | 'REPORTS';
 
 const modules: Module[] = [
   {
@@ -187,7 +186,7 @@ function App() {
   const [reportsTo, setReportsTo] = useState(defaultReportingPeriod.to);
 
   const [running, setRunning] = useState<ActionKind | null>(null);
-  const [result, setResult] = useState<SyncSummary | AllResult | null>(null);
+  const [result, setResult] = useState<SyncSummary | null>(null);
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const lastAction = useRef<null | (() => Promise<void>)>(null);
@@ -397,6 +396,9 @@ function App() {
   }
   if (isInternsOverview) {
     appContentInnerClassNames.push('app-content__inner--interns-overview');
+  }
+  if (isOnDemand) {
+    appContentInnerClassNames.push('app-content__inner--on-demand');
   }
 
   const headerEyebrow =
@@ -660,14 +662,6 @@ function App() {
     lastAction.current = doIssues;
   }
 
-  async function doAll() {
-    await run('ALL', async () => {
-      const res = await syncAllGlobal(!deltaOnly, assignedOnly, since || undefined);
-      setResult(res);
-    });
-    lastAction.current = doAll;
-  }
-
   async function doReports() {
     if (!isReportRangeValid) {
       showToast('warning', 'Neplatné datum od/do. Upravte rozsah a zkuste to znovu.');
@@ -743,24 +737,12 @@ function App() {
     : 'Bez výběru se smažou reporty všech projektů. Výběrem omezíte mazání jen na konkrétní projekty.';
 
   const resCard = result ? (
-    'durationMs' in result && 'fetched' in result ? (
-      <div className="card-summary">
-        <b>Souhrn</b>
-        <p>
-          fetched: {(result as SyncSummary).fetched}, inserted: {(result as SyncSummary).inserted}, updated: {(result as SyncSummary).updated}, skipped: {(result as SyncSummary).skipped}, pages: {(result as SyncSummary).pages}, duration: {(result as SyncSummary).durationMs} ms
-        </p>
-      </div>
-    ) : (
-      <div className="card-summary">
-        <b>Souhrn (ALL)</b>
-        <p>
-          Issues: {(result as AllResult).issues.status}
-          {(result as AllResult).issues.status === 'OK' ? ` (fetched ${(result as AllResult).issues.fetched}, pages ${(result as AllResult).issues.pages}, ${(result as AllResult).issues.durationMs} ms)` : ''}
-          <br />
-          Celkem: {(result as AllResult).durationMs} ms
-        </p>
-      </div>
-    )
+    <div className="card-summary">
+      <b>Souhrn</b>
+      <p>
+        fetched: {result.fetched}, inserted: {result.inserted}, updated: {result.updated}, skipped: {result.skipped}, pages: {result.pages}, duration: {result.durationMs} ms
+      </p>
+    </div>
   ) : null;
 
   const errCard = error ? (
@@ -832,7 +814,7 @@ function App() {
                             onChange={e => setSince(e.target.value)}
                           />
                         </label>
-                        <label className="on-demand-layout__field">
+                        <label className="on-demand-layout__field on-demand-layout__field--reports-range">
                           <span>Reporty od</span>
                           <input
                             type="datetime-local"
@@ -840,7 +822,7 @@ function App() {
                             onChange={e => setReportsFrom(e.target.value)}
                           />
                         </label>
-                        <label className="on-demand-layout__field">
+                        <label className="on-demand-layout__field on-demand-layout__field--reports-range">
                           <span>Reporty do</span>
                           <input
                             type="datetime-local"
@@ -855,14 +837,13 @@ function App() {
                     <div className="on-demand-layout__actions">
                       <h2 className="on-demand-layout__title">Spustit synchronizaci</h2>
                       <div className="actions">
-                        <button onClick={doRepositories} disabled={running === 'REPOSITORIES' || running === 'ALL'}>
+                        <button onClick={doRepositories} disabled={running === 'REPOSITORIES'}>
                           Sync Repositories
                         </button>
-                        <button onClick={doIssues} disabled={running === 'ISSUES' || running === 'ALL'}>Sync Issues</button>
-                        <button onClick={doAll} disabled={running !== null}>Sync ALL</button>
+                        <button onClick={doIssues} disabled={running === 'ISSUES'}>Sync Issues</button>
                         <button
                           onClick={doReports}
-                          disabled={running === 'REPORTS' || running === 'ALL' || !isReportRangeValid}
+                          disabled={running === 'REPORTS' || !isReportRangeValid}
                         >
                           Synchronizovat reporty
                         </button>

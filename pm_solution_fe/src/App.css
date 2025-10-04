@@ -10,9 +10,14 @@
   transition: margin-left 180ms ease;
 }
 
-.app-content__inner {
+.app-content__inner { 
   max-width: 960px;
   margin: 0 auto;
+}
+
+.app-content__inner--on-demand {
+  width: 70%;
+  max-width: none;
 }
 
 .app-content__inner--full {
@@ -70,6 +75,10 @@
   }
 
   .app-content__inner--interns-overview {
+    width: 100%;
+  }
+
+  .app-content__inner--on-demand {
     width: 100%;
   }
 
@@ -445,6 +454,10 @@
 .on-demand-layout__fields {
   display: grid;
   gap: 12px;
+}
+
+.on-demand-layout__field--reports-range {
+  grid-column: 1 / -1;
 }
 
 .on-demand-layout__results .results,
