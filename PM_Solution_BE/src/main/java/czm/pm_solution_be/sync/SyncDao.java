@@ -905,14 +905,22 @@ public class SyncDao {
                 "i.first_name AS intern_first_name, " +
                 "i.last_name AS intern_last_name, " +
                 "SUM(r.time_spent_hours) AS hours, " +
-                "SUM(CASE WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN " +
-                "COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0) ELSE 0 END) AS cost " +
+                "SUM(CASE " +
+                "        WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN " +
+                "            COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0) " +
+                "        WHEN lvl.code = 'employee' THEN 0 " +
+                "        ELSE COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0) " +
+                "    END) AS cost " +
                 "FROM report r " +
                 "JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id " +
                 "JOIN project p ON p.id = ptr.project_id " +
                 "JOIN repository repo ON repo.id = r.repository_id " +
                 "JOIN intern i ON i.username = r.username " +
                 "LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ptr.project_id " +
+                "LEFT JOIN intern_level_history ilh ON ilh.intern_id = i.id " +
+                "    AND ilh.valid_from <= r.spent_at::date " +
+                "    AND (ilh.valid_to IS NULL OR ilh.valid_to >= r.spent_at::date) " +
+                "LEFT JOIN level lvl ON lvl.id = ilh.level_id " +
                 "LEFT JOIN issue iss ON iss.repository_id = r.repository_id AND iss.iid = r.iid " +
                 "WHERE ptr.project_id = ?");
 
@@ -969,7 +977,9 @@ public class SyncDao {
                            SUM(CASE
                                    WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN
                                        COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
-                                   ELSE 0
+                                   WHEN lvl.code = 'employee' THEN 0
+                                   ELSE
+                                       COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
                                END) AS cost
                     FROM report r
                     JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id
@@ -977,6 +987,10 @@ public class SyncDao {
                     JOIN repository repo ON repo.id = r.repository_id
                     JOIN intern i ON i.username = r.username
                     LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ptr.project_id
+                    LEFT JOIN intern_level_history ilh ON ilh.intern_id = i.id
+                        AND ilh.valid_from <= r.spent_at::date
+                        AND (ilh.valid_to IS NULL OR ilh.valid_to >= r.spent_at::date)
+                    LEFT JOIN level lvl ON lvl.id = ilh.level_id
                     WHERE ptr.project_id = ?
                       AND r.spent_at >= ?
                       AND r.spent_at < ?

@@ -51,6 +51,22 @@ The backend deduplicates entries with an `ON CONFLICT` clause on `(repository_id
 - REST API rozšiřuje DTO o pole `isExternal`. Pokud je hodnota `false` nebo chybí, backend sazbu ignoruje a uloží `NULL`. Pokus o nastavení sazby pro interní projekt skončí validační chybou.
 - Přepočty výkazů a cache (`project.reported_cost`) používají projektovou sazbu pouze tehdy, když je projekt označen jako externí.
 
+### Výpočet vykázaných nákladů
+
+Výkazy uložené v tabulce `report` se do jednotlivých přehledů i do cache projektu (`project.reported_cost`) promítají jednotným SQL výrazem, který je znovu definovaný ve funkci `compute_project_report_cost` a sdílený metodami `SyncDao.listProjectReportDetail` a `SyncDao.listProjectMonthlyReport`.
+
+- **Vazba na projekt:** Každý výkaz se mapuje přes tabulku `projects_to_repositorie` na konkrétní projekt. Stejný vztah používají i detailní reporty.
+- **Použitá sazba:** Pokud má projekt nastavenou `hourly_rate_czk` a je označen jako externí, náklady se počítají podle ní. V opačném případě se použije hodinová sazba uložená přímo u výkazu (`report.hourly_rate_czk`).
+- **Stážista není v týmu:** Pokud k výkazu neexistuje vazba v `intern_project`, výraz `ip.project_id IS NULL` vrací `TRUE` a náklady se plně započítají. Tím je splněno pravidlo, že vykázaná práce stážisty mimo tým se má do nákladů zahrnout.
+- **Příznak `include_in_reported_cost`:**
+  - Pokud má stážista příznak `TRUE`, nebo pokud příznak není nastaven, náklady se počítají vždy.
+  - Pokud je příznak `FALSE`, SQL ještě kontroluje historii úrovní stážisty (`intern_level_history` → `level`). Vyloučení z nákladů nastane pouze pro řádky, kde výkaz časově spadá do období, kdy má stážista úroveň `employee` (porovnává se `report.spent_at::date` s intervalem `valid_from`/`valid_to`).
+  - Výkazy před datem, kdy se stážista stal zaměstnancem, zůstávají v nákladech započítané, i když je příznak `include_in_reported_cost = FALSE`. Jakmile období úrovně `employee` začne, nové výkazy s tímto příznakem se do nákladů nezahrnují (výraz vrací `0`).
+- **Časová omezení projektu:** Všechny výpočty respektují případně nastavené datumy `project.budget_from` a `project.budget_to` a ignorují výkazy mimo toto období.
+- **Souhrny v UI:** Přehled projektů (`listProjectOverview`) čte hodnotu `project.reported_cost`, takže po každé změně logiky musí migrace přepočítat cache, aby souhrn i detailní přehledy zobrazovaly shodné částky.
+
+Po úpravě funkce `compute_project_report_cost` se v migraci provede `UPDATE project SET reported_cost = compute_project_report_cost(id);`, aby se přepočítala cache pro všechny projekty a data v přehledech byla konzistentní s novou logikou.
+
 ### API reference
 
 Swagger UI is available at `http://localhost:8081/swagger-ui/index.html` when the backend is running. The documentation now includes the detailed description of the report synchronisation endpoint together with request/response schemas.

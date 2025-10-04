@@ -163,6 +163,179 @@ class SyncDaoIntegrationTest {
     }
 
     @Test
+    void listProjectOverviewIgnoresInternsExcludedFromReportedCost() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+            InternDao internDao = new InternDao(jdbcTemplate);
+
+            long repositoryId = insertRepository(jdbcTemplate);
+            long levelId = insertLevel(jdbcTemplate, "junior", BigDecimal.valueOf(160));
+
+            BigDecimal projectRate = BigDecimal.valueOf(250).setScale(2, RoundingMode.UNNECESSARY);
+            Long projectId = syncDao.createProjectByName(
+                    "Projekt-" + UUID.randomUUID(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    true,
+                    projectRate);
+            syncDao.linkProjectRepository(projectId, repositoryId);
+
+            InternRow includedIntern = internDao.insert("Anna", "Include", uniqueUsername(), levelId);
+            InternRow excludedIntern = internDao.insert("Boris", "Exclude", uniqueUsername(), levelId);
+            deleteExistingHistory(jdbcTemplate, includedIntern.id());
+            deleteExistingHistory(jdbcTemplate, excludedIntern.id());
+            insertLevelHistory(jdbcTemplate, includedIntern.id(), levelId, LocalDate.of(2024, 1, 1), null);
+            insertLevelHistory(jdbcTemplate, excludedIntern.id(), levelId, LocalDate.of(2024, 1, 1), null);
+
+            jdbcTemplate.update(
+                    "INSERT INTO intern_project (intern_id, project_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)",
+                    includedIntern.id(), projectId, BigDecimal.valueOf(40), true);
+            jdbcTemplate.update(
+                    "INSERT INTO intern_project (intern_id, project_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)",
+                    excludedIntern.id(), projectId, BigDecimal.valueOf(40), false);
+
+            BigDecimal oneHour = BigDecimal.ONE.setScale(4, RoundingMode.UNNECESSARY);
+            syncDao.insertReports(List.of(
+                    new SyncDao.ReportRow(
+                            repositoryId,
+                            null,
+                            OffsetDateTime.parse("2025-01-01T10:00:00Z"),
+                            3600,
+                            oneHour,
+                            includedIntern.username(),
+                            projectRate),
+                    new SyncDao.ReportRow(
+                            repositoryId,
+                            null,
+                            OffsetDateTime.parse("2025-01-02T10:00:00Z"),
+                            3600,
+                            oneHour,
+                            excludedIntern.username(),
+                            projectRate)
+            ));
+
+            List<SyncDao.ProjectOverviewRow> overview = syncDao.listProjectOverview();
+            SyncDao.ProjectOverviewRow projectRow = overview.stream()
+                    .filter(row -> row.id().equals(projectId))
+                    .findFirst()
+                    .orElseThrow();
+
+            assertThat(projectRow.reportedCost()).isEqualByComparingTo(projectRate);
+        }
+    }
+
+    @Test
+    void internExcludedOnlyAfterEmployeeLevelStarts() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+            InternDao internDao = new InternDao(jdbcTemplate);
+
+            long repositoryId = insertRepository(jdbcTemplate);
+            long juniorLevelId = insertLevel(jdbcTemplate, "junior", BigDecimal.valueOf(160));
+            long employeeLevelId = insertLevel(jdbcTemplate, "employee", BigDecimal.valueOf(0));
+
+            BigDecimal projectRate = BigDecimal.valueOf(250).setScale(2, RoundingMode.UNNECESSARY);
+            Long projectId = syncDao.createProjectByName(
+                    "Projekt-" + UUID.randomUUID(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    true,
+                    projectRate);
+            syncDao.linkProjectRepository(projectId, repositoryId);
+
+            InternRow intern = internDao.insert("Dana", "Toggle", uniqueUsername(), juniorLevelId);
+            deleteExistingHistory(jdbcTemplate, intern.id());
+            insertLevelHistory(jdbcTemplate, intern.id(), juniorLevelId, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 9, 30));
+            insertLevelHistory(jdbcTemplate, intern.id(), employeeLevelId, LocalDate.of(2025, 10, 1), null);
+            jdbcTemplate.update("UPDATE intern SET level_id = ? WHERE id = ?", employeeLevelId, intern.id());
+
+            jdbcTemplate.update(
+                    "INSERT INTO intern_project (intern_id, project_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)",
+                    intern.id(), projectId, BigDecimal.valueOf(40), false);
+
+            BigDecimal oneHour = BigDecimal.ONE.setScale(4, RoundingMode.UNNECESSARY);
+            syncDao.insertReports(List.of(
+                    new SyncDao.ReportRow(
+                            repositoryId,
+                            null,
+                            OffsetDateTime.parse("2025-09-15T10:00:00Z"),
+                            3600,
+                            oneHour,
+                            intern.username(),
+                            projectRate),
+                    new SyncDao.ReportRow(
+                            repositoryId,
+                            null,
+                            OffsetDateTime.parse("2025-10-15T10:00:00Z"),
+                            3600,
+                            oneHour,
+                            intern.username(),
+                            projectRate)
+            ));
+
+            OffsetDateTime from = OffsetDateTime.parse("2025-09-01T00:00:00Z");
+            OffsetDateTime to = OffsetDateTime.parse("2025-11-01T00:00:00Z");
+            List<SyncDao.ProjectMonthlyReportRow> monthly = syncDao.listProjectMonthlyReport(projectId, from, to);
+
+            assertThat(monthly)
+                    .extracting(row -> row.monthStart().toLocalDate())
+                    .containsExactly(LocalDate.of(2025, 9, 1), LocalDate.of(2025, 10, 1));
+            assertThat(monthly.get(0).cost()).isEqualByComparingTo(projectRate);
+            assertThat(monthly.get(1).cost()).isEqualByComparingTo("0");
+
+            List<SyncDao.ProjectOverviewRow> overview = syncDao.listProjectOverview();
+            SyncDao.ProjectOverviewRow projectRow = overview.stream()
+                    .filter(row -> row.id().equals(projectId))
+                    .findFirst()
+                    .orElseThrow();
+
+            assertThat(projectRow.reportedCost()).isEqualByComparingTo(projectRate);
+        }
+    }
+
+    @Test
     void createProjectByNameRejectsHourlyRateForInternalProject() {
         Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
 
