@@ -181,6 +181,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const milestoneChartTitleId = useId();
   const milestoneChartDescId = `${milestoneChartTitleId}-desc`;
   const milestoneSelectId = useId();
+  const milestoneSelectHintId = useId();
   const projectId = project.id;
 
   // Reset the local state whenever the project changes so that the date range and derived caches
@@ -535,6 +536,11 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         .join(' ')
     : '';
 
+  const milestoneStatusId = milestoneStatusMessage ? `${milestoneSelectId}-status` : undefined;
+  const milestoneSelectDescribedBy = [milestoneSelectHintId, milestoneStatusId]
+    .filter(Boolean)
+    .join(' ') || undefined;
+
   const milestoneSelectionEmpty = !loadingMilestoneCosts && milestoneCosts.length > 0 && selectedMilestoneIds.length === 0;
   const milestoneChartHasData = selectedMilestoneSummaries.length > 0 && hasMilestoneCostData;
   const milestoneChartEmptyState =
@@ -786,8 +792,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
           <h2>Srovnání milestones</h2>
         </header>
         <div className="projectLongTerm__comparisonControls">
-          <label className="projectLongTerm__milestoneSelectLabel" htmlFor={milestoneSelectId}>
-            <span>Vyberte milníky</span>
+          <div className="projectLongTerm__milestoneSelectGroup">
+            <label className="projectLongTerm__milestoneSelectLabel" htmlFor={milestoneSelectId}>
+              Vyberte milníky
+            </label>
             <select
               id={milestoneSelectId}
               multiple
@@ -796,6 +804,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
               onChange={handleMilestoneSelectionChange}
               disabled={loadingMilestoneCosts || milestoneCosts.length === 0}
               className="projectLongTerm__milestoneSelect"
+              aria-describedby={milestoneSelectDescribedBy}
             >
               {milestoneCosts.map(milestone => {
                 const optionLabel = formatMilestoneOptionLabel(milestone);
@@ -810,9 +819,16 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                 );
               })}
             </select>
-          </label>
+            <p id={milestoneSelectHintId} className="projectLongTerm__milestoneSelectHint">
+              Podržte Ctrl (Command na Macu) pro výběr více milníků.
+            </p>
+          </div>
           {milestoneStatusMessage ? (
-            <p className={milestoneStatusClassName} role={milestoneStatusMessage.tone === 'error' ? 'alert' : 'status'}>
+            <p
+              id={milestoneStatusId}
+              className={milestoneStatusClassName}
+              role={milestoneStatusMessage.tone === 'error' ? 'alert' : 'status'}
+            >
               {milestoneStatusMessage.text}
             </p>
           ) : null}

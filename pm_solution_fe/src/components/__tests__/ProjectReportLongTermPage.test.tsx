@@ -189,5 +189,9 @@ describe('ProjectReportLongTermPage', () => {
       const selectedValues = Array.from(select.selectedOptions).map(option => option.value);
       expect(new Set(selectedValues)).toEqual(new Set(['10', '11']));
     });
+
+    expect(
+      screen.getByText('Podržte Ctrl (Command na Macu) pro výběr více milníků.'),
+    ).toBeInTheDocument();
   });
 });
