@@ -151,14 +151,21 @@ public class InternService {
         OffsetDateTime toDateTime = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
         return syncDao.listInternMonthlyHours(fromDateTime, toDateTime).stream()
-                .map(row -> new InternMonthlyHoursResponse(
-                        row.internId(),
-                        row.username(),
-                        row.firstName(),
-                        row.lastName(),
-                        row.monthStart(),
-                        row.hours() != null ? row.hours() : BigDecimal.ZERO,
-                        row.cost() != null ? row.cost() : BigDecimal.ZERO))
+                .map(row -> {
+                    OffsetDateTime monthStart = row.monthStart();
+                    int year = monthStart != null ? monthStart.getYear() : 0;
+                    int month = monthStart != null ? monthStart.getMonthValue() : 0;
+                    return new InternMonthlyHoursResponse(
+                            row.internId(),
+                            row.username(),
+                            row.firstName(),
+                            row.lastName(),
+                            monthStart,
+                            year,
+                            month,
+                            row.hours() != null ? row.hours() : BigDecimal.ZERO,
+                            row.cost() != null ? row.cost() : BigDecimal.ZERO);
+                })
                 .toList();
     }
 
@@ -560,6 +567,8 @@ public class InternService {
                                              String firstName,
                                              String lastName,
                                              OffsetDateTime monthStart,
+                                             int year,
+                                             int month,
                                              BigDecimal hours,
                                              BigDecimal cost) {}
 }

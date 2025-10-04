@@ -43,13 +43,20 @@ const percentageFormatter = new Intl.NumberFormat('cs-CZ', {
  * chart with the averaged capacities and a detailed table with the raw data.
  */
 function PlanningResourcesPage() {
-  const [year] = useState(() => new Date().getFullYear());
   const [rows, setRows] = useState<InternMonthlyHoursRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(() => new Date().getFullYear());
 
-  const from = `${year}-01-01`;
-  const to = `${year}-12-31`;
+  const { from, to, requestedYears } = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+    return {
+      from: `${previousYear}-01-01`,
+      to: `${currentYear}-12-31`,
+      requestedYears: [previousYear, currentYear],
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,16 +87,58 @@ function PlanningResourcesPage() {
     };
   }, [from, to]);
 
+  const availableYears = useMemo(() => {
+    const yearSet = new Set<number>();
+    rows.forEach(row => {
+      if (Number.isFinite(row.year)) {
+        yearSet.add(row.year);
+      }
+    });
+    return Array.from(yearSet).sort((a, b) => b - a);
+  }, [rows]);
+
+  const sortedYearsAsc = useMemo(() => [...availableYears].sort((a, b) => a - b), [availableYears]);
+
+  useEffect(() => {
+    if (availableYears.length === 0) {
+      return;
+    }
+    setSelectedYear(prev => {
+      if (prev && availableYears.includes(prev)) {
+        return prev;
+      }
+      return availableYears[0];
+    });
+  }, [availableYears]);
+
+  const rowsByYear = useMemo(() => {
+    const map = new Map<number, InternMonthlyHoursRow[]>();
+    rows.forEach(row => {
+      if (!Number.isFinite(row.year)) {
+        return;
+      }
+      const bucket = map.get(row.year) ?? [];
+      bucket.push(row);
+      map.set(row.year, bucket);
+    });
+    return map;
+  }, [rows]);
+
+  const rowsForSelectedYear = useMemo(
+    () => (selectedYear != null ? rowsByYear.get(selectedYear) ?? [] : []),
+    [rowsByYear, selectedYear],
+  );
+
   const interns = useMemo<InternNormalizedRow[]>(() => {
     const map = new Map<number, InternHoursAccumulator>();
-    rows.forEach(row => {
-      const month = Number.parseInt(row.monthStart.slice(5, 7), 10);
-      if (Number.isNaN(month) || month < 1 || month > 12) {
+    rowsForSelectedYear.forEach(row => {
+      const monthIndex = Number.isFinite(row.month) ? row.month - 1 : -1;
+      if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
         return;
       }
       const existing = map.get(row.internId);
       const monthlyHours = existing?.monthlyHours ?? Array(12).fill(0);
-      monthlyHours[month - 1] += row.hours;
+      monthlyHours[monthIndex] = row.hours;
       const intern: InternHoursAccumulator = existing ?? {
         id: row.internId,
         username: row.username,
@@ -112,7 +161,7 @@ function PlanningResourcesPage() {
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-  }, [rows]);
+  }, [rowsForSelectedYear]);
 
   const averageNormalizedCapacity = useMemo(() => {
     if (interns.length === 0) {
@@ -133,19 +182,52 @@ function PlanningResourcesPage() {
     [averageNormalizedCapacity],
   );
 
-  const hasData = rows.length > 0;
+  const hasData = selectedYear != null && rowsForSelectedYear.length > 0;
+
+  const selectedYearLabel = typeof selectedYear === 'number' ? selectedYear.toString() : null;
+  const yearRangeDescription = sortedYearsAsc.length === 0
+    ? 'poslední dva roky'
+    : sortedYearsAsc.length === 1
+      ? `rok ${sortedYearsAsc[0]}`
+      : `roky ${sortedYearsAsc[0]}–${sortedYearsAsc[sortedYearsAsc.length - 1]}`;
+  const yearOptions = availableYears.length > 0 ? availableYears : requestedYears;
+  const disableYearButtons = availableYears.length === 0;
+  const displayYearLabel = selectedYearLabel ?? '—';
+  const selectedYearText = selectedYearLabel ? `v roce ${selectedYearLabel}` : 've vybraném období';
 
   return (
     <div className="planning-resources">
-      <p className="planning-resources__intro">
-        Normalizovaná kapacita vyjadřuje poměr vykázaných hodin v daném měsíci vůči nejvyššímu počtu hodin,
-        které stážista v&nbsp;roce {year} zaznamenal. Pro každého stážistu se tedy nejvytíženější měsíc bere jako 100&nbsp;%
-        a&nbsp;ostatní hodnoty se přepočítají na procenta. Graf zobrazuje průměr těchto hodnot napříč stážisty.
-      </p>
+      <div className="planning-resources__introRow">
+        <p className="planning-resources__intro">
+          Normalizovaná kapacita vyjadřuje poměr vykázaných hodin v&nbsp;daném měsíci vůči nejvyššímu počtu hodin,
+          které stážista ve vybraném roce zaznamenal. Pro každého stážistu se tedy nejvytíženější měsíc bere jako 100&nbsp;%
+          a&nbsp;ostatní hodnoty se přepočítají na procenta. Data jsou k&nbsp;dispozici za {yearRangeDescription}.
+          Pomocí přepínače vpravo zvolte rok, pro který chcete kapacitu zobrazit.
+        </p>
+        <div className="planning-resources__yearSelector" role="group" aria-label="Výběr roku">
+          {yearOptions.map(yearOption => {
+            const isActive = selectedYear === yearOption;
+            return (
+              <button
+                key={yearOption}
+                type="button"
+                className={`planning-resources__yearButton${isActive ? ' planning-resources__yearButton--active' : ''}`}
+                onClick={() => setSelectedYear(yearOption)}
+                aria-pressed={isActive}
+                disabled={disableYearButtons}
+              >
+                {yearOption}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <section className="panel">
         <div className="panel__body planning-resources__chart">
-          <h2 className="planning-resources__sectionTitle">Průměrná normalizovaná kapacita</h2>
+          <h2 className="planning-resources__sectionTitle">
+            Průměrná normalizovaná kapacita {selectedYearLabel ? `(${selectedYearLabel})` : ''}
+          </h2>
           {loading ? (
             <p className="planning-resources__status">Načítám data…</p>
           ) : error ? (
@@ -153,16 +235,20 @@ function PlanningResourcesPage() {
               {error}
             </p>
           ) : hasData ? (
-            <NormalizedCapacityChart data={chartPoints} />
+            <NormalizedCapacityChart data={chartPoints} year={selectedYear} />
           ) : (
-            <p className="planning-resources__status">Pro zadané období zatím nejsou k&nbsp;dispozici žádné záznamy.</p>
+            <p className="planning-resources__status">
+              Pro vybraný rok zatím nejsou k&nbsp;dispozici žádné záznamy.
+            </p>
           )}
         </div>
       </section>
 
       <section className="panel">
         <div className="panel__body planning-resources__tableWrapper">
-          <h2 className="planning-resources__sectionTitle">Vykázané hodiny podle stážistů</h2>
+          <h2 className="planning-resources__sectionTitle">
+            Vykázané hodiny podle stážistů {selectedYearLabel ? `(${selectedYearLabel})` : ''}
+          </h2>
           {loading ? (
             <p className="planning-resources__status">Načítám data…</p>
           ) : error ? (
@@ -192,9 +278,10 @@ function PlanningResourcesPage() {
                       {intern.monthlyHours.map((hours, index) => {
                         const percent = intern.normalizedCapacity[index];
                         const hasHours = hours > 0;
+                        const monthLabel = index + 1;
                         const title = hasHours
-                          ? `Měsíc ${index + 1}: ${hoursFormatter.format(hours)} h (${percentageFormatter.format(percent)} %)`
-                          : `Měsíc ${index + 1}: bez vykázaných hodin`;
+                          ? `Měsíc ${monthLabel}/${displayYearLabel}: ${hoursFormatter.format(hours)} h (${percentageFormatter.format(percent)} %)`
+                          : `Měsíc ${monthLabel}/${displayYearLabel}: bez vykázaných hodin`;
                         return (
                           <td key={index} title={title}>
                             {hasHours ? (
@@ -219,7 +306,7 @@ function PlanningResourcesPage() {
             <p className="planning-resources__status">Tabulka se zobrazí po načtení dat.</p>
           )}
           <p className="planning-resources__note">
-            Procentuální hodnoty odpovídají poměru vůči individuálnímu maximu každého stážisty v&nbsp;roce {year}.
+            Procentuální hodnoty odpovídají poměru vůči individuálnímu maximu každého stážisty {selectedYearText}.
           </p>
         </div>
       </section>
@@ -237,7 +324,7 @@ function buildInternName(row: InternMonthlyHoursRow): string {
   return row.username;
 }
 
-function NormalizedCapacityChart({ data }: { data: ChartPoint[] }) {
+function NormalizedCapacityChart({ data, year }: { data: ChartPoint[]; year: number | null }) {
   const titleId = useId();
   const descriptionId = useId();
 
@@ -246,6 +333,10 @@ function NormalizedCapacityChart({ data }: { data: ChartPoint[] }) {
   const padding = { top: 24, right: 32, bottom: 56, left: 64 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
+
+  const yearLabel = typeof year === 'number' ? year.toString() : null;
+  const yearDescription = yearLabel ? `v roce ${yearLabel}` : 've vybraném období';
+  const tooltipYear = yearLabel ?? 'vybraném období';
 
   const path = data.reduce((acc, point, index) => {
     const position = getPointPosition(point, innerWidth, innerHeight, padding);
@@ -263,9 +354,10 @@ function NormalizedCapacityChart({ data }: { data: ChartPoint[] }) {
         aria-labelledby={`${titleId} ${descriptionId}`}
         className="planning-resources__chartSvg"
       >
-        <title id={titleId}>Průměrná normalizovaná kapacita stážistů dle měsíců</title>
+        <title id={titleId}>Průměrná normalizovaná kapacita stážistů {yearDescription}</title>
         <desc id={descriptionId}>
-          Linie zobrazuje průměr normalizovaných hodin za jednotlivé měsíce. Základní osa ukazuje měsíce a svislá osa procenta.
+          Linie zobrazuje průměr normalizovaných hodin za jednotlivé měsíce {yearDescription}. Základní osa ukazuje měsíce a
+          svislá osa procenta.
         </desc>
         <g className="planning-resources__chartGrid">
           {yTicks.map(tick => {
@@ -310,7 +402,7 @@ function NormalizedCapacityChart({ data }: { data: ChartPoint[] }) {
             return (
               <circle key={point.month} cx={x} cy={y} r={6}>
                 <title>
-                  {`Měsíc ${point.month}: ${percentageFormatter.format(point.value)} %`}
+                  {`Měsíc ${point.month}/${tooltipYear}: ${percentageFormatter.format(point.value)} %`}
                 </title>
               </circle>
             );
@@ -318,7 +410,8 @@ function NormalizedCapacityChart({ data }: { data: ChartPoint[] }) {
         </g>
       </svg>
       <figcaption className="planning-resources__chartCaption">
-        Hodnoty vyjadřují průměrnou relativní kapacitu napříč všemi stážisty (100&nbsp;% = jejich osobní maximum v daném roce).
+        Hodnoty vyjadřují průměrnou relativní kapacitu napříč všemi stážisty ({yearDescription}; 100&nbsp;% = jejich osobní
+        maximum v daném roce).
       </figcaption>
     </figure>
   );

@@ -283,6 +283,8 @@ export type InternMonthlyHoursRowDTO = {
   firstName: string | null;
   lastName: string | null;
   monthStart: string;
+  year: number;
+  month: number;
   hours: number | string;
   cost: number | string | null;
 };
@@ -293,6 +295,8 @@ export type InternMonthlyHoursRow = {
   firstName: string | null;
   lastName: string | null;
   monthStart: string;
+  year: number;
+  month: number;
   hours: number;
   cost: number | null;
 };
@@ -502,6 +506,8 @@ function mapInternMonthlyHoursRow(dto: InternMonthlyHoursRowDTO): InternMonthlyH
     firstName: dto.firstName,
     lastName: dto.lastName,
     monthStart: dto.monthStart,
+    year: dto.year,
+    month: dto.month,
     hours: Number.isNaN(hoursRaw) ? 0 : hoursRaw,
     cost: Number.isNaN(costRaw) ? null : costRaw,
   };

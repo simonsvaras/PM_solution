@@ -4,6 +4,51 @@
   gap: clamp(24px, 4vw, 40px);
 }
 
+.planning-resources__introRow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planning-resources__yearSelector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.planning-resources__yearButton {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.planning-resources__yearButton:hover:not(:disabled) {
+  border-color: var(--color-accent-strong);
+  color: var(--color-accent-strong);
+}
+
+.planning-resources__yearButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.planning-resources__yearButton--active {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+  color: #fff;
+}
+
+.planning-resources__yearButton--active:hover:not(:disabled) {
+  color: #fff;
+}
+
 .planning-resources__intro {
   margin: 0;
   color: var(--color-text-muted);
@@ -153,6 +198,14 @@
 @media (max-width: 900px) {
   .planning-resources__table {
     min-width: 640px;
+  }
+}
+
+@media (min-width: 720px) {
+  .planning-resources__introRow {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
   }
 }
 

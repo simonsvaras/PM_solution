@@ -42,8 +42,9 @@ Key modules
 - **Stážisti** – full CRUD over interns. Radio buttons set the level, checkboxes assign any number of groups. Validation/messages mirror backend responses.
 - **Přehled stážistů** – card-based overview of every intern with total tracked hours and project workload breakdown accessible via modal detail.
 - **Plánování / Plánování zdrojů** – vizualizuje normalizovanou kapacitu stážistů. Z endpointu `/api/interns/monthly-hours` načte
-  vykázané hodiny, pro každého stážistu najde maximum v daném roce, přepočte ostatní měsíce na procenta a zobrazí průměr v čárovém
-  grafu doplněném o tabulku s hodinami i procentuální hodnotou pro jednotlivé měsíce.
+  vykázané hodiny za poslední dva roky, pro každého stážistu najde maximum v příslušném roce, přepočte ostatní měsíce na procenta
+  a zobrazí průměr v čárovém grafu doplněném o tabulku s hodinami i procentuální hodnotou pro jednotlivé měsíce. Přepínač v horní
+  části stránky umožní rychle přepnout mezi dostupnými roky.
 
 API usage
 ---------
