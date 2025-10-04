@@ -1,13 +1,15 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import './ProjectReportLongTermPage.css';
 import type {
   ErrorResponse,
   ProjectLongTermReportMeta,
   ProjectLongTermReportMonth,
   ProjectLongTermReportResponse,
+  ProjectMilestoneCostSummary,
   ProjectOverviewDTO,
 } from '../api';
-import { getProjectLongTermReport } from '../api';
+import { getProjectLongTermReport, getProjectMilestoneCostSummary } from '../api';
 
 type ProjectReportLongTermPageProps = {
   project: ProjectOverviewDTO;
@@ -129,6 +131,12 @@ function isNonNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
+function formatMilestoneOptionLabel(milestone: ProjectMilestoneCostSummary): string {
+  const trimmedTitle = milestone.title?.trim();
+  const title = trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : 'Bez názvu';
+  return `#${milestone.milestoneIid} — ${title}`;
+}
+
 function getMonthKeyFromMonthStart(value: string): string | null {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
@@ -151,8 +159,15 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const [reportMeta, setReportMeta] = useState<ProjectLongTermReportMeta | null>(null);
   const [totalHours, setTotalHours] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
+  const [milestoneCosts, setMilestoneCosts] = useState<ProjectMilestoneCostSummary[]>([]);
+  const [loadingMilestoneCosts, setLoadingMilestoneCosts] = useState(false);
+  const [milestoneCostError, setMilestoneCostError] = useState<ErrorResponse | null>(null);
+  const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<number[]>([]);
   const chartTitleId = useId();
   const chartDescId = `${chartTitleId}-desc`;
+  const milestoneChartTitleId = useId();
+  const milestoneChartDescId = `${milestoneChartTitleId}-desc`;
+  const milestoneSelectId = useId();
   const projectId = project.id;
 
   useEffect(() => {
@@ -164,6 +179,9 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     setTotalCost(0);
     setValidationError(null);
     setError(null);
+    setMilestoneCosts([]);
+    setSelectedMilestoneIds([]);
+    setMilestoneCostError(null);
   }, [project.id, defaultRange.from, defaultRange.to]);
 
   useEffect(() => {
@@ -246,6 +264,54 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
       ignore = true;
     };
   }, [projectId, fromValue, toValue]);
+
+  useEffect(() => {
+    let ignore = false;
+    setLoadingMilestoneCosts(true);
+    setMilestoneCostError(null);
+    getProjectMilestoneCostSummary(projectId)
+      .then(response => {
+        if (ignore) {
+          return;
+        }
+        const normalized = Array.isArray(response) ? response : [];
+        setMilestoneCosts(normalized);
+        setSelectedMilestoneIds(prev => {
+          if (prev.length > 0) {
+            const preserved = normalized
+              .map(item => item.milestoneId)
+              .filter(id => prev.includes(id));
+            if (preserved.length > 0) {
+              return preserved;
+            }
+          }
+          return normalized.map(item => item.milestoneId);
+        });
+        setLoadingMilestoneCosts(false);
+      })
+      .catch(err => {
+        if (ignore) {
+          return;
+        }
+        if (err && typeof err === 'object' && 'error' in err) {
+          setMilestoneCostError(err as ErrorResponse);
+        } else {
+          setMilestoneCostError({
+            error: {
+              code: 'unknown',
+              message: 'Nepodařilo se načíst náklady milníků.',
+              httpStatus: 0,
+            },
+          });
+        }
+        setMilestoneCosts([]);
+        setSelectedMilestoneIds([]);
+        setLoadingMilestoneCosts(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [projectId]);
 
   const monthRange = useMemo(() => {
     const start = parseDateInput(fromValue);
@@ -390,6 +456,73 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         : ([{ key: 'hours' as const, label: 'Měsíční odpracované hodiny' }] as const),
     [hasBudget],
   );
+
+  const selectedMilestoneSummaries = useMemo(() => {
+    if (milestoneCosts.length === 0 || selectedMilestoneIds.length === 0) {
+      return [] as ProjectMilestoneCostSummary[];
+    }
+    const allowed = new Set(selectedMilestoneIds);
+    return milestoneCosts.filter(item => allowed.has(item.milestoneId));
+  }, [milestoneCosts, selectedMilestoneIds]);
+
+  const maxMilestoneCost = selectedMilestoneSummaries.reduce((max, item) => {
+    const costValue = typeof item.totalCost === 'number' ? item.totalCost : Number(item.totalCost ?? 0);
+    return Math.max(max, Number.isFinite(costValue) ? costValue : 0);
+  }, 0);
+
+  const hasMilestoneCostData = selectedMilestoneSummaries.some(item => {
+    const costValue = typeof item.totalCost === 'number' ? item.totalCost : Number(item.totalCost ?? 0);
+    return Number.isFinite(costValue) && costValue > 0;
+  });
+
+  const milestoneChartHeight = 320;
+  const milestonePaddingX = 56;
+  const milestonePaddingY = 48;
+  const milestonePlotHeight = milestoneChartHeight - milestonePaddingY * 2;
+  const milestoneNominalWidth = Math.max(selectedMilestoneSummaries.length * 140, 320);
+  const milestoneChartWidth = milestoneNominalWidth + milestonePaddingX * 2;
+  const milestoneStep =
+    selectedMilestoneSummaries.length > 0 ? milestoneNominalWidth / selectedMilestoneSummaries.length : 0;
+  const getMilestoneX = (index: number) =>
+    selectedMilestoneSummaries.length === 1
+      ? milestonePaddingX + milestoneNominalWidth / 2
+      : milestonePaddingX + index * milestoneStep + milestoneStep / 2;
+  const milestoneBarWidth =
+    selectedMilestoneSummaries.length > 0
+      ? Math.min(80, (milestoneStep || milestoneNominalWidth) * 0.6)
+      : Math.min(80, milestoneNominalWidth * 0.6);
+
+  const milestoneStatusMessage: StatusMessage | null = milestoneCostError
+    ? { tone: 'error', text: milestoneCostError.error?.message ?? 'Nepodařilo se načíst náklady milníků.' }
+    : loadingMilestoneCosts
+    ? { tone: 'muted', text: 'Načítám milníky…' }
+    : milestoneCosts.length === 0
+    ? { tone: 'muted', text: 'Žádné milníky nejsou k dispozici.' }
+    : null;
+
+  const milestoneStatusClassName = milestoneStatusMessage
+    ? [
+        'projectLongTerm__status',
+        milestoneStatusMessage.tone === 'error' ? 'projectLongTerm__status--error' : null,
+        milestoneStatusMessage.tone === 'muted' ? 'projectLongTerm__status--muted' : null,
+      ]
+        .filter(isNonNull)
+        .join(' ')
+    : '';
+
+  const milestoneSelectionEmpty = !loadingMilestoneCosts && milestoneCosts.length > 0 && selectedMilestoneIds.length === 0;
+  const milestoneChartHasData = selectedMilestoneSummaries.length > 0 && hasMilestoneCostData;
+  const milestoneChartEmptyState =
+    !loadingMilestoneCosts && selectedMilestoneSummaries.length > 0 && !hasMilestoneCostData;
+
+  const milestoneSelectSize = Math.min(10, Math.max(4, milestoneCosts.length || 4));
+
+  const handleMilestoneSelectionChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const values = Array.from(event.target.selectedOptions)
+      .map(option => Number.parseInt(option.value, 10))
+      .filter(id => Number.isFinite(id));
+    setSelectedMilestoneIds(values);
+  };
 
   const emptyState = !loading && !error && !validationError && !hasChartData && chartPoints.length > 0;
 
@@ -616,6 +749,131 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
             Rozpočet projektu není nastaven, průběh vyčerpání proto není k dispozici.
           </p>
         ) : null}
+      </section>
+
+      <section className="projectLongTerm__chartCard projectLongTerm__comparisonCard">
+        <header className="projectLongTerm__chartHeader projectLongTerm__comparisonHeader">
+          <h2>Srovnání milestones</h2>
+        </header>
+        <div className="projectLongTerm__comparisonControls">
+          <label className="projectLongTerm__milestoneSelectLabel" htmlFor={milestoneSelectId}>
+            <span>Vyberte milníky</span>
+            <select
+              id={milestoneSelectId}
+              multiple
+              size={milestoneSelectSize}
+              value={selectedMilestoneIds.map(String)}
+              onChange={handleMilestoneSelectionChange}
+              disabled={loadingMilestoneCosts || milestoneCosts.length === 0}
+              className="projectLongTerm__milestoneSelect"
+            >
+              {milestoneCosts.map(milestone => {
+                const optionLabel = formatMilestoneOptionLabel(milestone);
+                return (
+                  <option
+                    key={milestone.milestoneId}
+                    value={milestone.milestoneId}
+                    title={optionLabel}
+                  >
+                    {optionLabel}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          {milestoneStatusMessage ? (
+            <p className={milestoneStatusClassName} role={milestoneStatusMessage.tone === 'error' ? 'alert' : 'status'}>
+              {milestoneStatusMessage.text}
+            </p>
+          ) : null}
+        </div>
+        <div className="projectLongTerm__chartWrapper">
+          {milestoneSelectionEmpty ? (
+            <p className="projectLongTerm__empty" role="status">
+              Vyberte alespoň jeden milník pro zobrazení srovnání.
+            </p>
+          ) : milestoneChartHasData ? (
+            <svg
+              className="projectLongTerm__chartSvg"
+              role="img"
+              width={milestoneChartWidth}
+              height={milestoneChartHeight}
+              viewBox={`0 0 ${milestoneChartWidth} ${milestoneChartHeight}`}
+              preserveAspectRatio="none"
+              style={{ width: milestoneChartWidth, maxWidth: '100%', height: 'auto' }}
+              aria-labelledby={`${milestoneChartTitleId} ${milestoneChartDescId}`}
+            >
+              <title id={milestoneChartTitleId}>{`Srovnání nákladů milníků projektu ${project.name}`}</title>
+              <desc id={milestoneChartDescId}>Sloupce zobrazují kumulované náklady vybraných milníků.</desc>
+              <line
+                x1={milestonePaddingX}
+                x2={milestoneChartWidth - milestonePaddingX}
+                y1={milestoneChartHeight - milestonePaddingY}
+                y2={milestoneChartHeight - milestonePaddingY}
+                stroke="var(--color-border)"
+                strokeWidth={1}
+              />
+              {Array.from({ length: 4 }, (_, index) => {
+                const fraction = (index + 1) / 4;
+                const y = milestonePaddingY + milestonePlotHeight * (1 - fraction);
+                return (
+                  <line
+                    key={`milestone-grid-${index}`}
+                    x1={milestonePaddingX}
+                    x2={milestoneChartWidth - milestonePaddingX}
+                    y1={y}
+                    y2={y}
+                    stroke="rgba(15, 23, 42, 0.08)"
+                    strokeWidth={1}
+                  />
+                );
+              })}
+              {selectedMilestoneSummaries.map((milestone, index) => {
+                const costValue =
+                  typeof milestone.totalCost === 'number' ? milestone.totalCost : Number(milestone.totalCost ?? 0);
+                const boundedCost = Math.max(0, Number.isFinite(costValue) ? costValue : 0);
+                const heightRatio = maxMilestoneCost > 0 ? boundedCost / maxMilestoneCost : 0;
+                const barHeight = heightRatio * milestonePlotHeight;
+                const xCenter = getMilestoneX(index);
+                const y = milestonePaddingY + (milestonePlotHeight - barHeight);
+                const labelY = Math.max(milestonePaddingY + 12, y - 8);
+                const optionLabel = formatMilestoneOptionLabel(milestone);
+                const chartLabel = optionLabel.length > 28 ? `${optionLabel.slice(0, 27)}…` : optionLabel;
+                return (
+                  <g key={`milestone-bar-${milestone.milestoneId}`}>
+                    <rect
+                      x={xCenter - milestoneBarWidth / 2}
+                      y={y}
+                      width={milestoneBarWidth}
+                      height={barHeight}
+                      rx={8}
+                      ry={8}
+                      fill="var(--color-accent-strong)"
+                    >
+                      <title>{`${optionLabel}: ${formatCurrency(boundedCost)}`}</title>
+                    </rect>
+                    <text x={xCenter} y={labelY} textAnchor="middle" className="projectLongTerm__chartValue">
+                      {formatCurrency(boundedCost)}
+                    </text>
+                    <text
+                      x={xCenter}
+                      y={milestoneChartHeight - milestonePaddingY + 24}
+                      textAnchor="middle"
+                      className="projectLongTerm__chartLabel"
+                      title={optionLabel}
+                    >
+                      {chartLabel}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : milestoneChartEmptyState ? (
+            <p className="projectLongTerm__empty" role="status">
+              Pro vybrané milníky nejsou dostupné náklady.
+            </p>
+          ) : null}
+        </div>
       </section>
     </div>
   );

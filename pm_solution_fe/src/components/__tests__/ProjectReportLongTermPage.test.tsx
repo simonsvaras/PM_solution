@@ -1,13 +1,15 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ProjectOverviewDTO } from '../../api';
-import { getProjectLongTermReport } from '../../api';
+import { getProjectLongTermReport, getProjectMilestoneCostSummary } from '../../api';
 import ProjectReportLongTermPage from '../ProjectReportLongTermPage';
 
 vi.mock('../../api', () => ({
   getProjectLongTermReport: vi.fn(),
+  getProjectMilestoneCostSummary: vi.fn(),
 }));
 
 const mockedGetProjectLongTermReport = vi.mocked(getProjectLongTermReport);
+const mockedGetProjectMilestoneCostSummary = vi.mocked(getProjectMilestoneCostSummary);
 
 const baseProject: ProjectOverviewDTO = {
   id: 1,
@@ -35,6 +37,25 @@ describe('ProjectReportLongTermPage', () => {
     vi.clearAllMocks();
   });
 
+  const milestoneCosts = [
+    {
+      milestoneId: 10,
+      milestoneIid: 1,
+      title: 'Milestone A',
+      state: 'active',
+      dueDate: '2025-03-01',
+      totalCost: 12000,
+    },
+    {
+      milestoneId: 11,
+      milestoneIid: 2,
+      title: 'Milestone B',
+      state: 'closed',
+      dueDate: '2025-04-01',
+      totalCost: 8000,
+    },
+  ];
+
   it('renders filters with default range for the current year', async () => {
     mockedGetProjectLongTermReport.mockResolvedValue({
       meta: null,
@@ -42,10 +63,12 @@ describe('ProjectReportLongTermPage', () => {
       totalCost: 0,
       months: [],
     });
+    mockedGetProjectMilestoneCostSummary.mockResolvedValue(milestoneCosts);
 
     render(<ProjectReportLongTermPage project={baseProject} />);
 
     await waitFor(() => expect(mockedGetProjectLongTermReport).toHaveBeenCalled());
+    await waitFor(() => expect(mockedGetProjectMilestoneCostSummary).toHaveBeenCalled());
 
     const now = new Date();
     const expectedFrom = formatDateValue(new Date(now.getFullYear(), 0, 1));
@@ -79,10 +102,12 @@ describe('ProjectReportLongTermPage', () => {
         },
       ],
     });
+    mockedGetProjectMilestoneCostSummary.mockResolvedValue(milestoneCosts);
 
     render(<ProjectReportLongTermPage project={{ ...baseProject, budget: 120000 }} />);
 
     await waitFor(() => expect(screen.getByRole('img', { name: /Dlouhodobý report projektu Projekt Orion/ })).toBeInTheDocument());
+    await waitFor(() => expect(mockedGetProjectMilestoneCostSummary).toHaveBeenCalled());
 
     const hoursSummary = screen.getByText('Celkem hodin').closest('div');
     expect(hoursSummary).toHaveTextContent('56,0');
@@ -115,10 +140,12 @@ describe('ProjectReportLongTermPage', () => {
         },
       ],
     });
+    mockedGetProjectMilestoneCostSummary.mockResolvedValue(milestoneCosts);
 
     render(<ProjectReportLongTermPage project={{ ...baseProject, budget: null }} />);
 
     await waitFor(() => expect(mockedGetProjectLongTermReport).toHaveBeenCalled());
+    await waitFor(() => expect(mockedGetProjectMilestoneCostSummary).toHaveBeenCalled());
 
     expect(await screen.findByText('Za zvolené období nejsou dostupná data.')).toBeInTheDocument();
     expect(screen.getByText(/Rozpočet projektu není nastaven/)).toBeInTheDocument();
@@ -132,10 +159,30 @@ describe('ProjectReportLongTermPage', () => {
         httpStatus: 500,
       },
     });
+    mockedGetProjectMilestoneCostSummary.mockResolvedValue([]);
 
     render(<ProjectReportLongTermPage project={baseProject} />);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Chyba načítání');
+  });
+
+  it('renders milestone comparison controls and selects all milestones by default', async () => {
+    mockedGetProjectLongTermReport.mockResolvedValue({
+      meta: null,
+      totalHours: 0,
+      totalCost: 0,
+      months: [],
+    });
+    mockedGetProjectMilestoneCostSummary.mockResolvedValue(milestoneCosts);
+
+    render(<ProjectReportLongTermPage project={baseProject} />);
+
+    const heading = await screen.findByRole('heading', { name: 'Srovnání milestones' });
+    expect(heading).toBeInTheDocument();
+
+    const select = screen.getByLabelText('Vyberte milníky') as HTMLSelectElement;
+    const selectedValues = Array.from(select.selectedOptions).map(option => option.value);
+    expect(new Set(selectedValues)).toEqual(new Set(['10', '11']));
   });
 });

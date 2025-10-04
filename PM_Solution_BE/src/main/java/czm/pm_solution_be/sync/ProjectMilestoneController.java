@@ -26,6 +26,11 @@ public class ProjectMilestoneController {
         return dao.listActiveMilestones(projectId);
     }
 
+    @GetMapping("/{projectId}/milestones/costs")
+    public List<SyncDao.MilestoneCostSummaryRow> listMilestoneCosts(@PathVariable long projectId) {
+        return dao.listProjectMilestoneCosts(projectId);
+    }
+
     @GetMapping("/{projectId}/milestones/issues")
     public List<SyncDao.MilestoneIssueCostRow> listMilestoneIssues(@PathVariable long projectId,
                                                                    @RequestParam(name = "milestoneId", required = false) List<Long> milestoneIds) {

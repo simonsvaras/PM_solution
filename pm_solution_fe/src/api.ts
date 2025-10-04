@@ -125,6 +125,15 @@ export type ProjectMilestoneSummary = {
   totalTimeSpentSeconds: number;
   totalCost: number;
 };
+
+export type ProjectMilestoneCostSummary = {
+  milestoneId: number;
+  milestoneIid: number;
+  title: string;
+  state: string;
+  dueDate: string | null;
+  totalCost: number;
+};
 export type ProjectMilestoneIssueCost = {
   milestoneId: number;
   issueId: number | null;
@@ -642,6 +651,14 @@ export async function getProjectActiveMilestones(projectId: number): Promise<Pro
   const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/active`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectMilestoneSummary[]>(res);
+}
+
+export async function getProjectMilestoneCostSummary(
+  projectId: number,
+): Promise<ProjectMilestoneCostSummary[]> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/costs`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectMilestoneCostSummary[]>(res);
 }
 
 export async function getProjectMilestoneIssueCosts(
