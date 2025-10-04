@@ -135,6 +135,14 @@ public class SyncDao {
     public record ProjectMonthlyReportRow(OffsetDateTime monthStart,
                                           BigDecimal hours,
                                           BigDecimal cost) {}
+
+    public record InternMonthlyHoursRow(Long internId,
+                                        String username,
+                                        String firstName,
+                                        String lastName,
+                                        OffsetDateTime monthStart,
+                                        BigDecimal hours,
+                                        BigDecimal cost) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
@@ -1021,6 +1029,85 @@ public class SyncDao {
                 from,
                 to,
                 projectId,
+                from,
+                to);
+    }
+
+    /**
+     * Builds a month-by-month matrix of intern effort within the requested interval.
+     *
+     * <p>The SQL mirrors the long-term project report pipeline: it generates a month
+     * series for the closed interval {@code [from, to)} and aggregates the `report`
+     * table using the shared cost formula that respects `intern_project` toggles
+     * and level transitions (interns at level code {@code employee} contribute
+     * hours but zero cost when excluded from reported cost).
+     *
+     * <p>Every intern is CROSS JOINed with the generated month buckets so the
+     * frontend can display zero values for months without activity.</p>
+     */
+    public List<InternMonthlyHoursRow> listInternMonthlyHours(OffsetDateTime from,
+                                                              OffsetDateTime to) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+
+        String sql = """
+                WITH month_series AS (
+                    SELECT generate_series(
+                               date_trunc('month', ?::timestamptz),
+                               date_trunc('month', (?::timestamptz - interval '1 second')),
+                               interval '1 month'
+                           ) AS month_start
+                ),
+                report_months AS (
+                    SELECT i.id AS intern_id,
+                           date_trunc('month', r.spent_at AT TIME ZONE 'UTC') AS month_start,
+                           SUM(r.time_spent_hours) AS hours,
+                           SUM(CASE
+                                   WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN
+                                       COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
+                                   WHEN lvl.code = 'employee' THEN 0
+                                   ELSE
+                                       COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
+                               END) AS cost
+                    FROM report r
+                    JOIN intern i ON i.username = r.username
+                    JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id
+                    JOIN project p ON p.id = ptr.project_id
+                    LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ptr.project_id
+                    LEFT JOIN intern_level_history ilh ON ilh.intern_id = i.id
+                        AND ilh.valid_from <= r.spent_at::date
+                        AND (ilh.valid_to IS NULL OR ilh.valid_to >= r.spent_at::date)
+                    LEFT JOIN level lvl ON lvl.id = ilh.level_id
+                    WHERE r.spent_at >= ?
+                      AND r.spent_at < ?
+                      AND (p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
+                      AND (p.budget_to IS NULL OR r.spent_at::date <= p.budget_to)
+                    GROUP BY i.id, month_start
+                )
+                SELECT i.id AS intern_id,
+                       i.username,
+                       i.first_name,
+                       i.last_name,
+                       ms.month_start,
+                       COALESCE(rm.hours, 0) AS hours,
+                       COALESCE(rm.cost, 0) AS cost
+                FROM intern i
+                CROSS JOIN month_series ms
+                LEFT JOIN report_months rm ON rm.intern_id = i.id AND rm.month_start = ms.month_start
+                ORDER BY LOWER(i.last_name), LOWER(i.first_name), i.username, ms.month_start
+                """;
+
+        return jdbc.query(sql,
+                (rs, rn) -> new InternMonthlyHoursRow(
+                        rs.getLong("intern_id"),
+                        rs.getString("username"),
+                        rs.getString("first_name"),
+                        rs.getString("last_name"),
+                        rs.getObject("month_start", OffsetDateTime.class),
+                        rs.getBigDecimal("hours"),
+                        rs.getBigDecimal("cost")),
+                from,
+                to,
                 from,
                 to);
     }

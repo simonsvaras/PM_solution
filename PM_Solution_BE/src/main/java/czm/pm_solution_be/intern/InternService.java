@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -127,6 +129,36 @@ public class InternService {
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(ids);
         return rows.stream()
                 .map(row -> toOverviewResponse(row, groupMap.getOrDefault(row.id(), List.of())))
+                .toList();
+    }
+
+    /**
+     * Produces a month-indexed grid of intern workload and cost using the shared SyncDao aggregation.
+     *
+     * <p>The method validates the requested date interval, transforms it into UTC offsets compatible with
+     * the reporting schema (closed-open interval) and post-processes the DAO output so the REST layer
+     * returns stable numeric types even for gaps without activity.</p>
+     */
+    public List<InternMonthlyHoursResponse> monthlyHours(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw ApiException.validation("Parametry \"from\" a \"to\" jsou povinné.", "interval_required");
+        }
+        if (to.isBefore(from)) {
+            throw ApiException.validation("Datum \"Do\" nesmí být dříve než datum \"Od\".", "interval_invalid");
+        }
+
+        OffsetDateTime fromDateTime = from.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime toDateTime = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        return syncDao.listInternMonthlyHours(fromDateTime, toDateTime).stream()
+                .map(row -> new InternMonthlyHoursResponse(
+                        row.internId(),
+                        row.username(),
+                        row.firstName(),
+                        row.lastName(),
+                        row.monthStart(),
+                        row.hours() != null ? row.hours() : BigDecimal.ZERO,
+                        row.cost() != null ? row.cost() : BigDecimal.ZERO))
                 .toList();
     }
 
@@ -523,6 +555,13 @@ public class InternService {
 
     public record LevelDto(long id, String code, String label) {}
     public record GroupDto(long id, int code, String label) {}
+    public record InternMonthlyHoursResponse(long internId,
+                                             String username,
+                                             String firstName,
+                                             String lastName,
+                                             OffsetDateTime monthStart,
+                                             BigDecimal hours,
+                                             BigDecimal cost) {}
 }
 
 

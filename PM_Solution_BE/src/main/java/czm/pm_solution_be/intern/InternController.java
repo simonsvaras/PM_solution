@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -54,6 +55,20 @@ public class InternController {
     @Operation(summary = "Přehled stážistů", description = "Vrací všechny stážisty včetně celkového počtu odpracovaných hodin.")
     public List<InternOverviewResponse> overview() {
         return service.overview();
+    }
+
+    /**
+     * Serves the month-bucketed aggregation of intern workload between the supplied dates.
+     */
+    @GetMapping("/monthly-hours")
+    @Operation(summary = "Měsíční odpracované hodiny stážistů",
+            description = "Vrací seznam stážistů s agregovanými hodinami a náklady po jednotlivých měsících v daném intervalu.")
+    public List<InternService.InternMonthlyHoursResponse> monthlyHours(
+            @Parameter(description = "Datum od (včetně)", required = true)
+            @RequestParam("from") LocalDate from,
+            @Parameter(description = "Datum do (včetně)", required = true)
+            @RequestParam("to") LocalDate to) {
+        return service.monthlyHours(from, to);
     }
 
     @GetMapping("/{id}")
