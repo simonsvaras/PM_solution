@@ -60,6 +60,10 @@
   width: 80%;
   max-width: none;
 }
+.app-content__inner--planning {
+  width: 90%;
+  max-width: none;
+}
 
 @media (max-width: 1024px) {
   .app-content--projects-overview {
@@ -75,6 +79,10 @@
   }
 
   .app-content__inner--interns-overview {
+    width: 100%;
+  }
+
+  .app-content__inner--planning {
     width: 100%;
   }
 

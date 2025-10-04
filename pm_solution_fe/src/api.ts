@@ -277,6 +277,26 @@ export type InternProjectAllocation = {
 export type InternDetailDTO = InternOverviewDTO & { projects: InternProjectAllocationDTO[] };
 export type InternDetail = InternOverview & { projects: InternProjectAllocation[] };
 
+export type InternMonthlyHoursRowDTO = {
+  internId: number;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  monthStart: string;
+  hours: number | string;
+  cost: number | string | null;
+};
+
+export type InternMonthlyHoursRow = {
+  internId: number;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  monthStart: string;
+  hours: number;
+  cost: number | null;
+};
+
 export type TeamReportInternDTO = {
   id: number;
   firstName: string;
@@ -470,6 +490,20 @@ function mapInternDetail(dto: InternDetailDTO): InternDetail {
   return {
     ...overview,
     projects: (dto.projects ?? []).map(mapInternProjectAllocation),
+  };
+}
+
+function mapInternMonthlyHoursRow(dto: InternMonthlyHoursRowDTO): InternMonthlyHoursRow {
+  const hoursRaw = parseNumber(dto.hours);
+  const costRaw = parseNumber(dto.cost);
+  return {
+    internId: dto.internId,
+    username: dto.username,
+    firstName: dto.firstName,
+    lastName: dto.lastName,
+    monthStart: dto.monthStart,
+    hours: Number.isNaN(hoursRaw) ? 0 : hoursRaw,
+    cost: Number.isNaN(costRaw) ? null : costRaw,
   };
 }
 
@@ -1003,6 +1037,19 @@ export async function listInternOverview(): Promise<InternOverview[]> {
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<InternOverviewDTO[]>(res);
   return data.map(mapInternOverview);
+}
+
+/**
+ * Loads the month-bucketed workload for all interns within the provided inclusive date range.
+ */
+export async function getInternMonthlyHours(from: string, to: string): Promise<InternMonthlyHoursRow[]> {
+  const params = new URLSearchParams();
+  params.set("from", from);
+  params.set("to", to);
+  const res = await fetch(`${API_BASE}/api/interns/monthly-hours?${params.toString()}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternMonthlyHoursRowDTO[]>(res);
+  return data.map(mapInternMonthlyHoursRow);
 }
 
 /**

@@ -1,0 +1,163 @@
+.planning-resources {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vw, 40px);
+}
+
+.planning-resources__intro {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.planning-resources__sectionTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.planning-resources__status {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.planning-resources__error {
+  margin: 0;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.planning-resources__chart {
+  gap: 24px;
+}
+
+.planning-resources__chartFigure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planning-resources__chartSvg {
+  width: 100%;
+  height: auto;
+}
+
+.planning-resources__chartGrid line {
+  stroke: rgba(148, 163, 184, 0.25);
+  stroke-dasharray: 4 6;
+}
+
+.planning-resources__chartAxis {
+  stroke: rgba(71, 85, 105, 0.5);
+  stroke-width: 1.5;
+}
+
+.planning-resources__chartLine {
+  fill: none;
+  stroke: var(--color-accent-strong);
+  stroke-width: 3;
+}
+
+.planning-resources__chartPoints circle {
+  fill: var(--color-accent-strong);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.planning-resources__chartTicks text {
+  font-size: 0.8rem;
+  fill: var(--color-text-muted);
+}
+
+.planning-resources__chartCaption {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.planning-resources__tableWrapper {
+  gap: 20px;
+}
+
+.planning-resources__tableScroll {
+  overflow-x: auto;
+}
+
+.planning-resources__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.planning-resources__table th,
+.planning-resources__table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.planning-resources__table thead th {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.planning-resources__table tbody th {
+  text-align: left;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  background: transparent;
+}
+
+.planning-resources__table tbody tr:last-child th,
+.planning-resources__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.planning-resources__internName {
+  display: block;
+}
+
+.planning-resources__internMeta {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.planning-resources__cellValue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.planning-resources__cellValueSecondary {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.planning-resources__cellPlaceholder {
+  color: var(--color-text-muted);
+}
+
+.planning-resources__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .planning-resources__table {
+    min-width: 640px;
+  }
+}
+
+@media (max-width: 720px) {
+  .planning-resources__table {
+    min-width: 560px;
+  }
+}
