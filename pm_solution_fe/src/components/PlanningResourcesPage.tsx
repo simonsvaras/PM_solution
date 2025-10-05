@@ -204,8 +204,14 @@ function PlanningResourcesPage() {
       return MONTHS.map(() => 0);
     }
     return MONTHS.map((_, index) => {
-      const total = interns.reduce((sum, intern) => sum + intern.normalizedCapacity[index], 0);
-      return total / interns.length;
+      const values = interns
+        .map(intern => intern.normalizedCapacity[index])
+        .filter(value => value > 0);
+      if (values.length === 0) {
+        return 0;
+      }
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return total / values.length;
     });
   }, [interns]);
 
@@ -237,7 +243,7 @@ function PlanningResourcesPage() {
         <p className="planning-resources__intro">
           Normalizovaná kapacita vyjadřuje poměr vykázaných hodin v&nbsp;daném měsíci vůči nejvyššímu počtu hodin,
           které stážista ve vybraném roce zaznamenal. Pro každého stážistu se tedy nejvytíženější měsíc bere jako 100&nbsp;%
-          a&nbsp;ostatní hodnoty se přepočítají na procenta. Do výpočtu se zahrnují pouze stážisti, kteří nemají úroveň
+          a&nbsp;ostatní hodnoty se přepočítají na procenta. Měsíce bez vykázaných hodin se do průměru nezapočítávají. Do výpočtu se zahrnují pouze stážisti, kteří nemají úroveň
           „zaměstnanec“. Data jsou k&nbsp;dispozici za {yearRangeDescription}.
           Pomocí přepínače vpravo zvolte rok, pro který chcete kapacitu zobrazit.
         </p>
@@ -345,8 +351,8 @@ function PlanningResourcesPage() {
             </p>
           )}
           <p className="planning-resources__note">
-            Procentuální hodnoty odpovídají poměru vůči individuálnímu maximu každého stážisty {selectedYearText}. Do tabulky se
-            zahrnují pouze stážisti, kteří nemají úroveň „zaměstnanec“.
+            Procentuální hodnoty odpovídají poměru vůči individuálnímu maximu každého stážisty {selectedYearText}; měsíce bez
+            vykázaných hodin se do průměru nezapočítávají. Do tabulky se zahrnují pouze stážisti, kteří nemají úroveň „zaměstnanec“.
           </p>
         </div>
       </section>
@@ -496,7 +502,7 @@ function NormalizedCapacityChart({
       </div>
       <figcaption className="planning-resources__chartCaption">
         Hodnoty vyjadřují průměrnou relativní kapacitu napříč všemi stážisty ({yearDescription}; 100&nbsp;% = jejich osobní
-        maximum v daném roce).
+        maximum v daném roce) a nezahrnují měsíce bez vykázaných hodin.
       </figcaption>
     </figure>
   );
