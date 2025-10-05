@@ -1074,8 +1074,8 @@ public class SyncDao {
                                END) AS cost
                     FROM report r
                     JOIN intern i ON i.username = r.username
-                    JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id
-                    JOIN project p ON p.id = ptr.project_id
+                    LEFT JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id
+                    LEFT JOIN project p ON p.id = ptr.project_id
                     LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ptr.project_id
                     LEFT JOIN intern_level_history ilh ON ilh.intern_id = i.id
                         AND ilh.valid_from <= r.spent_at::date
@@ -1083,8 +1083,8 @@ public class SyncDao {
                     LEFT JOIN level lvl ON lvl.id = ilh.level_id
                     WHERE r.spent_at >= ?
                       AND r.spent_at < ?
-                      AND (p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
-                      AND (p.budget_to IS NULL OR r.spent_at::date <= p.budget_to)
+                      AND (p.id IS NULL OR p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
+                      AND (p.id IS NULL OR p.budget_to IS NULL OR r.spent_at::date <= p.budget_to)
                     GROUP BY i.id, month_start
                 )
                 SELECT i.id AS intern_id,

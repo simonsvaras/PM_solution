@@ -169,6 +169,75 @@ class InternMonthlyHoursIntegrationTest {
         }
     }
 
+    @Test
+    void listInternMonthlyHoursIncludesReportsWithoutLinkedProject() {
+        Assumptions.assumeTrue(isDockerAvailable(), "Docker is required for the integration test");
+
+        DockerImageName image = DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres");
+        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image)) {
+            postgres.start();
+
+            Flyway.configure()
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(postgres.getJdbcUrl());
+            dataSource.setUsername(postgres.getUsername());
+            dataSource.setPassword(postgres.getPassword());
+
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            SyncDao syncDao = new SyncDao(jdbcTemplate);
+            InternDao internDao = new InternDao(jdbcTemplate);
+
+            long repositoryId = insertRepository(jdbcTemplate);
+
+            long juniorLevelId = insertLevel(jdbcTemplate, "junior", BigDecimal.valueOf(200));
+            InternDao.InternRow intern = internDao.insert("Dora", "Developer", uniqueUsername(), juniorLevelId);
+            resetLevelHistory(jdbcTemplate, intern.id());
+            insertLevelHistory(jdbcTemplate, intern.id(), juniorLevelId, LocalDate.of(2023, 9, 1), null);
+
+            BigDecimal loggedHours = BigDecimal.valueOf(5).setScale(4, RoundingMode.UNNECESSARY);
+            BigDecimal projectRate = BigDecimal.valueOf(220).setScale(2, RoundingMode.UNNECESSARY);
+            syncDao.insertReports(List.of(
+                    new ReportRow(
+                            repositoryId,
+                            null,
+                            OffsetDateTime.parse("2024-05-14T10:00:00Z"),
+                            18000,
+                            loggedHours,
+                            intern.username(),
+                            projectRate)
+            ));
+
+            OffsetDateTime from = OffsetDateTime.parse("2024-01-01T00:00:00Z");
+            OffsetDateTime to = OffsetDateTime.parse("2025-01-01T00:00:00Z");
+            List<InternMonthlyHoursRow> rows = syncDao.listInternMonthlyHours(from, to);
+
+            Map<Long, List<InternMonthlyHoursRow>> rowsByIntern = rows.stream()
+                    .collect(Collectors.groupingBy(InternMonthlyHoursRow::internId));
+            assertThat(rowsByIntern).containsKey(intern.id());
+
+            List<InternMonthlyHoursRow> internRows = rowsByIntern.get(intern.id());
+            assertThat(internRows)
+                    .extracting(row -> row.monthStart().toLocalDate())
+                    .contains(LocalDate.of(2024, 5, 1));
+
+            InternMonthlyHoursRow mayRow = internRows.stream()
+                    .filter(row -> row.monthStart().toLocalDate().equals(LocalDate.of(2024, 5, 1)))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(mayRow.hours()).isEqualByComparingTo(loggedHours);
+            assertThat(mayRow.cost()).isEqualByComparingTo(projectRate.multiply(loggedHours).setScale(2, RoundingMode.HALF_UP));
+            assertThat(mayRow.levelId()).isEqualTo(juniorLevelId);
+            assertThat(mayRow.levelCode()).isEqualTo("junior");
+            assertThat(mayRow.levelLabel()).isEqualTo("Level junior");
+        }
+    }
+
     private static boolean isDockerAvailable() {
         try {
             DockerClientFactory.instance().client();
