@@ -46,8 +46,9 @@ Key modules
   a zobrazí průměr v responzivním grafu postaveném na knihovně Recharts (hladká křivka + plocha s gradientem, tooltipy v procentech,
   baseline pro 50&nbsp;% a barevně zvýrazněná zkoušková/prázdninová období). Do průměru se nezahrnují měsíce, ve kterých měli daní
   stážisti nula hodin. Graf je řízen přes props, takže jej lze znovu použít i pro jiné role či roky. Pod grafem je tabulka s hodinami
-  i procentuální hodnotou pro jednotlivé měsíce. Přepínač v horní části stránky umožní rychle přepnout mezi dostupnými roky a graf
-  ignoruje stážisty s úrovní „zaměstnanec“, aby normalizace odrážela pouze aktivní stážisty.
+  i procentuální hodnotou pro jednotlivé měsíce s gradovaným zeleným pozadím buněk podle dosaženého procenta. Přepínač v horní části
+  stránky umožní rychle přepnout mezi dostupnými roky a graf ignoruje stážisty s úrovní „zaměstnanec“, aby normalizace odrážela pouze
+  aktivní stážisty.
 
 API usage
 ---------

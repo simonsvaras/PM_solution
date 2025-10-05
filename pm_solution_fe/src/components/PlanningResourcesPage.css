@@ -130,6 +130,23 @@
   font-variant-numeric: tabular-nums;
 }
 
+.planning-resources__tableCell {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.planning-resources__tableCell--highlighted {
+  border-bottom-color: rgba(148, 163, 184, 0.16);
+}
+
+.planning-resources__tableCell--highlighted-low {
+  font-weight: 500;
+}
+
+.planning-resources__tableCell--highlighted-medium,
+.planning-resources__tableCell--highlighted-strong {
+  font-weight: 600;
+}
+
 .planning-resources__table thead th {
   color: var(--color-text-muted);
   font-weight: 500;

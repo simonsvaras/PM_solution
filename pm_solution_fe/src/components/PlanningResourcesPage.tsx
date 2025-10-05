@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState, type CSSProperties } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -65,6 +65,56 @@ const percentageFormatter = new Intl.NumberFormat('cs-CZ', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
+
+type CellHighlightTone = 'low' | 'medium' | 'strong';
+
+type CellHighlightPresentation = {
+  style?: CSSProperties;
+  secondaryStyle?: CSSProperties;
+  tone: CellHighlightTone | null;
+};
+
+function buildCellHighlight(percent: number): CellHighlightPresentation {
+  if (!Number.isFinite(percent) || percent <= 0) {
+    return { style: undefined, secondaryStyle: undefined, tone: null };
+  }
+
+  const clamped = Math.max(0, Math.min(100, percent));
+  const intensity = clamped / 100;
+  const maxLightness = 94;
+  const minLightness = 40;
+  const lightness = maxLightness - intensity * (maxLightness - minLightness);
+  const minAlpha = 0.2;
+  const maxAlpha = 0.75;
+  const alpha = minAlpha + intensity * (maxAlpha - minAlpha);
+  const highlightColor = `hsla(142, 70%, ${lightness}%, ${alpha})`;
+
+  let tone: CellHighlightTone;
+  let textColor: string | undefined;
+  let secondaryColor: string | undefined;
+
+  if (intensity >= 0.75) {
+    tone = 'strong';
+    textColor = '#f0fdf4';
+    secondaryColor = 'rgba(240, 253, 244, 0.85)';
+  } else if (intensity >= 0.4) {
+    tone = 'medium';
+    textColor = '#064e3b';
+    secondaryColor = 'rgba(4, 120, 87, 0.78)';
+  } else {
+    tone = 'low';
+    secondaryColor = 'rgba(22, 163, 74, 0.65)';
+  }
+
+  const style: CSSProperties = {
+    backgroundColor: highlightColor,
+    ...(textColor ? { color: textColor } : null),
+  };
+
+  const secondaryStyle = secondaryColor ? { color: secondaryColor } : undefined;
+
+  return { style, secondaryStyle, tone };
+}
 
 /**
  * Page that visualises the normalised intern capacity over a calendar year.
@@ -320,17 +370,23 @@ function PlanningResourcesPage() {
                       </th>
                       {intern.monthlyHours.map((hours, index) => {
                         const percent = intern.normalizedCapacity[index];
+                        const highlight = buildCellHighlight(percent);
                         const hasHours = hours > 0;
                         const monthLabel = index + 1;
                         const title = hasHours
                           ? `Měsíc ${monthLabel}/${displayYearLabel}: ${hoursFormatter.format(hours)} h (${percentageFormatter.format(percent)} %)`
                           : `Měsíc ${monthLabel}/${displayYearLabel}: bez vykázaných hodin`;
+                        const cellClasses = ['planning-resources__tableCell'];
+                        if (highlight.tone) {
+                          cellClasses.push('planning-resources__tableCell--highlighted');
+                          cellClasses.push(`planning-resources__tableCell--highlighted-${highlight.tone}`);
+                        }
                         return (
-                          <td key={index} title={title}>
+                          <td key={index} title={title} className={cellClasses.join(' ')} style={highlight.style}>
                             {hasHours ? (
                               <span className="planning-resources__cellValue">
                                 <span>{hoursFormatter.format(hours)}&nbsp;h</span>
-                                <span className="planning-resources__cellValueSecondary">
+                                <span className="planning-resources__cellValueSecondary" style={highlight.secondaryStyle}>
                                   {percentageFormatter.format(percent)} %
                                 </span>
                               </span>
