@@ -50,6 +50,7 @@ type CapacityChartProps = {
 const DEFAULT_CHART_COLOR = '#1e40af';
 const DEFAULT_BANDS: AcademicBand[] = [
   { from: 1, to: 2, color: '#fde68a', alpha: 0.2 },
+  { from: 5, to: 6, color: '#fde68a', alpha: 0.2 },
   { from: 7, to: 9, color: '#bbf7d0', alpha: 0.18 },
 ];
 const DEFAULT_BASELINE = 50;
