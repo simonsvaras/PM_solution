@@ -1,4 +1,17 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import {
+  Area,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceArea,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import './PlanningResourcesPage.css';
 import { getInternMonthlyHours, type InternMonthlyHoursRow } from '../api';
 
@@ -18,10 +31,28 @@ type InternHoursAccumulator = {
   monthlyHours: number[];
 };
 
-type ChartPoint = {
+type MonthlyCapacity = {
   month: number;
   value: number;
 };
+
+type AcademicBand = { from: number; to: number; color: string; alpha?: number };
+
+type CapacityChartProps = {
+  data: MonthlyCapacity[];
+  bands?: AcademicBand[];
+  baseline?: number;
+  color?: string;
+  showArea?: boolean;
+  year?: number | null;
+};
+
+const DEFAULT_CHART_COLOR = '#1e40af';
+const DEFAULT_BANDS: AcademicBand[] = [
+  { from: 1, to: 2, color: '#fde68a', alpha: 0.2 },
+  { from: 7, to: 9, color: '#bbf7d0', alpha: 0.18 },
+];
+const DEFAULT_BASELINE = 50;
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 
@@ -178,7 +209,7 @@ function PlanningResourcesPage() {
     });
   }, [interns]);
 
-  const chartPoints: ChartPoint[] = useMemo(
+  const chartPoints: MonthlyCapacity[] = useMemo(
     () =>
       MONTHS.map((month, index) => ({
         month,
@@ -230,7 +261,7 @@ function PlanningResourcesPage() {
       </div>
 
       <section className="panel">
-        <div className="panel__body planning-resources__chart">
+        <div className="panel__body">
           <h2 className="planning-resources__sectionTitle">
             Průměrná normalizovaná kapacita {selectedYearLabel ? `(${selectedYearLabel})` : ''}
           </h2>
@@ -346,115 +377,129 @@ function isEmployeeLevel(row: InternMonthlyHoursRow): boolean {
   return levelLabel === 'zaměstnanec' || levelLabel === 'zamestnanec';
 }
 
-function NormalizedCapacityChart({ data, year }: { data: ChartPoint[]; year: number | null }) {
+function NormalizedCapacityChart({
+  data,
+  year,
+  bands = DEFAULT_BANDS,
+  baseline = DEFAULT_BASELINE,
+  color = DEFAULT_CHART_COLOR,
+  showArea = true,
+}: CapacityChartProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const gradientId = useId();
 
-  const chartWidth = 860;
-  const chartHeight = 360;
-  const padding = { top: 24, right: 32, bottom: 56, left: 64 };
-  const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = chartHeight - padding.top - padding.bottom;
-
+  const chartData = useMemo(() => data.map(item => ({ ...item })), [data]);
+  const dotsEnabled = chartData.length <= 24;
   const yearLabel = typeof year === 'number' ? year.toString() : null;
   const yearDescription = yearLabel ? `v roce ${yearLabel}` : 've vybraném období';
-  const tooltipYear = yearLabel ?? 'vybraném období';
 
-  const path = data.reduce((acc, point, index) => {
-    const position = getPointPosition(point, innerWidth, innerHeight, padding);
-    const command = `${index === 0 ? 'M' : 'L'} ${position.x} ${position.y}`;
-    return acc ? `${acc} ${command}` : command;
-  }, '');
+  const tooltipFormatter = (value: ValueType): [string, NameType] => {
+    const numeric = typeof value === 'number' ? value : Number(value);
+    const safeNumber = Number.isFinite(numeric) ? numeric : 0;
+    return [`${Math.round(safeNumber)} %`, 'Kapacita'];
+  };
 
-  const yTicks = [0, 25, 50, 75, 100];
+  const tooltipLabelFormatter = (label: ValueType): string => {
+    const numeric = typeof label === 'number' ? label : Number(label);
+    const safeNumber = Number.isFinite(numeric) ? numeric : 0;
+    return `Měsíc ${safeNumber}`;
+  };
 
   return (
     <figure className="planning-resources__chartFigure">
-      <svg
-        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+      <div
+        className="planning-resources__chartCanvas"
         role="img"
         aria-labelledby={`${titleId} ${descriptionId}`}
-        className="planning-resources__chartSvg"
       >
-        <title id={titleId}>Průměrná normalizovaná kapacita stážistů {yearDescription}</title>
-        <desc id={descriptionId}>
-          Linie zobrazuje průměr normalizovaných hodin za jednotlivé měsíce {yearDescription}. Základní osa ukazuje měsíce a
-          svislá osa procenta.
-        </desc>
-        <g className="planning-resources__chartGrid">
-          {yTicks.map(tick => {
-            const y = padding.top + (1 - tick / 100) * innerHeight;
-            return <line key={tick} x1={padding.left} x2={padding.left + innerWidth} y1={y} y2={y} />;
-          })}
-        </g>
-        <line
-          className="planning-resources__chartAxis"
-          x1={padding.left}
-          y1={padding.top + innerHeight}
-          x2={padding.left + innerWidth}
-          y2={padding.top + innerHeight}
-        />
-        <line className="planning-resources__chartAxis" x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + innerHeight} />
-        <g className="planning-resources__chartTicks planning-resources__chartTicks--y">
-          {yTicks.map(tick => {
-            const y = padding.top + (1 - tick / 100) * innerHeight;
-            return (
-              <g key={tick} transform={`translate(${padding.left - 12}, ${y})`}>
-                <text x={-8} y={4} textAnchor="end">
-                  {tick}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-        <g className="planning-resources__chartTicks planning-resources__chartTicks--x">
-          {data.map(point => {
-            const { x } = getPointPosition(point, innerWidth, innerHeight, padding);
-            return (
-              <g key={point.month} transform={`translate(${x}, ${padding.top + innerHeight + 24})`}>
-                <text textAnchor="middle">{point.month}</text>
-              </g>
-            );
-          })}
-        </g>
-        {path ? <path className="planning-resources__chartLine" d={path} /> : null}
-        <g className="planning-resources__chartPoints">
-          {data.map(point => {
-            const { x, y } = getPointPosition(point, innerWidth, innerHeight, padding);
-            return (
-              <circle key={point.month} cx={x} cy={y} r={6}>
-                <title>
-                  {`Měsíc ${point.month}/${tooltipYear}: ${percentageFormatter.format(point.value)} %`}
-                </title>
-              </circle>
-            );
-          })}
-        </g>
-      </svg>
+        <span id={titleId} className="planning-resources__srOnly">
+          Průměrná normalizovaná kapacita stážistů {yearDescription}
+        </span>
+        <span id={descriptionId} className="planning-resources__srOnly">
+          Čára ukazuje průměr procentuální kapacity napříč měsíci, osa X představuje měsíce 1 až 12 a osa Y rozsah 0 až 100 procent.
+        </span>
+        <div className="planning-resources__chartFrame">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
+              <defs>
+                {showArea ? (
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+                  </linearGradient>
+                ) : null}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.35)" />
+              <XAxis
+                dataKey="month"
+                tickFormatter={(month: number) => `${month}`}
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
+                axisLine={{ stroke: 'rgba(148, 163, 184, 0.6)' }}
+                tickLine={{ stroke: 'rgba(148, 163, 184, 0.6)' }}
+                padding={{ left: 8, right: 8 }}
+              />
+              <YAxis
+                domain={[0, 100]}
+                tickFormatter={(value: number) => `${value}%`}
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
+                axisLine={{ stroke: 'rgba(148, 163, 184, 0.6)' }}
+                tickLine={{ stroke: 'rgba(148, 163, 184, 0.6)' }}
+                allowDecimals={false}
+              />
+              <Tooltip
+                formatter={tooltipFormatter}
+                labelFormatter={tooltipLabelFormatter}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: '1px solid rgba(148, 163, 184, 0.35)',
+                  boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
+                }}
+              />
+              {bands.map(band => (
+                <ReferenceArea
+                  key={`${band.from}-${band.to}-${band.color}`}
+                  x1={band.from}
+                  x2={band.to}
+                  y1={0}
+                  y2={100}
+                  fill={band.color}
+                  fillOpacity={band.alpha ?? 0.18}
+                />
+              ))}
+              {typeof baseline === 'number' ? (
+                <ReferenceLine y={baseline} stroke="#94a3b8" strokeDasharray="4 4" />
+              ) : null}
+              {showArea ? (
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={color}
+                  fill={`url(#${gradientId})`}
+                  strokeWidth={3}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              ) : null}
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={3}
+                dot={dotsEnabled ? { r: 3, stroke: '#fff', strokeWidth: 2 } : false}
+                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
       <figcaption className="planning-resources__chartCaption">
         Hodnoty vyjadřují průměrnou relativní kapacitu napříč všemi stážisty ({yearDescription}; 100&nbsp;% = jejich osobní
         maximum v daném roce).
       </figcaption>
     </figure>
   );
-}
-
-function getPointPosition(point: ChartPoint, innerWidth: number, innerHeight: number, padding: {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}) {
-  const monthRatio = dataToRatio(point.month, MONTHS[0], MONTHS[MONTHS.length - 1]);
-  const x = padding.left + monthRatio * innerWidth;
-  const valueClamped = Math.min(Math.max(point.value, 0), 100);
-  const y = padding.top + (1 - valueClamped / 100) * innerHeight;
-  return { x, y };
-}
-
-function dataToRatio(value: number, min: number, max: number) {
-  if (max === min) return 0;
-  return (value - min) / (max - min);
 }
 
 export default PlanningResourcesPage;

@@ -73,10 +73,6 @@
   font-weight: 600;
 }
 
-.planning-resources__chart {
-  gap: 24px;
-}
-
 .planning-resources__chartFigure {
   margin: 0;
   display: flex;
@@ -84,42 +80,32 @@
   gap: 12px;
 }
 
-.planning-resources__chartSvg {
+.planning-resources__chartCanvas {
   width: 100%;
-  height: auto;
+  position: relative;
 }
 
-.planning-resources__chartGrid line {
-  stroke: rgba(148, 163, 184, 0.25);
-  stroke-dasharray: 4 6;
-}
-
-.planning-resources__chartAxis {
-  stroke: rgba(71, 85, 105, 0.5);
-  stroke-width: 1.5;
-}
-
-.planning-resources__chartLine {
-  fill: none;
-  stroke: var(--color-accent-strong);
-  stroke-width: 3;
-}
-
-.planning-resources__chartPoints circle {
-  fill: var(--color-accent-strong);
-  stroke: #fff;
-  stroke-width: 2;
-}
-
-.planning-resources__chartTicks text {
-  font-size: 0.8rem;
-  fill: var(--color-text-muted);
+.planning-resources__chartFrame {
+  height: 16rem;
+  width: 100%;
 }
 
 .planning-resources__chartCaption {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.85rem;
+}
+
+.planning-resources__srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .planning-resources__tableWrapper {
