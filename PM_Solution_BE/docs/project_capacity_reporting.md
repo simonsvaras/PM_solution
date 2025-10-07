@@ -18,7 +18,7 @@ Tento dokument shrnuje návrh rozšíření backendu modulu `projects-overview` 
        severity SMALLINT NOT NULL CHECK (severity BETWEEN 0 AND 100)
    );
    ```
-   - `code` – strojově čitelné hodnoty (`SATURATED`, `LACK_BE`, `LACK_FE`, `LACK_ANALYSIS`, `CRITICAL`).
+  - `code` – strojově čitelné hodnoty (`SATURATED`, `SURPLUS_BE`, `SURPLUS_FE`, `SURPLUS_ANALYSIS`, `LACK_BE`, `LACK_FE`, `LACK_ANALYSIS`, `CRITICAL`).
    - `label` – lokalizovaný název pro FE.
    - `severity` – číslo pro řazení/filtry (např. 0 = saturováno, 100 = kritické).
    - Tabulka se naplní seed daty ve Flyway migraci.
@@ -53,6 +53,9 @@ Tento dokument shrnuje návrh rozšíření backendu modulu `projects-overview` 
   - přidá tabulku `project_capacity_report`.
   - doplní indexy a případně materializovaný sloupec/cache.
 - Migrace bude idempotentní a bude respektovat stávající naming conventions (prefix `Vxx__`).
+- `V31__project_capacity_surplus_statuses.sql`
+  - přidá nové přebytkové statusy (`SURPLUS_BE`, `SURPLUS_FE`, `SURPLUS_ANALYSIS`) pro disciplíny s dostupnou kapacitou.
+  - používá `INSERT ... ON CONFLICT DO UPDATE`, aby při opakovaném nasazení sjednotila labely a severity.
 
 ## REST API
 ### Endpoints
@@ -63,20 +66,21 @@ Tento dokument shrnuje návrh rozšíření backendu modulu `projects-overview` 
      "reportedAt": "2024-03-05T09:15:00Z",
      "note": "Potřebujeme 0.5 FTE senior BE",
      "statuses": [
-       {
-         "code": "LACK_BE",
-         "label": "Chybí kapacita na backend",
-         "severity": 60
-       },
-       {
-         "code": "LACK_FE",
-         "label": "Chybí kapacita na frontend",
-         "severity": 60
-       }
-     ]
+   {
+     "code": "LACK_BE",
+     "label": "Chybí kapacita na backend",
+     "severity": 60
+   },
+   {
+     "code": "LACK_FE",
+     "label": "Chybí kapacita na frontend",
+     "severity": 60
    }
-   ```
-   - Implementace: repository vybere poslední report a agreguje všechny stavy přes `project_capacity_report_status`.
+ ]
+}
+  ```
+  - Implementace: repository vybere poslední report a agreguje všechny stavy přes `project_capacity_report_status`.
+  - Mezi podporované kódy patří i přebytkové varianty `SURPLUS_*`, takže lze zaznamenat např. „Přebytek BE“ i „Chybí kapacity na FE“ v jednom reportu.
 
 2. `GET /api/projects/{projectId}/capacity/history?from=&to=&page=&size=` – stránkovaná historie pro detail projektu.
    - Dotaz vybírá z `project_capacity_report` s filtrem na časové období.
@@ -115,6 +119,9 @@ Tento dokument shrnuje návrh rozšíření backendu modulu `projects-overview` 
      -- severity 0 = bez problému, 100 = kritické kapacitní riziko
      INSERT INTO capacity_status (code, label, severity) VALUES
      ('SATURATED', 'Všechny pozice saturovány', 0),
+     ('SURPLUS_BE', 'Přebytek BE', 10),
+     ('SURPLUS_FE', 'Přebytek FE', 10),
+     ('SURPLUS_ANALYSIS', 'Přebytek Analysis', 10),
      ('LACK_BE', 'Chybí kapacity na backend', 60),
      ('LACK_FE', 'Chybí kapacity na frontend', 60),
      ('LACK_ANALYSIS', 'Chybí kapacity na analýzu', 50),
