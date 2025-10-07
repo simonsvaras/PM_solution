@@ -88,25 +88,22 @@ export type ProjectOverviewDTO = {
   hourlyRateCzk: number | null;
 };
 
-export type ProjectCapacityReporter = {
-  username: string;
-  firstName: string | null;
-  lastName: string | null;
-  fullName: string | null;
+export type ProjectCapacityStatus = {
+  code: string;
+  label: string;
+  severity: number;
 };
 
 export type ProjectCapacityReport = {
   id: number;
-  statusCode: string;
-  statusLabel: string;
-  severity: number;
+  projectId: number;
   reportedAt: string;
-  reportedBy: ProjectCapacityReporter;
   note: string | null;
+  statuses: ProjectCapacityStatus[];
 };
 
 export type ReportProjectCapacityPayload = {
-  statusCode: string;
+  statusCodes: string[];
   note?: string | null;
 };
 

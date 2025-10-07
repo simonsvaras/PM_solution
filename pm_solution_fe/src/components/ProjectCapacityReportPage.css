@@ -56,15 +56,54 @@
 .capacityReport__field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  border: none;
+  padding: 0;
+  margin: 0;
 }
 
+.capacityReport__field legend,
 .capacityReport__field label {
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-.capacityReport__field select,
+.capacityReport__checkboxGroup {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 768px) {
+  .capacityReport__checkboxGroup {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+.capacityReport__checkboxOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(30, 64, 175, 0.04);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.capacityReport__checkboxOption input {
+  margin-top: 4px;
+}
+
+.capacityReport__checkboxOption:hover,
+.capacityReport__checkboxOption:focus-within {
+  border-color: rgba(30, 64, 175, 0.45);
+  background: rgba(30, 64, 175, 0.08);
+}
+
+.capacityReport__checkboxOption span {
+  line-height: 1.4;
+}
+
 .capacityReport__field textarea {
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -73,10 +112,6 @@
   color: var(--color-text-primary);
   background: var(--color-surface);
   resize: vertical;
-  min-height: 48px;
-}
-
-.capacityReport__field textarea {
   min-height: 120px;
 }
 

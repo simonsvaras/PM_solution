@@ -20,11 +20,15 @@ type ProjectCapacityReportPageProps = {
 
 type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
+const DEFAULT_SELECTION = normaliseStatusCodes(
+  PROJECT_CAPACITY_STATUS_OPTIONS[0]?.code ? [PROJECT_CAPACITY_STATUS_OPTIONS[0].code] : [],
+);
+
 export default function ProjectCapacityReportPage({ project, onShowToast }: ProjectCapacityReportPageProps) {
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentReport, setCurrentReport] = useState<ProjectCapacityReport | null>(null);
-  const [statusCode, setStatusCode] = useState(PROJECT_CAPACITY_STATUS_OPTIONS[0]?.code ?? 'SATURATED');
+  const [selectedStatusCodes, setSelectedStatusCodes] = useState<string[]>(DEFAULT_SELECTION);
   const [note, setNote] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +43,7 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
       .then(report => {
         if (cancelled) return;
         setCurrentReport(report);
-        setStatusCode(report.statusCode);
+        setSelectedStatusCodes(normaliseStatusCodes(report.statuses.map(status => status.code)));
         setLoadState('loaded');
       })
       .catch(error => {
@@ -60,14 +64,9 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
   }, [project.id]);
 
   useEffect(() => {
-    setStatusCode(PROJECT_CAPACITY_STATUS_OPTIONS[0]?.code ?? 'SATURATED');
+    setSelectedStatusCodes(DEFAULT_SELECTION);
     setNote('');
   }, [project.id]);
-
-  const lastReporterName = useMemo(() => {
-    if (!currentReport) return null;
-    return currentReport.reportedBy.fullName || currentReport.reportedBy.username;
-  }, [currentReport]);
 
   const lastReportedAt = useMemo(() => {
     if (!currentReport) return null;
@@ -82,14 +81,31 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
     }
   }, [currentReport]);
 
+  const currentStatusLabels = useMemo(() => {
+    if (!currentReport) return [] as string[];
+    return currentReport.statuses.map(status => status.label);
+  }, [currentReport]);
+
   const noteLength = note.length;
   const remainingCharacters = NOTE_LIMIT - noteLength;
+
+  function toggleStatus(code: string) {
+    setSelectedStatusCodes(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return normaliseStatusCodes(next);
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError(null);
-    if (!statusCode) {
-      setSubmitError('Vyberte stav projektu.');
+    if (selectedStatusCodes.length === 0) {
+      setSubmitError('Vyberte alespoň jeden stav projektu.');
       return;
     }
     if (note.length > NOTE_LIMIT) {
@@ -98,7 +114,7 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
     }
 
     const payload: ReportProjectCapacityPayload = {
-      statusCode,
+      statusCodes: selectedStatusCodes,
       note: note.trim() ? note.trim() : null,
     };
 
@@ -106,7 +122,7 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
     try {
       const created = await reportProjectCapacity(project.id, payload);
       setCurrentReport(created);
-      setStatusCode(created.statusCode);
+      setSelectedStatusCodes(normaliseStatusCodes(created.statuses.map(status => status.code)));
       setNote('');
       onShowToast?.('success', 'Kapacitní report byl uložen.');
     } catch (error) {
@@ -124,8 +140,8 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
       <div className="capacityReport__intro">
         <h2>Report kapacit</h2>
         <p>
-          Vyberte aktuální stav kapacit projektu a odešlete ho. Reporty se ukládají do historie včetně uživatele,
-          který změnu provedl.
+          Vyberte aktuální stav kapacit projektu a odešlete ho. Reporty se ukládají do historie, abychom viděli vývoj v
+          čase.
         </p>
         {loadState === 'loading' ? (
           <p className="capacityReport__loader">Načítám poslední report…</p>
@@ -135,11 +151,8 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
           </p>
         ) : currentReport ? (
           <p className="capacityReport__statusSummary">
-            Poslední stav: {currentReport.statusLabel}{' '}
-            <span>
-              {lastReportedAt ? `• ${lastReportedAt}` : null}
-              {lastReporterName ? ` • ${lastReporterName}` : null}
-            </span>
+            Poslední stav: {currentStatusLabels.length > 0 ? currentStatusLabels.join(', ') : 'Bez specifikace'}{' '}
+            {lastReportedAt ? <span>• {lastReportedAt}</span> : null}
           </p>
         ) : (
           <p className="capacityReport__statusSummary">Zatím nebyl zaznamenán žádný kapacitní report.</p>
@@ -147,22 +160,27 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
       </div>
 
       <form className="capacityReport__formCard" onSubmit={handleSubmit} noValidate>
-        <div className="capacityReport__field">
-          <label htmlFor="capacity-status">Aktuální stav</label>
-          <select
-            id="capacity-status"
-            value={statusCode}
-            onChange={event => setStatusCode(event.target.value)}
-            disabled={submitting}
-          >
-            {PROJECT_CAPACITY_STATUS_OPTIONS.map(option => (
-              <option key={option.code} value={option.code}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <p className="capacityReport__hint">Vyberte jednu z předdefinovaných možností kapacitního reportu.</p>
-        </div>
+        <fieldset className="capacityReport__field">
+          <legend>Aktuální stavy</legend>
+          <div className="capacityReport__checkboxGroup">
+            {PROJECT_CAPACITY_STATUS_OPTIONS.map(option => {
+              const checked = selectedStatusCodes.includes(option.code);
+              return (
+                <label key={option.code} className="capacityReport__checkboxOption">
+                  <input
+                    type="checkbox"
+                    value={option.code}
+                    checked={checked}
+                    onChange={() => toggleStatus(option.code)}
+                    disabled={submitting}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="capacityReport__hint">Můžete vybrat jednu nebo více možností podle aktuální situace.</p>
+        </fieldset>
 
         <div className="capacityReport__field">
           <label htmlFor="capacity-note">Poznámka (volitelná)</label>
@@ -200,4 +218,26 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
       </form>
     </section>
   );
+}
+
+function normaliseStatusCodes(codes: Iterable<string | null | undefined>): string[] {
+  const knownOrder = PROJECT_CAPACITY_STATUS_OPTIONS.map(option => option.code);
+  const set = new Set<string>();
+  for (const code of codes) {
+    if (!code) continue;
+    const trimmed = code.trim();
+    if (trimmed) {
+      set.add(trimmed);
+    }
+  }
+  const ordered: string[] = [];
+  for (const code of knownOrder) {
+    if (set.delete(code)) {
+      ordered.push(code);
+    }
+  }
+  if (set.size > 0) {
+    ordered.push(...set);
+  }
+  return ordered;
 }

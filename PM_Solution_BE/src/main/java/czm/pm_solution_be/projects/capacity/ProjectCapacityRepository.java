@@ -8,7 +8,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -25,22 +27,27 @@ public class ProjectCapacityRepository {
      */
     private static final String SQL_FIND_CURRENT =
             """
-            SELECT r.id,
-                   r.project_id,
-                   r.status_code,
+            WITH latest AS (
+                SELECT r.id,
+                       r.project_id,
+                       r.reported_at,
+                       r.note
+                FROM project_capacity_report r
+                WHERE r.project_id = ?
+                ORDER BY r.reported_at DESC, r.id DESC
+                LIMIT 1
+            )
+            SELECT l.id,
+                   l.project_id,
+                   l.reported_at,
+                   l.note,
+                   cs.code AS status_code,
                    cs.label AS status_label,
-                   cs.severity,
-                   r.reported_at,
-                   r.reported_by,
-                   reporter.first_name AS reported_by_first_name,
-                   reporter.last_name AS reported_by_last_name,
-                   r.note
-            FROM project_capacity_report r
-            JOIN capacity_status cs ON cs.code = r.status_code
-            LEFT JOIN intern reporter ON reporter.username = r.reported_by
-            WHERE r.project_id = ?
-            ORDER BY r.reported_at DESC, r.id DESC
-            LIMIT 1
+                   cs.severity AS status_severity
+            FROM latest l
+            JOIN project_capacity_report_status rs ON rs.report_id = l.id
+            JOIN capacity_status cs ON cs.code = rs.status_code
+            ORDER BY cs.severity DESC, cs.code ASC
             """;
 
     private static final String SQL_COUNT_HISTORY =
@@ -53,35 +60,34 @@ public class ProjectCapacityRepository {
 
     private static final String SQL_PROJECT_EXISTS = "SELECT EXISTS (SELECT 1 FROM project WHERE id = ?)";
 
-    private static final String SQL_REPORTER_EXISTS = "SELECT EXISTS (SELECT 1 FROM intern WHERE username = ?)";
-
     /**
-     * Insert query returning the inserted row enriched with status metadata and reporter name.
-     *
-     * <p>The CTE helps to keep the mapping logic in a single place and leverages the
-     * database default for {@code reported_at}.</p>
+     * Insert query returning metadata of the new report (statuses are inserted separately).
      */
     private static final String SQL_INSERT_REPORT =
             """
-            WITH inserted AS (
-                INSERT INTO project_capacity_report (project_id, status_code, reported_by, note)
-                VALUES (?, ?, ?, ?)
-                RETURNING id, project_id, status_code, reported_at, reported_by, note
-            )
-            SELECT i.id,
-                   i.project_id,
-                   i.status_code,
-                   cs.label AS status_label,
-                   cs.severity,
-                   i.reported_at,
-                   i.reported_by,
-                   reporter.first_name AS reported_by_first_name,
-                   reporter.last_name AS reported_by_last_name,
-                   i.note
-            FROM inserted i
-            JOIN capacity_status cs ON cs.code = i.status_code
-            LEFT JOIN intern reporter ON reporter.username = i.reported_by
+            INSERT INTO project_capacity_report (project_id, note)
+            VALUES (?, ?)
+            RETURNING id, project_id, reported_at, note
             """;
+
+    private static final String SQL_FIND_BY_ID =
+            """
+            SELECT r.id,
+                   r.project_id,
+                   r.reported_at,
+                   r.note,
+                   cs.code AS status_code,
+                   cs.label AS status_label,
+                   cs.severity AS status_severity
+            FROM project_capacity_report r
+            JOIN project_capacity_report_status rs ON rs.report_id = r.id
+            JOIN capacity_status cs ON cs.code = rs.status_code
+            WHERE r.id = ?
+            ORDER BY cs.severity DESC, cs.code ASC
+            """;
+
+    private static final String SQL_INSERT_STATUS =
+            "INSERT INTO project_capacity_report_status (report_id, status_code) VALUES (?, ?)";
 
     private final JdbcTemplate jdbc;
 
@@ -90,39 +96,48 @@ public class ProjectCapacityRepository {
     }
 
     /**
-     * Row mapping shared across the read queries.
-     *
-     * <p>Mapper vrací neutralní {@link ProjectCapacityRow}, který se dá snadno transformovat do REST DTO i
-     * doménových objektů. Díky {@code OffsetDateTime} nepřicházíme o timezone informaci z DB.</p>
+     * Mapper vrací jednotlivé řádky s jedním stavem, později se agregují do celého reportu.
      */
-    private static final RowMapper<ProjectCapacityRow> CAPACITY_MAPPER = new RowMapper<>() {
+    private static final RowMapper<ProjectCapacityRawRow> CAPACITY_RAW_MAPPER = new RowMapper<>() {
         @Override
-        public ProjectCapacityRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+        public ProjectCapacityRawRow mapRow(ResultSet rs, int rowNum) throws SQLException {
             OffsetDateTime reportedAt = rs.getObject("reported_at", OffsetDateTime.class);
-            return new ProjectCapacityRow(
+            return new ProjectCapacityRawRow(
                     rs.getLong("id"),
                     rs.getLong("project_id"),
+                    reportedAt,
+                    rs.getString("note"),
                     rs.getString("status_code"),
                     rs.getString("status_label"),
-                    rs.getInt("severity"),
-                    reportedAt,
-                    rs.getString("reported_by"),
-                    rs.getString("reported_by_first_name"),
-                    rs.getString("reported_by_last_name"),
-                    rs.getString("note"));
+                    rs.getInt("status_severity"));
+        }
+    };
+
+    private static final RowMapper<ProjectCapacityInsertRow> INSERT_MAPPER = new RowMapper<>() {
+        @Override
+        public ProjectCapacityInsertRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+            OffsetDateTime reportedAt = rs.getObject("reported_at", OffsetDateTime.class);
+            return new ProjectCapacityInsertRow(rs.getLong("id"), rs.getLong("project_id"), reportedAt, rs.getString("note"));
         }
     };
 
     public record ProjectCapacityRow(long id,
                                      long projectId,
-                                     String statusCode,
-                                     String statusLabel,
-                                     int severity,
                                      OffsetDateTime reportedAt,
-                                     String reportedBy,
-                                     String reportedByFirstName,
-                                     String reportedByLastName,
-                                     String note) {}
+                                     String note,
+                                     List<CapacityStatusRow> statuses) {}
+
+    private record ProjectCapacityRawRow(long id,
+                                         long projectId,
+                                         OffsetDateTime reportedAt,
+                                         String note,
+                                         String statusCode,
+                                         String statusLabel,
+                                         int statusSeverity) {}
+
+    private record ProjectCapacityInsertRow(long id, long projectId, OffsetDateTime reportedAt, String note) {}
+
+    public record CapacityStatusRow(String code, String label, int severity) {}
 
     public boolean projectExists(long projectId) {
         // Guard pro majority use-case: API se volá pouze pro existující projekty, ale chráníme se proti špatným ID
@@ -135,18 +150,26 @@ public class ProjectCapacityRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject(SQL_STATUS_EXISTS, Boolean.class, statusCode));
     }
 
-    public boolean reporterExists(String username) {
-        // Validace reportujícího probíhá proti tabulce internů – v další iteraci lze rozšířit o externí dodavatele.
-        return Boolean.TRUE.equals(jdbc.queryForObject(SQL_REPORTER_EXISTS, Boolean.class, username));
-    }
-
     public Optional<ProjectCapacityRow> findCurrent(long projectId) {
-        List<ProjectCapacityRow> rows = jdbc.query(SQL_FIND_CURRENT, CAPACITY_MAPPER, projectId);
-        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+        List<ProjectCapacityRawRow> rows = jdbc.query(SQL_FIND_CURRENT, CAPACITY_RAW_MAPPER, projectId);
+        List<ProjectCapacityRow> aggregated = aggregateRows(rows);
+        return aggregated.isEmpty() ? Optional.empty() : Optional.of(aggregated.get(0));
     }
 
-    public ProjectCapacityRow insertReport(long projectId, String statusCode, String reportedBy, String note) {
-        return jdbc.queryForObject(SQL_INSERT_REPORT, CAPACITY_MAPPER, projectId, statusCode, reportedBy, note);
+    public ProjectCapacityRow insertReport(long projectId, List<String> statusCodes, String note) {
+        ProjectCapacityInsertRow inserted = jdbc.queryForObject(SQL_INSERT_REPORT, INSERT_MAPPER, projectId, note);
+        if (inserted == null) {
+            throw new IllegalStateException("Očekávali jsme vložený kapacitní report, ale databáze nevrátila žádný řádek.");
+        }
+        if (statusCodes == null || statusCodes.isEmpty()) {
+            throw new IllegalArgumentException("Kapacitní report musí obsahovat alespoň jeden status.");
+        }
+        jdbc.batchUpdate(SQL_INSERT_STATUS, statusCodes, statusCodes.size(), (ps, code) -> {
+            ps.setLong(1, inserted.id());
+            ps.setString(2, code);
+        });
+        return findById(inserted.id())
+                .orElseThrow(() -> new IllegalStateException("Kapacitní report nebyl nalezen po vložení."));
     }
 
     public List<ProjectCapacityRow> listHistory(long projectId,
@@ -154,27 +177,18 @@ public class ProjectCapacityRepository {
                                                 OffsetDateTime to,
                                                 int limit,
                                                 int offset) {
-        // Query benefits from idx_project_capacity_report_project covering project_id and reported_at DESC.
-        // Filtry se skládají dynamicky – držíme jednoduchou StringBuilder variantu, protože počet kombinací je nízký
-        // a reaktivní DSL by bylo zbytečně komplexní.
+        // Query využívá CTE, aby stránkování probíhalo nad reporty a nikoliv nad kombinací report+status.
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
         sql.append(
                 """
-                SELECT r.id,
-                       r.project_id,
-                       r.status_code,
-                       cs.label AS status_label,
-                       cs.severity,
-                       r.reported_at,
-                       r.reported_by,
-                       reporter.first_name AS reported_by_first_name,
-                       reporter.last_name AS reported_by_last_name,
-                       r.note
-                FROM project_capacity_report r
-                JOIN capacity_status cs ON cs.code = r.status_code
-                LEFT JOIN intern reporter ON reporter.username = r.reported_by
-                WHERE r.project_id = ?
+                WITH filtered AS (
+                    SELECT r.id,
+                           r.project_id,
+                           r.reported_at,
+                           r.note
+                    FROM project_capacity_report r
+                    WHERE r.project_id = ?
                 """);
         params.add(projectId);
         if (from != null) {
@@ -185,10 +199,27 @@ public class ProjectCapacityRepository {
             sql.append(" AND r.reported_at <= ?");
             params.add(to);
         }
-        sql.append(" ORDER BY r.reported_at DESC, r.id DESC LIMIT ? OFFSET ?");
+        sql.append(
+                """
+                    ORDER BY r.reported_at DESC, r.id DESC
+                    LIMIT ? OFFSET ?
+                )
+                SELECT f.id,
+                       f.project_id,
+                       f.reported_at,
+                       f.note,
+                       cs.code AS status_code,
+                       cs.label AS status_label,
+                       cs.severity AS status_severity
+                FROM filtered f
+                JOIN project_capacity_report_status rs ON rs.report_id = f.id
+                JOIN capacity_status cs ON cs.code = rs.status_code
+                ORDER BY f.reported_at DESC, f.id DESC, cs.severity DESC, cs.code ASC
+                """);
         params.add(limit);
         params.add(offset);
-        return jdbc.query(sql.toString(), CAPACITY_MAPPER, params.toArray());
+        List<ProjectCapacityRawRow> rows = jdbc.query(sql.toString(), CAPACITY_RAW_MAPPER, params.toArray());
+        return aggregateRows(rows);
     }
 
     public long countHistory(long projectId, OffsetDateTime from, OffsetDateTime to) {
@@ -206,5 +237,44 @@ public class ProjectCapacityRepository {
         }
         Long count = jdbc.queryForObject(sql.toString(), Long.class, params.toArray());
         return count != null ? count : 0L;
+    }
+
+    private Optional<ProjectCapacityRow> findById(long id) {
+        List<ProjectCapacityRawRow> rows = jdbc.query(SQL_FIND_BY_ID, CAPACITY_RAW_MAPPER, id);
+        List<ProjectCapacityRow> aggregated = aggregateRows(rows);
+        return aggregated.isEmpty() ? Optional.empty() : Optional.of(aggregated.get(0));
+    }
+
+    private List<ProjectCapacityRow> aggregateRows(List<ProjectCapacityRawRow> rows) {
+        Map<Long, ReportAccumulator> grouped = new LinkedHashMap<>();
+        for (ProjectCapacityRawRow raw : rows) {
+            ReportAccumulator accumulator = grouped.computeIfAbsent(raw.id(),
+                    ignored -> new ReportAccumulator(raw.id(), raw.projectId(), raw.reportedAt(), raw.note()));
+            accumulator.addStatus(new CapacityStatusRow(raw.statusCode(), raw.statusLabel(), raw.statusSeverity()));
+        }
+        return grouped.values().stream().map(ReportAccumulator::toRow).toList();
+    }
+
+    private static final class ReportAccumulator {
+        private final long id;
+        private final long projectId;
+        private final OffsetDateTime reportedAt;
+        private final String note;
+        private final List<CapacityStatusRow> statuses = new ArrayList<>();
+
+        private ReportAccumulator(long id, long projectId, OffsetDateTime reportedAt, String note) {
+            this.id = id;
+            this.projectId = projectId;
+            this.reportedAt = reportedAt;
+            this.note = note;
+        }
+
+        private void addStatus(CapacityStatusRow status) {
+            statuses.add(status);
+        }
+
+        private ProjectCapacityRow toRow() {
+            return new ProjectCapacityRow(id, projectId, reportedAt, note, List.copyOf(statuses));
+        }
     }
 }

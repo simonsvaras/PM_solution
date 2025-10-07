@@ -88,7 +88,6 @@ export default function ProjectReportPage({
     };
   }, [project.id]);
 
-  const capacityReporterName = capacityReport?.reportedBy.fullName || capacityReport?.reportedBy.username || null;
   const capacityReportedAt = (() => {
     if (!capacityReport?.reportedAt) return null;
     const date = new Date(capacityReport.reportedAt);
@@ -96,6 +95,7 @@ export default function ProjectReportPage({
     return date;
   })();
   const capacityReportedAtLabel = capacityReportedAt ? dateTimeFormatter.format(capacityReportedAt) : null;
+  const capacityStatuses = capacityReport?.statuses ?? [];
 
   useEffect(() => {
     let cancelled = false;
@@ -378,7 +378,6 @@ export default function ProjectReportPage({
               {capacityReport && capacityReportedAtLabel ? (
                 <p className="projectReport__capacityMeta">
                   Naposledy hlášeno {capacityReportedAtLabel}
-                  {capacityReporterName ? ` • ${capacityReporterName}` : ''}
                 </p>
               ) : null}
             </div>
@@ -393,7 +392,19 @@ export default function ProjectReportPage({
             ) : null}
             {capacityReport ? (
               <>
-                <p className="projectReport__capacityStatus">{capacityReport.statusLabel}</p>
+                <ul className="projectReport__capacityStatusList">
+                  {capacityStatuses.length > 0 ? (
+                    capacityStatuses.map(status => (
+                      <li key={status.code} className="projectReport__capacityStatus">
+                        {status.label}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="projectReport__capacityStatus projectReport__capacityStatus--empty">
+                      Stav nebyl specifikován.
+                    </li>
+                  )}
+                </ul>
                 {capacityReport.note ? <p className="projectReport__capacityNote">{capacityReport.note}</p> : null}
               </>
             ) : null}

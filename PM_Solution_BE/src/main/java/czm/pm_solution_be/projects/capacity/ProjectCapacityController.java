@@ -2,7 +2,7 @@ package czm.pm_solution_be.projects.capacity;
 
 import czm.pm_solution_be.projects.capacity.ProjectCapacityService.CapacityHistoryResult;
 import czm.pm_solution_be.projects.capacity.ProjectCapacityService.ProjectCapacityEntry;
-import czm.pm_solution_be.projects.capacity.ProjectCapacityService.Reporter;
+import czm.pm_solution_be.projects.capacity.ProjectCapacityService.ProjectCapacityStatus;
 import czm.pm_solution_be.web.ApiException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.security.Principal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -77,51 +76,33 @@ public class ProjectCapacityController {
      * a notifikace mohly napojit na {@link ProjectCapacityService} bez dalších listenerů.</p>
      *
      * @param projectId identifikátor projektu
-     * @param request vstupní payload s kódem statusu a volitelnou poznámkou
-     * @param principal autentizovaný uživatel používá svůj username jako reported_by
+     * @param request vstupní payload s kolekcí kódů statusů a volitelnou poznámkou
      * @return vytvořený záznam
      */
     @PostMapping
     public ResponseEntity<ProjectCapacityResponse> reportCapacity(@PathVariable long projectId,
-                                                                  @RequestBody ReportCapacityRequest request,
-                                                                  Principal principal) {
+                                                                  @RequestBody ReportCapacityRequest request) {
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
-        if (principal == null || principal.getName() == null) {
-            throw ApiException.validation("Nelze určit přihlášeného uživatele.", "principal_missing");
-        }
-        // Principal#getName vrací username pro sloupec reported_by
-        ProjectCapacityEntry entry = service.reportCapacity(projectId, request.statusCode(), request.note(), principal.getName());
+        ProjectCapacityEntry entry = service.reportCapacity(projectId, request.statusCodes(), request.note());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(entry));
     }
 
     private ProjectCapacityResponse toResponse(ProjectCapacityEntry entry) {
-        Reporter reporter = entry.reporter();
-        ReporterResponse reporterResponse = new ReporterResponse(
-                reporter.username(),
-                reporter.firstName(),
-                reporter.lastName(),
-                reporter.fullName());
-        return new ProjectCapacityResponse(
-                entry.id(),
-                entry.statusCode(),
-                entry.statusLabel(),
-                entry.severity(),
-                entry.reportedAt(),
-                reporterResponse,
-                entry.note());
+        List<ProjectCapacityStatusResponse> statuses = entry.statuses().stream()
+                .map(status -> new ProjectCapacityStatusResponse(status.code(), status.label(), status.severity()))
+                .toList();
+        return new ProjectCapacityResponse(entry.id(), entry.projectId(), entry.reportedAt(), statuses, entry.note());
     }
 
     public record ProjectCapacityResponse(long id,
-                                          String statusCode,
-                                          String statusLabel,
-                                          int severity,
+                                          long projectId,
                                           OffsetDateTime reportedAt,
-                                          ReporterResponse reportedBy,
+                                          List<ProjectCapacityStatusResponse> statuses,
                                           String note) {}
 
-    public record ReporterResponse(String username, String firstName, String lastName, String fullName) {}
+    public record ProjectCapacityStatusResponse(String code, String label, int severity) {}
 
     public record HistoryResponse(List<ProjectCapacityResponse> items,
                                   long totalElements,
@@ -134,5 +115,5 @@ public class ProjectCapacityController {
      * <p>Validace se provádí až na servisní vrstvě, aby šlo později doplnit jednotné bean validation anotace,
      * které budou sdíleny pro REST i případný message consumer.</p>
      */
-    public record ReportCapacityRequest(String statusCode, String note) {}
+    public record ReportCapacityRequest(List<String> statusCodes, String note) {}
 }

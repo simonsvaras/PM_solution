@@ -1,5 +1,6 @@
 package czm.pm_solution_be.projects.capacity;
 
+import czm.pm_solution_be.projects.capacity.ProjectCapacityRepository.CapacityStatusRow;
 import czm.pm_solution_be.projects.capacity.ProjectCapacityRepository.ProjectCapacityRow;
 import czm.pm_solution_be.web.ApiException;
 import org.slf4j.Logger;
@@ -8,9 +9,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Objects;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Application service orchestrating validation and orchestration for project capacity reports.
@@ -42,30 +43,26 @@ public class ProjectCapacityService {
      * hodnota obsahuje kompletně obohacená data a lze ji poslat přímo FE nebo použít pro audit.</p>
      */
     public ProjectCapacityEntry reportCapacity(long projectId,
-                                               String statusCode,
-                                               String note,
-                                               String reportedBy) {
-        if (statusCode == null || statusCode.isBlank()) {
-            throw ApiException.validation("Status kapacit musí být vyplněn.", "status_required");
-        }
-        if (reportedBy == null || reportedBy.isBlank()) {
-            throw ApiException.validation("Uživatel reportující kapacity musí být znám.", "reporter_required");
+                                               List<String> statusCodes,
+                                               String note) {
+        Set<String> distinctCodes = sanitizeStatusCodes(statusCodes);
+        if (distinctCodes.isEmpty()) {
+            throw ApiException.validation("Vyberte alespoň jeden kapacitní stav.", "status_required");
         }
         validateNoteLength(note);
 
         if (!repository.projectExists(projectId)) {
             throw ApiException.notFound("Projekt pro report kapacit nebyl nalezen.", "project");
         }
-        if (!repository.statusExists(statusCode)) {
-            throw ApiException.validation("Neznámý kapacitní status.", "capacity_status");
-        }
-        if (!repository.reporterExists(reportedBy)) {
-            throw ApiException.validation("Reportující uživatel nebyl nalezen mezi interny.", "reporter_unknown");
+        for (String code : distinctCodes) {
+            if (!repository.statusExists(code)) {
+                throw ApiException.validation("Neznámý kapacitní status.", "capacity_status");
+            }
         }
 
         // TODO: extend audit logging once unified audit service is available
-        ProjectCapacityRow row = repository.insertReport(projectId, statusCode, reportedBy, note);
-        log.info("Kapacitní status projektu {} nastaven na {} uživatelem {}", projectId, statusCode, reportedBy);
+        ProjectCapacityRow row = repository.insertReport(projectId, List.copyOf(distinctCodes), note);
+        log.info("Kapacitní status projektu {} nastaven na {}", projectId, distinctCodes);
         return toEntry(row);
     }
 
@@ -125,6 +122,23 @@ public class ProjectCapacityService {
         return new CapacityHistoryResult(items, total, resolvedPage, resolvedSize);
     }
 
+    private Set<String> sanitizeStatusCodes(List<String> statusCodes) {
+        if (statusCodes == null) {
+            return Set.of();
+        }
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (String code : statusCodes) {
+            if (code == null) {
+                continue;
+            }
+            String trimmed = code.trim();
+            if (!trimmed.isEmpty()) {
+                result.add(trimmed);
+            }
+        }
+        return result;
+    }
+
     private void validateNoteLength(String note) {
         if (note != null && note.length() > MAX_NOTE_LENGTH) {
             // Vracíme validaci s konkrétním kódem, FE může zobrazit lokalizovanou hlášku.
@@ -133,40 +147,19 @@ public class ProjectCapacityService {
     }
 
     private ProjectCapacityEntry toEntry(ProjectCapacityRow row) {
-        // Repository vrací pouze surová data – zde je převádíme do business DTO, které obsahuje fullName helper.
-        Reporter reporter = new Reporter(row.reportedBy(), row.reportedByFirstName(), row.reportedByLastName());
-        return new ProjectCapacityEntry(
-                row.id(),
-                row.projectId(),
-                row.statusCode(),
-                row.statusLabel(),
-                row.severity(),
-                row.reportedAt(),
-                reporter,
-                row.note());
+        List<ProjectCapacityStatus> statuses = row.statuses().stream()
+                .map(status -> new ProjectCapacityStatus(status.code(), status.label(), status.severity()))
+                .collect(Collectors.toList());
+        return new ProjectCapacityEntry(row.id(), row.projectId(), row.reportedAt(), row.note(), statuses);
     }
 
     public record ProjectCapacityEntry(long id,
                                        long projectId,
-                                       String statusCode,
-                                       String statusLabel,
-                                       int severity,
                                        OffsetDateTime reportedAt,
-                                       Reporter reporter,
-                                       String note) {}
+                                       String note,
+                                       List<ProjectCapacityStatus> statuses) {}
 
-    public record Reporter(String username, String firstName, String lastName) {
-        public String fullName() {
-            if ((firstName == null || firstName.isBlank()) && (lastName == null || lastName.isBlank())) {
-                return null;
-            }
-            // Stream.joining zachová pořadí jméno + příjmení a ignoruje chybějící část – je připraveno i na budoucí middleName.
-            return Stream.of(firstName, lastName)
-                    .filter(Objects::nonNull)
-                    .filter(part -> !part.isBlank())
-                    .collect(Collectors.joining(" "));
-        }
-    }
+    public record ProjectCapacityStatus(String code, String label, int severity) {}
 
     public record CapacityHistoryResult(List<ProjectCapacityEntry> items,
                                         long totalElements,
