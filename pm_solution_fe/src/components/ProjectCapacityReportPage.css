@@ -68,6 +68,25 @@
   color: var(--color-text-primary);
 }
 
+.capacityReport__checkboxSections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.capacityReport__checkboxSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.capacityReport__checkboxSectionTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
 .capacityReport__checkboxGroup {
   display: grid;
   gap: 10px;

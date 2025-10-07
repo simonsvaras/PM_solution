@@ -7,7 +7,11 @@ import type {
   ReportProjectCapacityPayload,
 } from '../api';
 import { getProjectCapacity, reportProjectCapacity } from '../api';
-import { PROJECT_CAPACITY_STATUS_OPTIONS } from '../config/capacityStatuses';
+import {
+  PROJECT_CAPACITY_STATUS_OPTIONS,
+  PROJECT_CAPACITY_STATUS_SECTIONS,
+  getProjectCapacityStatusSectionId,
+} from '../config/capacityStatuses';
 
 const NOTE_LIMIT = 1000;
 
@@ -21,7 +25,9 @@ type ProjectCapacityReportPageProps = {
 type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
 const DEFAULT_SELECTION = normaliseStatusCodes(
-  PROJECT_CAPACITY_STATUS_OPTIONS[0]?.code ? [PROJECT_CAPACITY_STATUS_OPTIONS[0].code] : [],
+  PROJECT_CAPACITY_STATUS_SECTIONS[0]?.options[0]?.code
+    ? [PROJECT_CAPACITY_STATUS_SECTIONS[0].options[0].code]
+    : [],
 );
 
 export default function ProjectCapacityReportPage({ project, onShowToast }: ProjectCapacityReportPageProps) {
@@ -43,7 +49,9 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
       .then(report => {
         if (cancelled) return;
         setCurrentReport(report);
-        setSelectedStatusCodes(normaliseStatusCodes(report.statuses.map(status => status.code)));
+        setSelectedStatusCodes(
+          normaliseStatusCodesForSingleSection(report.statuses.map(status => status.code)),
+        );
         setLoadState('loaded');
       })
       .catch(error => {
@@ -91,7 +99,11 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
 
   function toggleStatus(code: string) {
     setSelectedStatusCodes(prev => {
-      const next = new Set(prev);
+      const sectionId = getProjectCapacityStatusSectionId(code);
+      const scoped = sectionId
+        ? prev.filter(existing => getProjectCapacityStatusSectionId(existing) === sectionId)
+        : [...prev];
+      const next = new Set(scoped);
       if (next.has(code)) {
         next.delete(code);
       } else {
@@ -122,7 +134,9 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
     try {
       const created = await reportProjectCapacity(project.id, payload);
       setCurrentReport(created);
-      setSelectedStatusCodes(normaliseStatusCodes(created.statuses.map(status => status.code)));
+      setSelectedStatusCodes(
+        normaliseStatusCodesForSingleSection(created.statuses.map(status => status.code)),
+      );
       setNote('');
       onShowToast?.('success', 'Kapacitní report byl uložen.');
     } catch (error) {
@@ -162,24 +176,35 @@ export default function ProjectCapacityReportPage({ project, onShowToast }: Proj
       <form className="capacityReport__formCard" onSubmit={handleSubmit} noValidate>
         <fieldset className="capacityReport__field">
           <legend>Aktuální stavy</legend>
-          <div className="capacityReport__checkboxGroup">
-            {PROJECT_CAPACITY_STATUS_OPTIONS.map(option => {
-              const checked = selectedStatusCodes.includes(option.code);
-              return (
-                <label key={option.code} className="capacityReport__checkboxOption">
-                  <input
-                    type="checkbox"
-                    value={option.code}
-                    checked={checked}
-                    onChange={() => toggleStatus(option.code)}
-                    disabled={submitting}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              );
-            })}
+          <div className="capacityReport__checkboxSections">
+            {PROJECT_CAPACITY_STATUS_SECTIONS.map(section => (
+              <div key={section.id} className="capacityReport__checkboxSection">
+                {section.title ? (
+                  <h3 className="capacityReport__checkboxSectionTitle">{section.title}</h3>
+                ) : null}
+                <div className="capacityReport__checkboxGroup">
+                  {section.options.map(option => {
+                    const checked = selectedStatusCodes.includes(option.code);
+                    return (
+                      <label key={option.code} className="capacityReport__checkboxOption">
+                        <input
+                          type="checkbox"
+                          value={option.code}
+                          checked={checked}
+                          onChange={() => toggleStatus(option.code)}
+                          disabled={submitting}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
-          <p className="capacityReport__hint">Můžete vybrat jednu nebo více možností podle aktuální situace.</p>
+          <p className="capacityReport__hint">
+            Vyberte možnosti v jedné sekci. Při přepnutí sekce se dřívější volby automaticky zruší.
+          </p>
         </fieldset>
 
         <div className="capacityReport__field">
@@ -240,4 +265,20 @@ function normaliseStatusCodes(codes: Iterable<string | null | undefined>): strin
     ordered.push(...set);
   }
   return ordered;
+}
+
+function normaliseStatusCodesForSingleSection(codes: Iterable<string | null | undefined>): string[] {
+  const normalised = normaliseStatusCodes(codes);
+  if (normalised.length <= 1) {
+    return normalised;
+  }
+  const firstScopedCode = normalised.find(code => getProjectCapacityStatusSectionId(code));
+  if (!firstScopedCode) {
+    return normalised;
+  }
+  const targetSectionId = getProjectCapacityStatusSectionId(firstScopedCode);
+  if (!targetSectionId) {
+    return normalised;
+  }
+  return normalised.filter(code => getProjectCapacityStatusSectionId(code) === targetSectionId);
 }
