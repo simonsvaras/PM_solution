@@ -8,6 +8,7 @@ import ProjectReportDetailPage from './components/ProjectReportDetailPage';
 import ProjectReportInternDetailPage from './components/ProjectReportInternDetailPage';
 import ProjectReportProjectDetailPage from './components/ProjectReportProjectDetailPage';
 import ProjectReportLongTermPage from './components/ProjectReportLongTermPage';
+import ProjectCapacityReportPage from './components/ProjectCapacityReportPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
@@ -74,7 +75,13 @@ const modules: Module[] = [
   },
 ];
 
-type ReportDetailView = 'summary' | 'detail' | 'detail-long-term' | 'detail-intern' | 'detail-project';
+type ReportDetailView =
+  | 'summary'
+  | 'detail'
+  | 'detail-long-term'
+  | 'detail-intern'
+  | 'detail-project'
+  | 'detail-capacity';
 
 type DetailSectionView = Exclude<ReportDetailView, 'summary'>;
 
@@ -84,7 +91,8 @@ function isReportDetailView(value: string | null): value is ReportDetailView {
     value === 'detail' ||
     value === 'detail-long-term' ||
     value === 'detail-intern' ||
-    value === 'detail-project'
+    value === 'detail-project' ||
+    value === 'detail-capacity'
   );
 }
 
@@ -436,6 +444,8 @@ function App() {
       headerDescription = 'Analyzujte dlouhodobý vývoj hodin a vyčerpání rozpočtu projektu po jednotlivých měsících.';
     } else if (reportView === 'detail-intern') {
       headerDescription = 'Stránka detailu stážisty je ve vývoji.';
+    } else if (reportView === 'detail-capacity') {
+      headerDescription = 'Zaznamenejte aktuální stav kapacit projektu a sdílejte kontext s dodavatelským týmem.';
     }
   } else if (isOnDemand) {
     headerDescription = 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.';
@@ -467,6 +477,7 @@ function App() {
   }
 
   const detailNavigationItems: { view: DetailSectionView; label: string }[] = [
+    { view: 'detail-capacity', label: 'Report stavů' },
     { view: 'detail', label: 'Obecný report' },
     { view: 'detail-intern', label: 'Detail stážisty' },
     { view: 'detail-project', label: 'Detail projektu' },
@@ -939,6 +950,8 @@ function App() {
                 <ProjectReportLongTermPage project={selectedReportProject} />
               ) : reportView === 'detail-intern' ? (
                 <ProjectReportInternDetailPage project={selectedReportProject} />
+              ) : reportView === 'detail-capacity' ? (
+                <ProjectCapacityReportPage project={selectedReportProject} onShowToast={showToast} />
               ) : (
                 <ProjectReportProjectDetailPage project={selectedReportProject} />
               )

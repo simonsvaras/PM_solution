@@ -1,0 +1,142 @@
+.capacityReport {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  min-height: 100vh;
+  padding: 0 clamp(24px, 4vw, 48px) clamp(40px, 5vw, 72px);
+  box-sizing: border-box;
+}
+
+.capacityReport__intro {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: 24px clamp(24px, 4vw, 40px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.capacityReport__intro h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.4vw, 1.6rem);
+  color: var(--color-text-primary);
+}
+
+.capacityReport__intro p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.capacityReport__statusSummary {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.capacityReport__statusSummary span {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.capacityReport__formCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 48px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 720px;
+}
+
+.capacityReport__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.capacityReport__field label {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.capacityReport__field select,
+.capacityReport__field textarea {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  resize: vertical;
+  min-height: 48px;
+}
+
+.capacityReport__field textarea {
+  min-height: 120px;
+}
+
+.capacityReport__hint {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.capacityReport__error {
+  margin: 0;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.capacityReport__actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.capacityReport__submit {
+  background: var(--color-accent-strong);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 28px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.capacityReport__submit:hover:not(:disabled),
+.capacityReport__submit:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(30, 64, 175, 0.18);
+}
+
+.capacityReport__submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.capacityReport__loader {
+  color: var(--color-text-secondary);
+}
+
+.capacityReport__noteCounter {
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary, #6b7280);
+  margin-left: auto;
+}
+
+.capacityReport__historyLink {
+  font-size: 0.9rem;
+  color: var(--color-accent-strong);
+  text-decoration: none;
+}
+
+.capacityReport__historyLink:hover,
+.capacityReport__historyLink:focus-visible {
+  text-decoration: underline;
+}

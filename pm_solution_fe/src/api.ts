@@ -88,6 +88,28 @@ export type ProjectOverviewDTO = {
   hourlyRateCzk: number | null;
 };
 
+export type ProjectCapacityReporter = {
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string | null;
+};
+
+export type ProjectCapacityReport = {
+  id: number;
+  statusCode: string;
+  statusLabel: string;
+  severity: number;
+  reportedAt: string;
+  reportedBy: ProjectCapacityReporter;
+  note: string | null;
+};
+
+export type ReportProjectCapacityPayload = {
+  statusCode: string;
+  note?: string | null;
+};
+
 export type ProjectLongTermReportMeta = {
   budget: number | null;
   budgetFrom: string | null;
@@ -549,6 +571,25 @@ export async function getProjectsOverview(): Promise<ProjectOverviewDTO[]> {
   const res = await fetch(`${API_BASE}/api/projects/overview`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectOverviewDTO[]>(res);
+}
+
+export async function getProjectCapacity(projectId: number): Promise<ProjectCapacityReport> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/capacity`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectCapacityReport>(res);
+}
+
+export async function reportProjectCapacity(
+  projectId: number,
+  payload: ReportProjectCapacityPayload,
+): Promise<ProjectCapacityReport> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/capacity`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<ProjectCapacityReport>(res);
 }
 
 export async function getReportTeams(): Promise<TeamReportTeam[]> {

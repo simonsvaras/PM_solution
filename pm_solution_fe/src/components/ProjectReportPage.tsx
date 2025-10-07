@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import './ProjectReportPage.css';
 import TeamReportTable from './TeamReportTable';
-import type { ProjectOverviewDTO, SyncSummary, TeamReportTeam, ErrorResponse } from '../api';
-import { getReportTeams, syncProjectReports, syncProjectMilestones } from '../api';
+import type { ProjectOverviewDTO, SyncSummary, TeamReportTeam, ErrorResponse, ProjectCapacityReport } from '../api';
+import { getProjectCapacity, getReportTeams, syncProjectReports, syncProjectMilestones } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
 import ProjectSettingsModal from './ProjectSettingsModal';
 
@@ -40,6 +40,9 @@ export default function ProjectReportPage({
   const [milestoneSyncing, setMilestoneSyncing] = useState(false);
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
   const [milestoneSummary, setMilestoneSummary] = useState<SyncSummary | null>(null);
+  const [capacityReport, setCapacityReport] = useState<ProjectCapacityReport | null>(null);
+  const [capacityStatus, setCapacityStatus] = useState<'idle' | 'loading' | 'loaded'>('idle');
+  const [capacityError, setCapacityError] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentProject(project);
@@ -49,6 +52,50 @@ export default function ProjectReportPage({
     () => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
     [],
   );
+  const dateTimeFormatter = useMemo(
+    () => new Intl.DateTimeFormat('cs-CZ', { dateStyle: 'short', timeStyle: 'short' }),
+    [],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setCapacityStatus('loading');
+    setCapacityError(null);
+    setCapacityReport(null);
+
+    getProjectCapacity(project.id)
+      .then(report => {
+        if (cancelled) return;
+        setCapacityReport(report);
+        setCapacityStatus('loaded');
+      })
+      .catch(err => {
+        if (cancelled) return;
+        const error = err as ErrorResponse;
+        const httpStatus = error?.error?.httpStatus;
+        if (httpStatus === 404) {
+          // No status has been reported for the project yet – treat as empty state.
+          setCapacityReport(null);
+          setCapacityStatus('loaded');
+          return;
+        }
+        setCapacityError(error?.error?.message ?? 'Aktuální stav kapacit se nepodařilo načíst.');
+        setCapacityStatus('loaded');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  const capacityReporterName = capacityReport?.reportedBy.fullName || capacityReport?.reportedBy.username || null;
+  const capacityReportedAt = (() => {
+    if (!capacityReport?.reportedAt) return null;
+    const date = new Date(capacityReport.reportedAt);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
+  })();
+  const capacityReportedAtLabel = capacityReportedAt ? dateTimeFormatter.format(capacityReportedAt) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -254,86 +301,112 @@ export default function ProjectReportPage({
           </section>
         </div>
         <section className="projectReport" aria-label={`Report projektu ${currentProject.name}`}>
-        <div className="projectReport__card projectReport__overviewCard">
-          <div className="projectReport__overviewHeader">
-            <h2>Otevřené issue</h2>
-            <p className="projectReport__metric">{currentProject.openIssues}</p>
-          </div>
-          <BudgetBurnIndicator
-            budget={currentProject.budget}
-            reportedCost={currentProject.reportedCost}
-            currencyFormatter={currencyFormatter}
-          />
-        </div>
-        <div className="projectReport__card projectReport__syncCard">
-          <div className="projectReport__syncHeader">
-            <h2>Synchronizace výkazů</h2>
-            <p className="projectReport__syncDescription">
-              Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
-            </p>
-            <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
-          </div>
-          <label className="projectReport__checkbox">
-            <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
-            Synchronizovat data jen od poslední synchronizace
-          </label>
-          <div className="projectReport__range" aria-disabled={sinceLast}>
-            <label>
-              <span>Od</span>
-              <input
-                type="datetime-local"
-                value={fromValue}
-                onChange={event => setFromValue(event.target.value)}
-                disabled={sinceLast}
-              />
-            </label>
-            <label>
-              <span>Do</span>
-              <input
-                type="datetime-local"
-                value={toValue}
-                onChange={event => setToValue(event.target.value)}
-                disabled={sinceLast}
-              />
-            </label>
-          </div>
-          {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
-          {syncSummary ? (
-            <p className="projectReport__status projectReport__status--success">
-              Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
-              {syncSummary.durationMs} ms.
-            </p>
-          ) : null}
-          {syncSummary && syncSummary.missingUsernames.length > 0 ? (
-            <div className="projectReport__missing">
-              <p className="projectReport__missingTitle">
-                Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
-              </p>
-              <ul className="projectReport__missingList">
-                {syncSummary.missingUsernames.map(username => (
-                  <li key={username}>{username}</li>
-                ))}
-              </ul>
+          <div className="projectReport__card projectReport__overviewCard">
+            <div className="projectReport__overviewHeader">
+              <h2>Otevřené issue</h2>
+              <p className="projectReport__metric">{currentProject.openIssues}</p>
             </div>
-          ) : null}
-          <button
-            type="button"
-            className="projectReport__syncButton"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? 'Synchronizuji…' : 'Synchronizovat výkazy'}
-          </button>
-        </div>
-      </section>
-      <ProjectSettingsModal
-        project={currentProject}
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onProjectUpdated={handleProjectSettingsSaved}
-        onTeamUpdated={handleTeamUpdated}
-      />
-    </div>
+            <BudgetBurnIndicator
+              budget={currentProject.budget}
+              reportedCost={currentProject.reportedCost}
+              currencyFormatter={currencyFormatter}
+            />
+          </div>
+          <div className="projectReport__card projectReport__syncCard">
+            <div className="projectReport__syncHeader">
+              <h2>Synchronizace výkazů</h2>
+              <p className="projectReport__syncDescription">
+                Spusť synchronizaci, která načte timelogy ze všech repozitářů přiřazených k projektu a uloží je do databáze.
+              </p>
+              <p className="projectReport__note">Výkazy se synchronizují jen pro uživatele, kteří jsou v systému vytvořeni.</p>
+            </div>
+            <label className="projectReport__checkbox">
+              <input type="checkbox" checked={sinceLast} onChange={handleToggleSinceLast} />
+              Synchronizovat data jen od poslední synchronizace
+            </label>
+            <div className="projectReport__range" aria-disabled={sinceLast}>
+              <label>
+                <span>Od</span>
+                <input
+                  type="datetime-local"
+                  value={fromValue}
+                  onChange={event => setFromValue(event.target.value)}
+                  disabled={sinceLast}
+                />
+              </label>
+              <label>
+                <span>Do</span>
+                <input
+                  type="datetime-local"
+                  value={toValue}
+                  onChange={event => setToValue(event.target.value)}
+                  disabled={sinceLast}
+                />
+              </label>
+            </div>
+            {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
+            {syncSummary ? (
+              <p className="projectReport__status projectReport__status--success">
+                Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}
+                {syncSummary.durationMs} ms.
+              </p>
+            ) : null}
+            {syncSummary && syncSummary.missingUsernames.length > 0 ? (
+              <div className="projectReport__missing">
+                <p className="projectReport__missingTitle">
+                  Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
+                </p>
+                <ul className="projectReport__missingList">
+                  {syncSummary.missingUsernames.map(username => (
+                    <li key={username}>{username}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="projectReport__syncButton"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? 'Synchronizuji…' : 'Synchronizovat výkazy'}
+            </button>
+          </div>
+          <div className="projectReport__card projectReport__capacityCard">
+            <div className="projectReport__capacityHeader">
+              <h2>Aktuální stav kapacit</h2>
+              {capacityReport && capacityReportedAtLabel ? (
+                <p className="projectReport__capacityMeta">
+                  Naposledy hlášeno {capacityReportedAtLabel}
+                  {capacityReporterName ? ` • ${capacityReporterName}` : ''}
+                </p>
+              ) : null}
+            </div>
+            {capacityStatus === 'loading' ? (
+              <p className="projectReport__capacityLoading">Načítám aktuální stav…</p>
+            ) : null}
+            {capacityError ? (
+              <p className="projectReport__status projectReport__status--error">{capacityError}</p>
+            ) : null}
+            {!capacityError && capacityStatus === 'loaded' && !capacityReport ? (
+              <p className="projectReport__capacityEmpty">Pro projekt zatím není nahlášen žádný stav kapacit.</p>
+            ) : null}
+            {capacityReport ? (
+              <>
+                <p className="projectReport__capacityStatus">{capacityReport.statusLabel}</p>
+                {capacityReport.note ? <p className="projectReport__capacityNote">{capacityReport.note}</p> : null}
+              </>
+            ) : null}
+          </div>
+        </section>
+        <ProjectSettingsModal
+          project={currentProject}
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onProjectUpdated={handleProjectSettingsSaved}
+          onTeamUpdated={handleTeamUpdated}
+        />
+      </div>
     </>
   );
 }
