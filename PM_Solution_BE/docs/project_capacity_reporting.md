@@ -98,11 +98,12 @@ Tento dokument shrnuje návrh rozšíření backendu modulu `projects-overview` 
 - **DAO vrstva (`ProjectCapacityRepository`)**
   - Repo je nově umístěno v balíčku `czm.pm_solution_be.projects.capacity` a zapouzdřuje veškeré SQL dotazy na tabulky `project_capacity_report`, `project_capacity_report_status` a `capacity_status`.
   - V kódu jsou doplněny technické komentáře popisující využití indexů, agregaci více stavů a důvod řazení podle závažnosti.
-  - Repository také poskytuje metody `projectExists` a `statusExists`, aby servisní vrstva mohla vracet čitelné chyby.
+  - Repository poskytuje metodu `projectExists` pro ověření existence projektu a nově `loadStatusesByCodes`, která jedním dotazem načte metadata všech požadovaných statusů.
 - **Service (`ProjectCapacityService`)**
   - Obsluhuje validaci vstupů, mapování do DTO a logování kapacitních změn. Konstanty `DEFAULT_PAGE`, `MAX_SIZE` a `MAX_NOTE_LENGTH` jsou doplněny o inline komentáře.
   - Metoda `reportCapacity` obsahuje TODO poznámku pro napojení na centralizovaný audit log. Paginační logika je okomentována (ochrana proti overflow a záporným hodnotám).
   - Servisní vrstva normalizuje kolekci stavů (odstraňuje duplicity, kontroluje prázdné hodnoty) ještě před vložením do DB.
+  - Před samotným uložením načte jedním dotazem metadata všech požadovaných statusů, takže FE obratem dostane label i závažnost bez následného dotazu.
 - **Controller (`ProjectCapacityController`)**
   - REST rozhraní je zdokumentováno JavaDocem pro každý endpoint a vysvětluje, jak posílat více statusů v jedné žádosti.
   - Odpověď vrací kolekci stavů včetně závažnosti; poznámka v kódu popisuje mapování na DTO pro FE.

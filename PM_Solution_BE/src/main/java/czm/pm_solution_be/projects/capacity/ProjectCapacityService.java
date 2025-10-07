@@ -1,6 +1,7 @@
 package czm.pm_solution_be.projects.capacity;
 
 import czm.pm_solution_be.projects.capacity.ProjectCapacityRepository.CapacityStatusRow;
+import czm.pm_solution_be.projects.capacity.ProjectCapacityRepository.ProjectCapacityInsertRow;
 import czm.pm_solution_be.projects.capacity.ProjectCapacityRepository.ProjectCapacityRow;
 import czm.pm_solution_be.web.ApiException;
 import org.slf4j.Logger;
@@ -54,14 +55,15 @@ public class ProjectCapacityService {
         if (!repository.projectExists(projectId)) {
             throw ApiException.notFound("Projekt pro report kapacit nebyl nalezen.", "project");
         }
-        for (String code : distinctCodes) {
-            if (!repository.statusExists(code)) {
-                throw ApiException.validation("Neznámý kapacitní status.", "capacity_status");
-            }
+        List<String> orderedCodes = List.copyOf(distinctCodes);
+        List<CapacityStatusRow> statuses = repository.loadStatusesByCodes(orderedCodes);
+        if (statuses.size() != orderedCodes.size()) {
+            throw ApiException.validation("Neznámý kapacitní status.", "capacity_status");
         }
 
-        // TODO: extend audit logging once unified audit service is available
-        ProjectCapacityRow row = repository.insertReport(projectId, List.copyOf(distinctCodes), note);
+        ProjectCapacityInsertRow inserted = repository.insertReport(projectId, orderedCodes, note);
+        ProjectCapacityRow row = new ProjectCapacityRow(
+                inserted.id(), inserted.projectId(), inserted.reportedAt(), inserted.note(), statuses);
         log.info("Kapacitní status projektu {} nastaven na {}", projectId, distinctCodes);
         return toEntry(row);
     }

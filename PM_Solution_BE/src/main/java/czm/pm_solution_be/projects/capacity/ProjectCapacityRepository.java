@@ -56,8 +56,6 @@ public class ProjectCapacityRepository {
     // V případě filtrace podle časového intervalu je základní count výrazně levnější než reálná stránka –
     // potřebujeme ho kvůli zobrazení celkového počtu záznamů ve FE paginatoru.
 
-    private static final String SQL_STATUS_EXISTS = "SELECT EXISTS (SELECT 1 FROM capacity_status WHERE code = ?)";
-
     private static final String SQL_PROJECT_EXISTS = "SELECT EXISTS (SELECT 1 FROM project WHERE id = ?)";
 
     /**
@@ -88,6 +86,9 @@ public class ProjectCapacityRepository {
 
     private static final String SQL_INSERT_STATUS =
             "INSERT INTO project_capacity_report_status (report_id, status_code) VALUES (?, ?)";
+
+    private static final String SQL_SELECT_STATUSES_BASE =
+            "SELECT cs.code, cs.label, cs.severity FROM capacity_status cs WHERE cs.code IN (";
 
     private final JdbcTemplate jdbc;
 
@@ -135,7 +136,7 @@ public class ProjectCapacityRepository {
                                          String statusLabel,
                                          int statusSeverity) {}
 
-    private record ProjectCapacityInsertRow(long id, long projectId, OffsetDateTime reportedAt, String note) {}
+    public record ProjectCapacityInsertRow(long id, long projectId, OffsetDateTime reportedAt, String note) {}
 
     public record CapacityStatusRow(String code, String label, int severity) {}
 
@@ -145,18 +146,13 @@ public class ProjectCapacityRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject(SQL_PROJECT_EXISTS, Boolean.class, projectId));
     }
 
-    public boolean statusExists(String statusCode) {
-        // Pomocí EXISTS necháváme rozhodnutí databázi a tím minimalizujeme objem přenášených dat.
-        return Boolean.TRUE.equals(jdbc.queryForObject(SQL_STATUS_EXISTS, Boolean.class, statusCode));
-    }
-
     public Optional<ProjectCapacityRow> findCurrent(long projectId) {
         List<ProjectCapacityRawRow> rows = jdbc.query(SQL_FIND_CURRENT, CAPACITY_RAW_MAPPER, projectId);
         List<ProjectCapacityRow> aggregated = aggregateRows(rows);
         return aggregated.isEmpty() ? Optional.empty() : Optional.of(aggregated.get(0));
     }
 
-    public ProjectCapacityRow insertReport(long projectId, List<String> statusCodes, String note) {
+    public ProjectCapacityInsertRow insertReport(long projectId, List<String> statusCodes, String note) {
         ProjectCapacityInsertRow inserted = jdbc.queryForObject(SQL_INSERT_REPORT, INSERT_MAPPER, projectId, note);
         if (inserted == null) {
             throw new IllegalStateException("Očekávali jsme vložený kapacitní report, ale databáze nevrátila žádný řádek.");
@@ -168,8 +164,21 @@ public class ProjectCapacityRepository {
             ps.setLong(1, inserted.id());
             ps.setString(2, code);
         });
-        return findById(inserted.id())
-                .orElseThrow(() -> new IllegalStateException("Kapacitní report nebyl nalezen po vložení."));
+        return inserted;
+    }
+
+    public List<CapacityStatusRow> loadStatusesByCodes(List<String> statusCodes) {
+        if (statusCodes == null || statusCodes.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(", ", statusCodes.stream().map(ignored -> "?").toList());
+        String sql = SQL_SELECT_STATUSES_BASE + placeholders + ") ORDER BY cs.severity DESC, cs.code ASC";
+        return jdbc.query(sql, (rs, rowNum) ->
+                new CapacityStatusRow(
+                        rs.getString("code"),
+                        rs.getString("label"),
+                        rs.getInt("severity")),
+                statusCodes.toArray());
     }
 
     public List<ProjectCapacityRow> listHistory(long projectId,
