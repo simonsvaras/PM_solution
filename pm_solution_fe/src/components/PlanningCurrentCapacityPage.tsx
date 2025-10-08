@@ -10,8 +10,11 @@ export default function PlanningCurrentCapacityPage() {
   const [data, setData] = useState<PlanningCurrentCapacityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedProjectStatusCode, setSelectedProjectStatusCode] = useState<string | null>(null);
-  const modalTitleId = useId();
-  const modalDescriptionId = useId();
+  const [selectedInternStatusCode, setSelectedInternStatusCode] = useState<string | null>(null);
+  const projectModalTitleId = useId();
+  const projectModalDescriptionId = useId();
+  const internModalTitleId = useId();
+  const internModalDescriptionId = useId();
 
   useEffect(() => {
     let ignore = false;
@@ -59,36 +62,71 @@ export default function PlanningCurrentCapacityPage() {
     }
   }, [projectStatuses, selectedProjectStatusCode]);
 
+  useEffect(() => {
+    if (selectedInternStatusCode == null) {
+      return;
+    }
+    const hasInternsForStatus = internStatuses.some(
+      status => status.code === selectedInternStatusCode && Boolean(status.interns?.length),
+    );
+    if (!hasInternsForStatus) {
+      setSelectedInternStatusCode(null);
+    }
+  }, [internStatuses, selectedInternStatusCode]);
+
   const selectedProjectStatus =
     selectedProjectStatusCode != null
       ? projectStatuses.find(status => status.code === selectedProjectStatusCode) ?? null
       : null;
 
-  const closeModal = () => {
+  const selectedInternStatus =
+    selectedInternStatusCode != null
+      ? internStatuses.find(status => status.code === selectedInternStatusCode) ?? null
+      : null;
+
+  const closeProjectModal = () => {
     setSelectedProjectStatusCode(null);
   };
 
+  const closeInternModal = () => {
+    setSelectedInternStatusCode(null);
+  };
+
   useEffect(() => {
-    if (!selectedProjectStatus) {
+    if (!selectedProjectStatus && !selectedInternStatus) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        closeModal();
+        if (selectedProjectStatus) {
+          closeProjectModal();
+        }
+        if (selectedInternStatus) {
+          closeInternModal();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedProjectStatus]);
+  }, [selectedProjectStatus, selectedInternStatus]);
 
   const handleProjectStatusClick = (status: CapacitySummaryStatus) => {
     if (!status.projects || status.projects.length === 0) {
       return;
     }
     setSelectedProjectStatusCode(status.code);
+    setSelectedInternStatusCode(null);
+  };
+
+  const handleInternStatusClick = (status: CapacitySummaryStatus) => {
+    if (!status.interns || status.interns.length === 0) {
+      return;
+    }
+    setSelectedInternStatusCode(status.code);
+    setSelectedProjectStatusCode(null);
   };
 
   let content: JSX.Element;
@@ -116,6 +154,7 @@ export default function PlanningCurrentCapacityPage() {
           totalLabel="Celkem stážistů"
           totalValue={data?.interns.total ?? 0}
           statuses={internStatuses}
+          onStatusClick={handleInternStatusClick}
           emptyMessage="Zatím není dostupný žádný stav stážistů."
         />
       </div>
@@ -131,36 +170,79 @@ export default function PlanningCurrentCapacityPage() {
         <div
           className="planningCurrentCapacity__modalOverlay"
           role="presentation"
-          onClick={closeModal}
+          onClick={closeProjectModal}
         >
           <div
             className="planningCurrentCapacity__modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby={modalTitleId}
+            aria-labelledby={projectModalTitleId}
             onClick={event => event.stopPropagation()}
-            aria-describedby={modalDescriptionId}
+            aria-describedby={projectModalDescriptionId}
           >
             <header className="planningCurrentCapacity__modalHeader">
-              <h3 id={modalTitleId} className="planningCurrentCapacity__modalTitle">
+              <h3 id={projectModalTitleId} className="planningCurrentCapacity__modalTitle">
                 {selectedProjectStatus.label}
               </h3>
               <button
                 type="button"
                 className="planningCurrentCapacity__modalClose"
-                onClick={closeModal}
+                onClick={closeProjectModal}
                 aria-label="Zavřít dialog se seznamem projektů"
               >
                 ×
               </button>
             </header>
-            <p id={modalDescriptionId} className="planningCurrentCapacity__modalDescription">
+            <p
+              id={projectModalDescriptionId}
+              className="planningCurrentCapacity__modalDescription"
+            >
               Počet projektů v tomto stavu: {selectedProjectStatus.count}.
             </p>
             <ul className="planningCurrentCapacity__modalList">
               {selectedProjectStatus.projects?.map(project => (
                 <li key={project.id} className="planningCurrentCapacity__modalListItem">
                   {project.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+      {selectedInternStatus && (
+        <div
+          className="planningCurrentCapacity__modalOverlay"
+          role="presentation"
+          onClick={closeInternModal}
+        >
+          <div
+            className="planningCurrentCapacity__modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={internModalTitleId}
+            onClick={event => event.stopPropagation()}
+            aria-describedby={internModalDescriptionId}
+          >
+            <header className="planningCurrentCapacity__modalHeader">
+              <h3 id={internModalTitleId} className="planningCurrentCapacity__modalTitle">
+                {selectedInternStatus.label}
+              </h3>
+              <button
+                type="button"
+                className="planningCurrentCapacity__modalClose"
+                onClick={closeInternModal}
+                aria-label="Zavřít dialog se seznamem stážistů"
+              >
+                ×
+              </button>
+            </header>
+            <p id={internModalDescriptionId} className="planningCurrentCapacity__modalDescription">
+              Počet stážistů v tomto stavu: {selectedInternStatus.count}.
+            </p>
+            <ul className="planningCurrentCapacity__modalList">
+              {selectedInternStatus.interns?.map(intern => (
+                <li key={intern.id} className="planningCurrentCapacity__modalListItem">
+                  {intern.name}
                 </li>
               ))}
             </ul>

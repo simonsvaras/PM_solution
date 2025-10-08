@@ -74,6 +74,15 @@ public class PlanningCapacityRepository {
             ORDER BY s.severity DESC, s.code ASC
             """;
 
+    private static final String SQL_INTERNS_BY_STATUS =
+            """
+            SELECT i.status_code,
+                   i.id   AS intern_id,
+                   concat_ws(' ', i.first_name, i.last_name) AS intern_name
+            FROM intern i
+            ORDER BY i.status_code ASC, intern_name ASC
+            """;
+
     private static final String SQL_INTERN_TOTAL = "SELECT COUNT(*) FROM intern";
 
     private final JdbcTemplate jdbc;
@@ -118,6 +127,18 @@ public class PlanningCapacityRepository {
         return jdbc.query(SQL_INTERN_STATUS_COUNTS, STATUS_COUNT_MAPPER);
     }
 
+    public List<InternStatusAssignmentRow> loadInternsByStatus() {
+        return jdbc.query(SQL_INTERNS_BY_STATUS, new RowMapper<>() {
+            @Override
+            public InternStatusAssignmentRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+                return new InternStatusAssignmentRow(
+                        rs.getString("status_code"),
+                        rs.getLong("intern_id"),
+                        rs.getString("intern_name"));
+            }
+        });
+    }
+
     public long countInterns() {
         Long total = jdbc.queryForObject(SQL_INTERN_TOTAL, Long.class);
         return total == null ? 0L : total;
@@ -126,5 +147,7 @@ public class PlanningCapacityRepository {
     public record StatusCountRow(String code, String label, int severity, long count) {}
 
     public record ProjectStatusAssignmentRow(String statusCode, long projectId, String projectName) {}
+
+    public record InternStatusAssignmentRow(String statusCode, long internId, String internName) {}
 }
 

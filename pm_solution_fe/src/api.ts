@@ -107,7 +107,7 @@ export type ReportProjectCapacityPayload = {
   note?: string | null;
 };
 
-export type PlanningCapacityStatusProject = {
+export type PlanningCapacityStatusItem = {
   id: number;
   name: string;
 };
@@ -117,7 +117,8 @@ export type PlanningCapacityStatusSummary = {
   label: string;
   severity: number;
   count: number;
-  projects: PlanningCapacityStatusProject[];
+  projects: PlanningCapacityStatusItem[];
+  interns: PlanningCapacityStatusItem[];
 };
 
 export type PlanningCapacitySummarySection = {

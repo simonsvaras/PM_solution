@@ -19,12 +19,23 @@ public class PlanningCapacityService {
     public CurrentCapacityResponse getCurrentCapacitySummary() {
         List<PlanningCapacityRepository.StatusCountRow> projectStatuses = repository.loadProjectStatusCounts();
         List<PlanningCapacityRepository.ProjectStatusAssignmentRow> projectAssignments = repository.loadProjectsByStatus();
-        Map<String, List<CurrentCapacityResponse.ProjectSummary>> projectsByStatus = projectAssignments.stream()
+        Map<String, List<CurrentCapacityResponse.AssignmentSummary>> projectsByStatus = projectAssignments.stream()
                 .collect(Collectors.groupingBy(
                         PlanningCapacityRepository.ProjectStatusAssignmentRow::statusCode,
                         LinkedHashMap::new,
-                        Collectors.mapping(row -> new CurrentCapacityResponse.ProjectSummary(row.projectId(), row.projectName()), Collectors.toList())));
+                        Collectors.mapping(
+                                row -> new CurrentCapacityResponse.AssignmentSummary(row.projectId(), row.projectName()),
+                                Collectors.toList())));
+
         List<PlanningCapacityRepository.StatusCountRow> internStatuses = repository.loadInternStatusCounts();
+        List<PlanningCapacityRepository.InternStatusAssignmentRow> internAssignments = repository.loadInternsByStatus();
+        Map<String, List<CurrentCapacityResponse.AssignmentSummary>> internsByStatus = internAssignments.stream()
+                .collect(Collectors.groupingBy(
+                        PlanningCapacityRepository.InternStatusAssignmentRow::statusCode,
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                row -> new CurrentCapacityResponse.AssignmentSummary(row.internId(), row.internName()),
+                                Collectors.toList())));
 
         CurrentCapacityResponse.Section projectSection = new CurrentCapacityResponse.Section(
                 repository.countProjects(),
@@ -34,7 +45,8 @@ public class PlanningCapacityService {
                                 row.label(),
                                 row.severity(),
                                 row.count(),
-                                projectsByStatus.getOrDefault(row.code(), List.of())))
+                                projectsByStatus.getOrDefault(row.code(), List.of()),
+                                List.of()))
                         .toList());
 
         CurrentCapacityResponse.Section internSection = new CurrentCapacityResponse.Section(
@@ -45,7 +57,8 @@ public class PlanningCapacityService {
                                 row.label(),
                                 row.severity(),
                                 row.count(),
-                                List.of()))
+                                List.of(),
+                                internsByStatus.getOrDefault(row.code(), List.of())))
                         .toList());
 
         return new CurrentCapacityResponse(projectSection, internSection);
@@ -54,9 +67,11 @@ public class PlanningCapacityService {
     public record CurrentCapacityResponse(Section projects, Section interns) {
         public record Section(long total, List<StatusSummary> statuses) {}
 
-        public record StatusSummary(String code, String label, int severity, long count, List<ProjectSummary> projects) {}
+        public record StatusSummary(String code, String label, int severity, long count,
+                                    List<AssignmentSummary> projects,
+                                    List<AssignmentSummary> interns) {}
 
-        public record ProjectSummary(long id, String name) {}
+        public record AssignmentSummary(long id, String name) {}
     }
 }
 

@@ -2,7 +2,7 @@ import './CapacitySummaryCard.css';
 
 const numberFormatter = new Intl.NumberFormat('cs-CZ');
 
-export type CapacitySummaryStatusProject = {
+export type CapacitySummaryStatusEntity = {
   id: number;
   name: string;
 };
@@ -12,7 +12,8 @@ export type CapacitySummaryStatus = {
   label: string;
   severity: number;
   count: number;
-  projects?: CapacitySummaryStatusProject[];
+  projects?: CapacitySummaryStatusEntity[];
+  interns?: CapacitySummaryStatusEntity[];
 };
 
 type CapacitySummaryCardProps = {
@@ -52,7 +53,9 @@ export default function CapacitySummaryCard({
           {statuses.map(status => {
             const tone = getSeverityTone(status.severity);
             const projects = status.projects ?? [];
-            const isClickable = Boolean(onStatusClick && projects.length > 0);
+            const interns = status.interns ?? [];
+            const relatedEntities = projects.length > 0 ? projects : interns;
+            const isClickable = Boolean(onStatusClick && relatedEntities.length > 0);
             const className = `capacitySummaryCard__item capacitySummaryCard__item--${tone}`;
             const content = (
               <>
