@@ -21,6 +21,82 @@
   color: #b91c1c;
 }
 
+.planningCurrentCapacity__modalOverlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 20;
+}
+
+.planningCurrentCapacity__modal {
+  width: min(34rem, 100%);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.planningCurrentCapacity__modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.planningCurrentCapacity__modalTitle {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.planningCurrentCapacity__modalClose {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.planningCurrentCapacity__modalClose:hover {
+  color: #0f172a;
+}
+
+.planningCurrentCapacity__modalClose:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.planningCurrentCapacity__modalDescription {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.planningCurrentCapacity__modalList {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.planningCurrentCapacity__modalListItem {
+  list-style: disc;
+}
+
 @media (max-width: 1024px) {
   .planningCurrentCapacity__grid {
     grid-template-columns: 1fr;

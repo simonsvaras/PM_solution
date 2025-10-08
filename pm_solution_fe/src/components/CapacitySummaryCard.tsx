@@ -2,11 +2,17 @@ import './CapacitySummaryCard.css';
 
 const numberFormatter = new Intl.NumberFormat('cs-CZ');
 
+export type CapacitySummaryStatusProject = {
+  id: number;
+  name: string;
+};
+
 export type CapacitySummaryStatus = {
   code: string;
   label: string;
   severity: number;
   count: number;
+  projects?: CapacitySummaryStatusProject[];
 };
 
 type CapacitySummaryCardProps = {
@@ -15,6 +21,7 @@ type CapacitySummaryCardProps = {
   totalValue: number;
   statuses: CapacitySummaryStatus[];
   emptyMessage?: string;
+  onStatusClick?: (status: CapacitySummaryStatus) => void;
 };
 
 function getSeverityTone(severity: number): 'neutral' | 'warning' | 'critical' {
@@ -29,6 +36,7 @@ export default function CapacitySummaryCard({
   totalValue,
   statuses,
   emptyMessage = 'Zatím nejsou k dispozici žádná data.',
+  onStatusClick,
 }: CapacitySummaryCardProps) {
   return (
     <article className="capacitySummaryCard" aria-label={title}>
@@ -43,13 +51,30 @@ export default function CapacitySummaryCard({
         <ul className="capacitySummaryCard__list">
           {statuses.map(status => {
             const tone = getSeverityTone(status.severity);
-            return (
-              <li
-                key={status.code}
-                className={`capacitySummaryCard__item capacitySummaryCard__item--${tone}`}
-              >
+            const projects = status.projects ?? [];
+            const isClickable = Boolean(onStatusClick && projects.length > 0);
+            const className = `capacitySummaryCard__item capacitySummaryCard__item--${tone}`;
+            const content = (
+              <>
                 <span className="capacitySummaryCard__itemLabel">{status.label}</span>
                 <span className="capacitySummaryCard__itemValue">{numberFormatter.format(status.count)}</span>
+              </>
+            );
+
+            return (
+              <li key={status.code}>
+                {isClickable ? (
+                  <button
+                    type="button"
+                    className={className}
+                    onClick={() => onStatusClick?.(status)}
+                    aria-haspopup="dialog"
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className={className}>{content}</div>
+                )}
               </li>
             );
           })}

@@ -38,6 +38,28 @@ public class PlanningCapacityRepository {
             ORDER BY cs.severity DESC, cs.code ASC
             """;
 
+    private static final String SQL_PROJECTS_BY_STATUS =
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (r.project_id) r.id,
+                                                r.project_id
+                FROM project_capacity_report r
+                ORDER BY r.project_id, r.reported_at DESC, r.id DESC
+            ),
+            latest_statuses AS (
+                SELECT l.project_id,
+                       rs.status_code
+                FROM latest l
+                JOIN project_capacity_report_status rs ON rs.report_id = l.id
+            )
+            SELECT ls.status_code,
+                   p.id          AS project_id,
+                   p.name        AS project_name
+            FROM latest_statuses ls
+            JOIN project p ON p.id = ls.project_id
+            ORDER BY ls.status_code ASC, p.name ASC
+            """;
+
     private static final String SQL_PROJECT_TOTAL = "SELECT COUNT(*) FROM project";
 
     private static final String SQL_INTERN_STATUS_COUNTS =
@@ -75,6 +97,18 @@ public class PlanningCapacityRepository {
         return jdbc.query(SQL_PROJECT_STATUS_COUNTS, STATUS_COUNT_MAPPER);
     }
 
+    public List<ProjectStatusAssignmentRow> loadProjectsByStatus() {
+        return jdbc.query(SQL_PROJECTS_BY_STATUS, new RowMapper<>() {
+            @Override
+            public ProjectStatusAssignmentRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+                return new ProjectStatusAssignmentRow(
+                        rs.getString("status_code"),
+                        rs.getLong("project_id"),
+                        rs.getString("project_name"));
+            }
+        });
+    }
+
     public long countProjects() {
         Long total = jdbc.queryForObject(SQL_PROJECT_TOTAL, Long.class);
         return total == null ? 0L : total;
@@ -90,5 +124,7 @@ public class PlanningCapacityRepository {
     }
 
     public record StatusCountRow(String code, String label, int severity, long count) {}
+
+    public record ProjectStatusAssignmentRow(String statusCode, long projectId, String projectName) {}
 }
 
