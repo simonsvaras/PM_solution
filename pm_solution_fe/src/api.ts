@@ -110,6 +110,8 @@ export type ReportProjectCapacityPayload = {
 export type PlanningCapacityStatusItem = {
   id: number;
   name: string;
+  level?: string | null;
+  groups?: string[];
 };
 
 export type PlanningCapacityStatusSummary = {

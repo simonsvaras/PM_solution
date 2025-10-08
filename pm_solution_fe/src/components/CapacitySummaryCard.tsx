@@ -5,6 +5,8 @@ const numberFormatter = new Intl.NumberFormat('cs-CZ');
 export type CapacitySummaryStatusEntity = {
   id: number;
   name: string;
+  level?: string | null;
+  groups?: string[];
 };
 
 export type CapacitySummaryStatus = {

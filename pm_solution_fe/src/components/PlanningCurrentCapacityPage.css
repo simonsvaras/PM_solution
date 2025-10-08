@@ -85,7 +85,7 @@
 
 .planningCurrentCapacity__modalList {
   margin: 0;
-  padding-left: 1rem;
+  padding-left: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -94,7 +94,23 @@
 }
 
 .planningCurrentCapacity__modalListItem {
-  list-style: disc;
+  list-style: none;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.planningCurrentCapacity__modalItemName {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.planningCurrentCapacity__modalItemMeta {
+  font-size: 0.85rem;
+  color: #64748b;
 }
 
 @media (max-width: 1024px) {

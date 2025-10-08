@@ -6,7 +6,9 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Repository responsible for aggregating current capacity information for planning dashboards.
@@ -78,8 +80,14 @@ public class PlanningCapacityRepository {
             """
             SELECT i.status_code,
                    i.id   AS intern_id,
-                   concat_ws(' ', i.first_name, i.last_name) AS intern_name
+                   concat_ws(' ', i.first_name, i.last_name) AS intern_name,
+                   l.label AS level_label,
+                   array_agg(g.label ORDER BY g.label) AS group_labels
             FROM intern i
+            JOIN level l ON l.id = i.level_id
+            LEFT JOIN intern_group ig ON ig.intern_id = i.id
+            LEFT JOIN "group" g ON g.id = ig.group_id
+            GROUP BY i.status_code, i.id, intern_name, l.label
             ORDER BY i.status_code ASC, intern_name ASC
             """;
 
@@ -131,10 +139,27 @@ public class PlanningCapacityRepository {
         return jdbc.query(SQL_INTERNS_BY_STATUS, new RowMapper<>() {
             @Override
             public InternStatusAssignmentRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+                java.sql.Array sqlArray = rs.getArray("group_labels");
+                List<String> groupLabels = List.of();
+                if (sqlArray != null) {
+                    Object array = sqlArray.getArray();
+                    if (array instanceof String[] strings) {
+                        groupLabels = Arrays.stream(strings)
+                                .filter(Objects::nonNull)
+                                .toList();
+                    } else if (array instanceof Object[] objects) {
+                        groupLabels = Arrays.stream(objects)
+                                .filter(Objects::nonNull)
+                                .map(Object::toString)
+                                .toList();
+                    }
+                }
                 return new InternStatusAssignmentRow(
                         rs.getString("status_code"),
                         rs.getLong("intern_id"),
-                        rs.getString("intern_name"));
+                        rs.getString("intern_name"),
+                        rs.getString("level_label"),
+                        groupLabels);
             }
         });
     }
@@ -148,6 +173,7 @@ public class PlanningCapacityRepository {
 
     public record ProjectStatusAssignmentRow(String statusCode, long projectId, String projectName) {}
 
-    public record InternStatusAssignmentRow(String statusCode, long internId, String internName) {}
+    public record InternStatusAssignmentRow(String statusCode, long internId, String internName,
+                                            String levelLabel, List<String> groupLabels) {}
 }
 

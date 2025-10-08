@@ -240,11 +240,26 @@ export default function PlanningCurrentCapacityPage() {
               Počet stážistů v tomto stavu: {selectedInternStatus.count}.
             </p>
             <ul className="planningCurrentCapacity__modalList">
-              {selectedInternStatus.interns?.map(intern => (
-                <li key={intern.id} className="planningCurrentCapacity__modalListItem">
-                  {intern.name}
-                </li>
-              ))}
+              {selectedInternStatus.interns?.map(intern => {
+                const groups = intern.groups?.filter(group => group.trim().length > 0) ?? [];
+                const metaParts: string[] = [];
+                const level = intern.level?.trim();
+                if (level) {
+                  metaParts.push(level);
+                }
+                if (groups.length > 0) {
+                  metaParts.push(groups.join(', '));
+                }
+
+                return (
+                  <li key={intern.id} className="planningCurrentCapacity__modalListItem">
+                    <span className="planningCurrentCapacity__modalItemName">{intern.name}</span>
+                    {metaParts.length > 0 && (
+                      <span className="planningCurrentCapacity__modalItemMeta">{metaParts.join(' • ')}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>

@@ -24,7 +24,11 @@ public class PlanningCapacityService {
                         PlanningCapacityRepository.ProjectStatusAssignmentRow::statusCode,
                         LinkedHashMap::new,
                         Collectors.mapping(
-                                row -> new CurrentCapacityResponse.AssignmentSummary(row.projectId(), row.projectName()),
+                                row -> new CurrentCapacityResponse.AssignmentSummary(
+                                        row.projectId(),
+                                        row.projectName(),
+                                        null,
+                                        List.of()),
                                 Collectors.toList())));
 
         List<PlanningCapacityRepository.StatusCountRow> internStatuses = repository.loadInternStatusCounts();
@@ -34,7 +38,11 @@ public class PlanningCapacityService {
                         PlanningCapacityRepository.InternStatusAssignmentRow::statusCode,
                         LinkedHashMap::new,
                         Collectors.mapping(
-                                row -> new CurrentCapacityResponse.AssignmentSummary(row.internId(), row.internName()),
+                                row -> new CurrentCapacityResponse.AssignmentSummary(
+                                        row.internId(),
+                                        row.internName(),
+                                        row.levelLabel(),
+                                        row.groupLabels()),
                                 Collectors.toList())));
 
         CurrentCapacityResponse.Section projectSection = new CurrentCapacityResponse.Section(
@@ -71,7 +79,7 @@ public class PlanningCapacityService {
                                     List<AssignmentSummary> projects,
                                     List<AssignmentSummary> interns) {}
 
-        public record AssignmentSummary(long id, String name) {}
+        public record AssignmentSummary(long id, String name, String level, List<String> groups) {}
     }
 }
 
