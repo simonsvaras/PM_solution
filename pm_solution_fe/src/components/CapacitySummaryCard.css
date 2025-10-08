@@ -1,0 +1,115 @@
+.capacitySummaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  min-height: 100%;
+}
+
+.capacitySummaryCard__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.capacitySummaryCard__title {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #111827;
+}
+
+.capacitySummaryCard__total {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.capacitySummaryCard__total strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.capacitySummaryCard__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capacitySummaryCard__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  background: #f9fafb;
+}
+
+.capacitySummaryCard__itemLabel {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.capacitySummaryCard__itemValue {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.capacitySummaryCard__item--warning {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(252, 211, 77, 0.2);
+}
+
+.capacitySummaryCard__item--warning .capacitySummaryCard__itemValue,
+.capacitySummaryCard__item--warning .capacitySummaryCard__itemLabel {
+  color: #92400e;
+}
+
+.capacitySummaryCard__item--critical {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(248, 113, 113, 0.18);
+}
+
+.capacitySummaryCard__item--critical .capacitySummaryCard__itemValue,
+.capacitySummaryCard__item--critical .capacitySummaryCard__itemLabel {
+  color: #991b1b;
+}
+
+.capacitySummaryCard__empty {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .capacitySummaryCard {
+    padding: 1.25rem;
+  }
+
+  .capacitySummaryCard__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .capacitySummaryCard__total {
+    align-items: flex-start;
+  }
+}
+

@@ -14,6 +14,7 @@ import InternsOverviewPage from './components/InternsOverviewPage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
 import SyncReportsOverviewPage from './components/SyncReportsOverviewPage';
 import PlanningResourcesPage from './components/PlanningResourcesPage';
+import PlanningCurrentCapacityPage from './components/PlanningCurrentCapacityPage';
 import {
   API_BASE,
   deleteReports,
@@ -63,7 +64,10 @@ const modules: Module[] = [
   {
     key: 'planning',
     name: 'Plánování',
-    submodules: [{ key: 'planning-resources', name: 'Plánování zdrojů' }],
+    submodules: [
+      { key: 'planning-current', name: 'Aktuální kapacity' },
+      { key: 'planning-resources', name: 'Plánování zdrojů' },
+    ],
   },
   {
     key: 'settings',
@@ -394,6 +398,7 @@ function App() {
   const isInternsOverview = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-overview';
   const isInternsAdmin = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-admin';
   const isPlanningResources = activeModuleKey === 'planning' && activeSubmoduleKey === 'planning-resources';
+  const isPlanningCurrent = activeModuleKey === 'planning' && activeSubmoduleKey === 'planning-current';
   const isProjectReportActive = isProjectsOverview && selectedReportProject !== null;
   const isProjectReportSummary =
     isProjectReportActive && (reportView === 'summary' || reportView === null || reportView === undefined);
@@ -412,7 +417,7 @@ function App() {
   if (isInternsOverview) {
     appContentInnerClassNames.push('app-content__inner--interns-overview');
   }
-  if (isPlanningResources) {
+  if (activeModuleKey === 'planning') {
     appContentInnerClassNames.push('app-content__inner--planning');
   }
   if (isOnDemand) {
@@ -455,6 +460,8 @@ function App() {
     headerDescription = 'Vytvářejte a spravujte projekty v aplikaci.';
   } else if (isInternsAdmin) {
     headerDescription = 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.';
+  } else if (isPlanningCurrent) {
+    headerDescription = 'Získejte aktuální přehled o vytížení projektů a stážistů.';
   } else if (isPlanningResources) {
     headerDescription = 'Sledujte relativní vytížení stážistů napříč měsíci pomocí normalizované kapacity.';
   } else if (isSyncReportsOverview) {
@@ -468,6 +475,7 @@ function App() {
     !isProjectsOverview &&
     !isProjectsAdmin &&
     !isInternsAdmin &&
+    !isPlanningCurrent &&
     !isPlanningResources &&
     !isProjectsTeams &&
     !isInternsOverview &&
@@ -974,6 +982,8 @@ function App() {
             <InternsPage />
           ) : isPlanningResources ? (
             <PlanningResourcesPage />
+          ) : isPlanningCurrent ? (
+            <PlanningCurrentCapacityPage />
           ) : isProjectsTeams ? (
             <ReportsTeamsPage />
           ) : (

@@ -107,6 +107,23 @@ export type ReportProjectCapacityPayload = {
   note?: string | null;
 };
 
+export type PlanningCapacityStatusSummary = {
+  code: string;
+  label: string;
+  severity: number;
+  count: number;
+};
+
+export type PlanningCapacitySummarySection = {
+  total: number;
+  statuses: PlanningCapacityStatusSummary[];
+};
+
+export type PlanningCurrentCapacityResponse = {
+  projects: PlanningCapacitySummarySection;
+  interns: PlanningCapacitySummarySection;
+};
+
 export type ProjectLongTermReportMeta = {
   budget: number | null;
   budgetFrom: string | null;
@@ -647,6 +664,12 @@ export async function reportProjectCapacity(
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectCapacityReport>(res);
+}
+
+export async function getPlanningCurrentCapacity(): Promise<PlanningCurrentCapacityResponse> {
+  const res = await fetch(`${API_BASE}/api/planning/current-capacity`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<PlanningCurrentCapacityResponse>(res);
 }
 
 export async function getReportTeams(): Promise<TeamReportTeam[]> {
