@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import './PlanningCurrentCapacityPage.css';
 import CapacitySummaryCard, { type CapacitySummaryStatus } from './CapacitySummaryCard';
 import { getPlanningCurrentCapacity, type PlanningCurrentCapacityResponse } from '../api';
