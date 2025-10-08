@@ -5,7 +5,11 @@ import czm.pm_solution_be.intern.InternDao.InternOverviewRow;
 import czm.pm_solution_be.intern.InternDao.InternProjectRow;
 import czm.pm_solution_be.intern.InternDao.InternRow;
 import czm.pm_solution_be.intern.InternDao.LevelRow;
+import czm.pm_solution_be.intern.InternDao.StatusHistoryRow;
+import czm.pm_solution_be.intern.InternDao.StatusRow;
 import czm.pm_solution_be.intern.InternLevelHistoryResponse;
+import czm.pm_solution_be.intern.InternStatusHistoryResponse;
+import czm.pm_solution_be.intern.InternStatusUpdateRequest;
 import czm.pm_solution_be.sync.SyncDao;
 import czm.pm_solution_be.web.ApiException;
 import org.slf4j.Logger;
@@ -39,6 +43,8 @@ public class InternService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
+    /** Default status used when the caller does not specify an explicit code on create. */
+    private static final String DEFAULT_STATUS_CODE = "VOLNE_CAPACITY";
 
     private final InternDao dao;
     private final SyncDao syncDao;
@@ -59,16 +65,23 @@ public class InternService {
         }
         List<GroupRow> groups = validateGroupIds(input.groupIds());
 
-        InternRow inserted = dao.insert(input.firstName(), input.lastName(), input.username(), currentLevel.id());
+        String resolvedStatusCode = input.statusCode() != null ? input.statusCode() : DEFAULT_STATUS_CODE;
+        StatusRow status = dao.findStatus(resolvedStatusCode)
+                .orElseThrow(() -> ApiException.validation("Neznámý status stážisty.", "intern_status_not_found"));
+
+        // Persist the intern row with the resolved status code so subsequent queries read a consistent state.
+        InternRow inserted = dao.insert(input.firstName(), input.lastName(), input.username(), currentLevel.id(), status.code());
         dao.replaceInternGroups(inserted.id(), input.groupIds());
         dao.replaceLevelHistory(inserted.id(), input.history().stream()
                 .map(entry -> new InternDao.LevelHistoryInput(entry.levelId(), entry.validFrom(), entry.validTo()))
                 .toList());
+        // Immediately open the status history so auditing endpoints return a non-empty collection.
+        dao.insertStatusHistory(inserted.id(), status.code(), LocalDate.now());
 
         InternRow row = dao.findById(inserted.id())
                 .orElseThrow(() -> ApiException.internal("Stážista byl vytvořen, ale nepodařilo se načíst jeho data.", "intern_reload_failed"));
         Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(row.id()));
-        log.info("Intern created id={} username={} levelId={}", row.id(), row.username(), row.levelId());
+        log.info("Intern created id={} username={} levelId={} status={}", row.id(), row.username(), row.levelId(), row.statusCode());
         return toResponse(row, groupMap.getOrDefault(row.id(), groups));
     }
 
@@ -83,20 +96,34 @@ public class InternService {
                 .orElseThrow(() -> ApiException.validation("Zvolená úroveň neexistuje.", "level_not_found"));
         List<GroupRow> groups = validateGroupIds(input.groupIds());
 
+        StatusRow requestedStatus = null;
+        if (input.statusCode() != null) {
+            requestedStatus = dao.findStatus(input.statusCode())
+                    .orElseThrow(() -> ApiException.validation("Neznámý status stážisty.", "intern_status_not_found"));
+        }
+
         InternRow updated = dao.update(existing.id(), input.firstName(), input.lastName(), input.username(), level.id());
         dao.replaceInternGroups(updated.id(), input.groupIds());
         dao.replaceLevelHistory(updated.id(), input.history().stream()
                 .map(entry -> new InternDao.LevelHistoryInput(entry.levelId(), entry.validFrom(), entry.validTo()))
                 .toList());
 
+        InternRow statusAwareRow = updated;
+        if (requestedStatus != null && !Objects.equals(existing.statusCode(), requestedStatus.code())) {
+            // Propagate the change into both the denormalised column and the history table.
+            statusAwareRow = applyStatusChange(updated.id(), requestedStatus.code(), LocalDate.now());
+        }
+
         if (existing.levelId() != level.id()) {
             int recalculated = syncDao.recomputeReportCostsForIntern(existing.id());
             log.info("Přepočítáno {} nákladů reportů pro stážistu {}", recalculated, updated.username());
         }
 
-        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(updated.id()));
-        log.info("Intern updated id={} username={} levelId={}", updated.id(), updated.username(), updated.levelId());
-        return toResponse(updated, groupMap.getOrDefault(updated.id(), groups));
+        InternRow finalRow = statusAwareRow != null ? statusAwareRow : dao.findById(updated.id())
+                .orElseThrow(() -> ApiException.internal("Stážista byl upraven, ale nepodařilo se načíst jeho data.", "intern_reload_failed"));
+        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(finalRow.id()));
+        log.info("Intern updated id={} username={} levelId={} status={}", finalRow.id(), finalRow.username(), finalRow.levelId(), finalRow.statusCode());
+        return toResponse(finalRow, groupMap.getOrDefault(finalRow.id(), groups));
     }
 
     @Transactional
@@ -195,9 +222,37 @@ public class InternService {
                 base.username(),
                 base.levelId(),
                 base.levelLabel(),
+                base.statusCode(),
+                base.statusLabel(),
+                base.statusSeverity(),
                 base.groups(),
                 base.totalHours(),
                 allocations);
+    }
+
+    /**
+     * Applies a status change request and returns the refreshed intern payload for FE hydration.
+     */
+    @Transactional
+    public InternResponse updateStatus(long internId, InternStatusUpdateRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Body nesmí být prázdné.", "body_required");
+        }
+        String normalizedCode = normalizeStatusCode(request.statusCode());
+        if (normalizedCode == null) {
+            throw ApiException.validation("Status je povinný.", "intern_status_required");
+        }
+        LocalDate effectiveDate = request.validFrom() != null ? request.validFrom() : LocalDate.now();
+
+        InternRow existing = dao.findById(internId)
+                .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
+        StatusRow status = dao.findStatus(normalizedCode)
+                .orElseThrow(() -> ApiException.validation("Neznámý status stážisty.", "intern_status_not_found"));
+
+        InternRow updated = applyStatusChange(existing.id(), status.code(), effectiveDate);
+        Map<Long, List<GroupRow>> groupMap = dao.findGroupsForInternIds(List.of(updated.id()));
+        log.info("Intern status updated id={} username={} status={} effective={}", updated.id(), updated.username(), updated.statusCode(), effectiveDate);
+        return toResponse(updated, groupMap.getOrDefault(updated.id(), List.of()));
     }
 
     public List<InternLevelHistoryResponse> getLevelHistory(long internId) {
@@ -209,6 +264,23 @@ public class InternService {
                         row.levelId(),
                         row.levelCode(),
                         row.levelLabel(),
+                        row.validFrom(),
+                        row.validTo()))
+                .toList();
+    }
+
+    /**
+     * Returns the chronological history of status changes for the requested intern.
+     */
+    public List<InternStatusHistoryResponse> getStatusHistory(long internId) {
+        dao.findById(internId)
+                .orElseThrow(() -> ApiException.notFound("Stážista nebyl nalezen.", "intern"));
+        return dao.findStatusHistory(internId).stream()
+                .map(row -> new InternStatusHistoryResponse(
+                        row.id(),
+                        row.statusCode(),
+                        row.statusLabel(),
+                        row.statusSeverity(),
                         row.validFrom(),
                         row.validTo()))
                 .toList();
@@ -275,6 +347,15 @@ public class InternService {
                 .toList();
     }
 
+    /**
+     * Exposes intern status references so FE can populate dropdowns consistently.
+     */
+    public List<StatusDto> listInternStatuses() {
+        return dao.listStatuses().stream()
+                .map(s -> new StatusDto(s.code(), s.label(), s.severity()))
+                .toList();
+    }
+
     private void ensureUsernameUnique(String username, Long selfId) {
         dao.findByUsernameIgnoreCase(username).ifPresent(existing -> {
             if (selfId == null || !Objects.equals(existing.id(), selfId)) {
@@ -299,6 +380,7 @@ public class InternService {
         List<Long> groupIds = request.groupIds() != null ? request.groupIds() : List.of();
         List<Long> sanitized = sanitizeGroupIds(groupIds);
         List<LevelAssignmentInput> history = normalizeLevelHistory(request.levelHistory());
+        String statusCode = normalizeStatusCode(request.statusCode());
         Set<Long> levelIds = history.stream().map(LevelAssignmentInput::levelId).collect(Collectors.toCollection(LinkedHashSet::new));
         List<LevelRow> levelRows = dao.findLevelsByIds(levelIds);
         Map<Long, LevelRow> levelsById = new HashMap<>();
@@ -315,7 +397,7 @@ public class InternService {
             throw ApiException.validation("Aktuální úroveň musí mít nevyplněné datum do.", "level_history_current_required");
         }
         long currentLevelId = current.levelId();
-        return new NormalizedInput(firstName, lastName, username, currentLevelId, sanitized, history, levelsById);
+        return new NormalizedInput(firstName, lastName, username, currentLevelId, sanitized, history, levelsById, statusCode);
     }
 
     private List<GroupRow> validateGroupIds(List<Long> groupIds) {
@@ -488,6 +570,24 @@ public class InternService {
         return trimmed;
     }
 
+    /**
+     * Normalises status codes to uppercase snake-case and validates allowed characters.
+     */
+    private String normalizeStatusCode(String statusCode) {
+        if (statusCode == null) {
+            return null;
+        }
+        String trimmed = statusCode.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        String upper = trimmed.toUpperCase(Locale.ROOT);
+        if (!upper.matches("[A-Z0-9_]+")) {
+            throw ApiException.validation("Status smí obsahovat pouze písmena, číslice a podtržítko.", "intern_status_invalid");
+        }
+        return upper;
+    }
+
     private List<InternDao.SortOrder> resolveSort(String sortParam) {
         List<InternDao.SortOrder> orders = new ArrayList<>();
         if (sortParam == null || sortParam.isBlank()) {
@@ -522,6 +622,38 @@ public class InternService {
         return orders;
     }
 
+    /**
+     * Persists a status change atomically by updating both the current column and the history table.
+     */
+    private InternRow applyStatusChange(long internId, String statusCode, LocalDate effectiveDate) {
+        if (effectiveDate == null) {
+            throw ApiException.validation("Datum od je povinné.", "intern_status_valid_from_required");
+        }
+        List<StatusHistoryRow> history = dao.findStatusHistory(internId);
+        StatusHistoryRow current = null;
+        for (StatusHistoryRow row : history) {
+            if (row.validTo() == null) {
+                current = row;
+            }
+        }
+        if (current != null) {
+            if (effectiveDate.isBefore(current.validFrom())) {
+                throw ApiException.validation("Datum od nesmí být dříve než aktuální otevřený záznam.", "intern_status_overlap");
+            }
+            if (Objects.equals(current.statusCode(), statusCode) && effectiveDate.isEqual(current.validFrom())) {
+                return dao.findById(internId)
+                        .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst stav stážisty po změně.", "intern_status_reload_failed"));
+            }
+        }
+
+        dao.closeOpenStatusHistory(internId, effectiveDate);
+        dao.insertStatusHistory(internId, statusCode, effectiveDate);
+        dao.updateInternStatus(internId, statusCode);
+
+        return dao.findById(internId)
+                .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst stav stážisty po změně.", "intern_status_reload_failed"));
+    }
+
     private InternResponse toResponse(InternRow row, List<GroupRow> groups) {
         List<InternGroupResponse> groupResponses = groups.stream()
                 .map(g -> new InternGroupResponse(g.id(), g.code(), g.label()))
@@ -533,6 +665,9 @@ public class InternService {
                 row.username(),
                 row.levelId(),
                 row.levelLabel(),
+                row.statusCode(),
+                row.statusLabel(),
+                row.statusSeverity(),
                 groupResponses);
     }
 
@@ -549,6 +684,9 @@ public class InternService {
                 row.username(),
                 row.levelId(),
                 row.levelLabel(),
+                row.statusCode(),
+                row.statusLabel(),
+                row.statusSeverity(),
                 groupResponses,
                 hours);
     }
@@ -559,12 +697,14 @@ public class InternService {
                                    long currentLevelId,
                                    List<Long> groupIds,
                                    List<LevelAssignmentInput> history,
-                                   Map<Long, LevelRow> levelsById) {}
+                                   Map<Long, LevelRow> levelsById,
+                                   String statusCode) {}
 
     private record LevelAssignmentInput(long levelId, LocalDate validFrom, LocalDate validTo) {}
 
     public record LevelDto(long id, String code, String label) {}
     public record GroupDto(long id, int code, String label) {}
+    public record StatusDto(String code, String label, int severity) {}
     public record InternMonthlyHoursResponse(long internId,
                                              String username,
                                              String firstName,

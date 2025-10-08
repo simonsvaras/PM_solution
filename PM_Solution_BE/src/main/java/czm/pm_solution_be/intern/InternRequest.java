@@ -11,6 +11,7 @@ public record InternRequest(
         @JsonProperty("first_name") String firstName,
         @JsonProperty("last_name") String lastName,
         @JsonProperty("username") String username,
+        @JsonProperty("status_code") String statusCode,
         @JsonProperty("group_ids") List<Long> groupIds,
         @JsonProperty("level_history") List<InternLevelHistoryRequest> levelHistory) {
 }

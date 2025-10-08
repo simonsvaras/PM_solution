@@ -83,10 +83,22 @@ public class InternController {
         return service.getLevelHistory(id);
     }
 
+    @GetMapping("/{id}/status/history")
+    @Operation(summary = "Historie statusů stážisty")
+    public List<InternStatusHistoryResponse> statusHistory(@PathVariable long id) {
+        return service.getStatusHistory(id);
+    }
+
     @GetMapping("/{id}/detail")
     @Operation(summary = "Přehled stážisty", description = "Vrací agregovaná data o stážistovi včetně projektů a úvazků.")
     public InternDetailResponse overviewDetail(@PathVariable long id) {
         return service.overviewDetail(id);
+    }
+
+    @PostMapping("/{id}/status")
+    @Operation(summary = "Změna statusu stážisty", description = "Aktualizuje aktuální status a uloží položku do historie.")
+    public InternResponse updateStatus(@PathVariable long id, @RequestBody InternStatusUpdateRequest request) {
+        return service.updateStatus(id, request);
     }
 
     @GetMapping

@@ -31,7 +31,15 @@ import java.util.Set;
 public class InternDao {
     private final JdbcTemplate jdbc;
 
-    public record InternRow(long id, String firstName, String lastName, String username, long levelId, String levelLabel) {}
+    public record InternRow(long id,
+                            String firstName,
+                            String lastName,
+                            String username,
+                            long levelId,
+                            String levelLabel,
+                            String statusCode,
+                            String statusLabel,
+                            int statusSeverity) {}
     public record InternAssignmentRow(long id,
                                       String firstName,
                                       String lastName,
@@ -48,6 +56,9 @@ public class InternDao {
                                     String username,
                                     long levelId,
                                     String levelLabel,
+                                    String statusCode,
+                                    String statusLabel,
+                                    int statusSeverity,
                                     long totalSeconds) {}
     public record InternProjectRow(long projectId,
                                    String projectName,
@@ -58,6 +69,13 @@ public class InternDao {
     public record LevelHistoryRow(long id, long levelId, String levelCode, String levelLabel, LocalDate validFrom,
                                   LocalDate validTo) {}
     public record LevelHistoryInput(long levelId, LocalDate validFrom, LocalDate validTo) {}
+    public record StatusRow(String code, String label, int severity) {}
+    public record StatusHistoryRow(long id,
+                                   String statusCode,
+                                   String statusLabel,
+                                   int statusSeverity,
+                                   LocalDate validFrom,
+                                   LocalDate validTo) {}
     public record SortOrder(String column, boolean ascending) {}
     public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {}
     public record PageResult(List<InternRow> rows, long totalElements) {}
@@ -85,7 +103,10 @@ public class InternDao {
                     rs.getString("last_name"),
                     rs.getString("username"),
                     rs.getLong("level_id"),
-                    rs.getString("level_label"));
+                    rs.getString("level_label"),
+                    rs.getString("status_code"),
+                    rs.getString("status_label"),
+                    rs.getInt("status_severity"));
         }
     };
 
@@ -107,6 +128,19 @@ public class InternDao {
             rs.getDate("valid_from").toLocalDate(),
             rs.getDate("valid_to") != null ? rs.getDate("valid_to").toLocalDate() : null);
 
+    private static final RowMapper<StatusRow> STATUS_MAPPER = (rs, rn) -> new StatusRow(
+            rs.getString("code"),
+            rs.getString("label"),
+            rs.getInt("severity"));
+
+    private static final RowMapper<StatusHistoryRow> STATUS_HISTORY_MAPPER = (rs, rn) -> new StatusHistoryRow(
+            rs.getLong("id"),
+            rs.getString("status_code"),
+            rs.getString("status_label"),
+            rs.getInt("status_severity"),
+            rs.getDate("valid_from").toLocalDate(),
+            rs.getDate("valid_to") != null ? rs.getDate("valid_to").toLocalDate() : null);
+
     private static final RowMapper<InternOverviewRow> OVERVIEW_MAPPER = (rs, rn) -> new InternOverviewRow(
             rs.getLong("id"),
             rs.getString("first_name"),
@@ -114,6 +148,9 @@ public class InternDao {
             rs.getString("username"),
             rs.getLong("level_id"),
             rs.getString("level_label"),
+            rs.getString("status_code"),
+            rs.getString("status_label"),
+            rs.getInt("status_severity"),
             rs.getLong("total_seconds"));
 
     private static final RowMapper<InternProjectRow> PROJECT_MAPPER = (rs, rn) -> new InternProjectRow(
@@ -131,9 +168,18 @@ public class InternDao {
      */
     public Optional<InternRow> findById(long id) {
         List<InternRow> rows = jdbc.query("""
-                SELECT i.id, i.first_name, i.last_name, i.username, i.level_id, l.label AS level_label
+                SELECT i.id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.label AS level_label,
+                       i.status_code,
+                       s.label AS status_label,
+                       s.severity AS status_severity
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
+                JOIN intern_status s ON s.code = i.status_code
                 WHERE i.id = ?
                 """, INTERN_MAPPER, id);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
@@ -144,9 +190,18 @@ public class InternDao {
      */
     public Optional<InternRow> findByUsernameIgnoreCase(String username) {
         List<InternRow> rows = jdbc.query("""
-                SELECT i.id, i.first_name, i.last_name, i.username, i.level_id, l.label AS level_label
+                SELECT i.id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.label AS level_label,
+                       i.status_code,
+                       s.label AS status_label,
+                       s.severity AS status_severity
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
+                JOIN intern_status s ON s.code = i.status_code
                 WHERE LOWER(i.username) = ?
                 """, INTERN_MAPPER, username.toLowerCase(Locale.ROOT));
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
@@ -155,19 +210,27 @@ public class InternDao {
     /**
      * Inserts a new intern and returns the stored row.
      */
-    public InternRow insert(String firstName, String lastName, String username, long levelId) {
+    public InternRow insert(String firstName, String lastName, String username, long levelId, String statusCode) {
         InternRow inserted = jdbc.queryForObject(
                 """
-                INSERT INTO intern (first_name, last_name, username, level_id)
-                VALUES (?, ?, ?, ?)
-                RETURNING id, first_name, last_name, username, level_id,
-                          (SELECT label FROM level WHERE id = level_id) AS level_label
+                INSERT INTO intern (first_name, last_name, username, level_id, status_code)
+                VALUES (?, ?, ?, ?, ?)
+                RETURNING id,
+                          first_name,
+                          last_name,
+                          username,
+                          level_id,
+                          (SELECT label FROM level WHERE id = level_id) AS level_label,
+                          status_code,
+                          (SELECT label FROM intern_status WHERE code = status_code) AS status_label,
+                          (SELECT severity FROM intern_status WHERE code = status_code) AS status_severity
                 """,
                 INTERN_MAPPER,
                 firstName,
                 lastName,
                 username,
-                levelId);
+                levelId,
+                statusCode);
         if (inserted == null) {
             throw new IllegalStateException("Failed to insert intern");
         }
@@ -183,8 +246,15 @@ public class InternDao {
                 UPDATE intern
                 SET first_name = ?, last_name = ?, username = ?, level_id = ?
                 WHERE id = ?
-                RETURNING id, first_name, last_name, username, level_id,
-                          (SELECT label FROM level WHERE id = level_id) AS level_label
+                RETURNING id,
+                          first_name,
+                          last_name,
+                          username,
+                          level_id,
+                          (SELECT label FROM level WHERE id = level_id) AS level_label,
+                          status_code,
+                          (SELECT label FROM intern_status WHERE code = status_code) AS status_label,
+                          (SELECT severity FROM intern_status WHERE code = status_code) AS status_severity
                 """,
                 INTERN_MAPPER,
                 firstName,
@@ -212,6 +282,7 @@ public class InternDao {
         StringBuilder sql = new StringBuilder("""
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
+                JOIN intern_status s ON s.code = i.status_code
                 WHERE 1=1
                 """);
         List<Object> params = new ArrayList<>();
@@ -238,7 +309,15 @@ public class InternDao {
 
         List<InternRow> rows = jdbc.query(
                 """
-                SELECT i.id, i.first_name, i.last_name, i.username, i.level_id, l.label AS level_label
+                SELECT i.id,
+                       i.first_name,
+                       i.last_name,
+                       i.username,
+                       i.level_id,
+                       l.label AS level_label,
+                       i.status_code,
+                       s.label AS status_label,
+                       s.severity AS status_severity
                 """ + sql + orderClause + " LIMIT ? OFFSET ?",
                 INTERN_MAPPER,
                 listParams.toArray());
@@ -257,9 +336,13 @@ public class InternDao {
                        i.username,
                        i.level_id,
                        l.label AS level_label,
+                       i.status_code,
+                       s.label AS status_label,
+                       s.severity AS status_severity,
                        COALESCE(ts.seconds_spent_total, 0) AS total_seconds
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
+                JOIN intern_status s ON s.code = i.status_code
                 LEFT JOIN intern_time_summary ts ON ts.intern_id = i.id
                 ORDER BY i.last_name, i.first_name, i.id
                 """, OVERVIEW_MAPPER);
@@ -276,9 +359,13 @@ public class InternDao {
                        i.username,
                        i.level_id,
                        l.label AS level_label,
+                       i.status_code,
+                       s.label AS status_label,
+                       s.severity AS status_severity,
                        COALESCE(ts.seconds_spent_total, 0) AS total_seconds
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
+                JOIN intern_status s ON s.code = i.status_code
                 LEFT JOIN intern_time_summary ts ON ts.intern_id = i.id
                 WHERE i.id = ?
                 """, OVERVIEW_MAPPER, id);
@@ -324,6 +411,27 @@ public class InternDao {
         List<Object> params = new ArrayList<>();
         params.addAll(levelIds);
         return jdbc.query("SELECT id, code, label FROM level WHERE id IN (" + inClause + ")", LEVEL_MAPPER, params.toArray());
+    }
+
+    /**
+     * Returns the reference list of intern statuses ordered by severity for deterministic FE rendering.
+     */
+    public List<StatusRow> listStatuses() {
+        return jdbc.query("SELECT code, label, severity FROM intern_status ORDER BY severity DESC, label ASC", STATUS_MAPPER);
+    }
+
+    /**
+     * Resolves a single status row by its business code.
+     */
+    public Optional<StatusRow> findStatus(String statusCode) {
+        if (statusCode == null) {
+            return Optional.empty();
+        }
+        List<StatusRow> rows = jdbc.query(
+                "SELECT code, label, severity FROM intern_status WHERE code = ?",
+                STATUS_MAPPER,
+                statusCode);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
     /**
@@ -525,6 +633,61 @@ public class InternDao {
                 newLevelStart,
                 newLevelStart,
                 newLevelStart.minusDays(1),
+                internId);
+    }
+
+    /**
+     * Updates the denormalised current status on the intern aggregate.
+     */
+    public void updateInternStatus(long internId, String statusCode) {
+        jdbc.update("UPDATE intern SET status_code = ? WHERE id = ?", statusCode, internId);
+    }
+
+    /**
+     * Inserts a new status history row representing the active status from the supplied date onwards.
+     */
+    public void insertStatusHistory(long internId, String statusCode, LocalDate fromDate) {
+        jdbc.update(
+                "INSERT INTO intern_status_history (intern_id, status_code, valid_from, valid_to) VALUES (?, ?, ?, NULL)",
+                internId,
+                statusCode,
+                fromDate);
+    }
+
+    /**
+     * Closes the currently open status history record when a new status becomes effective.
+     */
+    public void closeOpenStatusHistory(long internId, LocalDate newStatusStart) {
+        jdbc.update(
+                """
+                UPDATE intern_status_history
+                SET valid_to = CASE WHEN valid_from >= ? THEN ? ELSE ? END
+                WHERE intern_id = ? AND valid_to IS NULL
+                """,
+                newStatusStart,
+                newStatusStart,
+                newStatusStart.minusDays(1),
+                internId);
+    }
+
+    /**
+     * Loads status history for the given intern with resolved labels for auditing on the FE.
+     */
+    public List<StatusHistoryRow> findStatusHistory(long internId) {
+        return jdbc.query(
+                """
+                SELECT ish.id,
+                       ish.status_code,
+                       s.label AS status_label,
+                       s.severity AS status_severity,
+                       ish.valid_from,
+                       ish.valid_to
+                FROM intern_status_history ish
+                JOIN intern_status s ON s.code = ish.status_code
+                WHERE ish.intern_id = ?
+                ORDER BY ish.valid_from ASC, ish.id ASC
+                """,
+                STATUS_HISTORY_MAPPER,
                 internId);
     }
 

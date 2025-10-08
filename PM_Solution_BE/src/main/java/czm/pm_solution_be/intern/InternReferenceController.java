@@ -27,6 +27,14 @@ public class InternReferenceController {
     public List<InternService.GroupDto> listGroups() {
         return service.listGroups();
     }
+
+    /**
+     * Exposes intern status reference data for dropdowns.
+     */
+    @GetMapping("/intern-statuses")
+    public List<InternService.StatusDto> listStatuses() {
+        return service.listInternStatuses();
+    }
 }
 
 
