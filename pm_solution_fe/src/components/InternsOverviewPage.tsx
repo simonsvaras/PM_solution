@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import './InternsOverviewPage.css';
 import InternCard from './InternCard';
 import Modal from './Modal';
 import {
   getInternOverviewDetail,
+  getInternStatusHistory,
   listInternOverview,
+  listInternStatuses,
+  updateInternStatus,
   type ErrorResponse,
   type InternDetail,
   type InternOverview,
+  type InternStatusHistoryEntry,
+  type InternStatusOption,
 } from '../api';
 
 function formatHours(hours: number | null): string {
@@ -24,6 +29,30 @@ function extractErrorMessage(err: unknown): string {
   return 'Nepodařilo se načíst data.';
 }
 
+function resolveStatusModifier(severity: number): string {
+  // Technický komentář: Stejně jako u karet chceme veškeré severity mapovat na jednotné CSS modifiery.
+  if (severity >= 30) return 'internsOverview__statusBadge--critical';
+  if (severity >= 20) return 'internsOverview__statusBadge--warning';
+  return 'internsOverview__statusBadge--ok';
+}
+
+function formatDateCz(value: string): string {
+  // Technický komentář: Historii zobrazujeme ve formátu cs-CZ, při parsovací chybě vracíme původní řetězec.
+  try {
+    const formatter = new Intl.DateTimeFormat('cs-CZ');
+    return formatter.format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function formatHistoryRange(entry: InternStatusHistoryEntry): string {
+  // Technický komentář: ValidTo je null pro aktuální status, proto používáme slovní spojení „dosud“.
+  const from = formatDateCz(entry.validFrom);
+  const to = entry.validTo ? formatDateCz(entry.validTo) : 'dosud';
+  return `${from} – ${to}`;
+}
+
 export default function InternsOverviewPage() {
   const [interns, setInterns] = useState<InternOverview[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +64,17 @@ export default function InternsOverviewPage() {
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState<number | 'all'>('all');
   const [levelFilter, setLevelFilter] = useState<number | 'all'>('all');
+  // Technický komentář: Stavové kolekce držíme odděleně pro katalog, formulář a historii, aby se dalo reloadovat nezávisle.
+  const [statusOptions, setStatusOptions] = useState<InternStatusOption[]>([]);
+  const [statusOptionsLoading, setStatusOptionsLoading] = useState(false);
+  const [statusOptionsError, setStatusOptionsError] = useState<string | null>(null);
+  const [statusForm, setStatusForm] = useState<{ statusCode: string; validFrom: string }>({ statusCode: '', validFrom: '' });
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [statusSubmitError, setStatusSubmitError] = useState<string | null>(null);
+  const [statusSubmitSuccess, setStatusSubmitSuccess] = useState<string | null>(null);
+  const [statusHistory, setStatusHistory] = useState<InternStatusHistoryEntry[]>([]);
+  const [statusHistoryLoading, setStatusHistoryLoading] = useState(false);
+  const [statusHistoryError, setStatusHistoryError] = useState<string | null>(null);
 
   const groupOptions = useMemo(() => {
     const groups = new Map<number, { id: number; label: string }>();
@@ -67,10 +107,26 @@ export default function InternsOverviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    // Technický komentář: Katalog statusů načítáme jednorázově, protože se mění jen migracemi.
+    setStatusOptionsLoading(true);
+    setStatusOptionsError(null);
+    listInternStatuses()
+      .then(data => setStatusOptions(data))
+      .catch(err => setStatusOptionsError(extractErrorMessage(err)))
+      .finally(() => setStatusOptionsLoading(false));
+  }, []);
+
   const totalTrackedHours = useMemo(
     () => interns.reduce((acc, intern) => acc + (Number.isFinite(intern.totalHours) ? intern.totalHours : 0), 0),
     [interns],
   );
+
+  useEffect(() => {
+    if (!detail) return;
+    // Technický komentář: Po načtení detailu synchronizujeme formulář, kdyby se status mezitím změnil jinde.
+    setStatusForm(prev => ({ ...prev, statusCode: detail.statusCode }));
+  }, [detail]);
 
   const filteredInterns = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -90,15 +146,37 @@ export default function InternsOverviewPage() {
   const visibleInterns = filteredInterns;
   const isFiltered = Boolean(search.trim()) || groupFilter !== 'all' || levelFilter !== 'all';
 
+  async function fetchStatusHistory(internId: number) {
+    // Technický komentář: Historii načítáme přes helper, aby se dala vyvolat i po úspěšném updatu.
+    setStatusHistoryLoading(true);
+    setStatusHistoryError(null);
+    try {
+      const history = await getInternStatusHistory(internId);
+      setStatusHistory(history);
+    } catch (error) {
+      setStatusHistory([]);
+      setStatusHistoryError(extractErrorMessage(error));
+    } finally {
+      setStatusHistoryLoading(false);
+    }
+  }
+
   function openDetail(intern: InternOverview) {
     setSelected(intern);
     setDetail(null);
     setDetailError(null);
     setDetailLoading(true);
+    setStatusForm({ statusCode: intern.statusCode, validFrom: '' });
+    setStatusSubmitError(null);
+    setStatusSubmitSuccess(null);
+    setStatusHistory([]);
+    setStatusHistoryError(null);
     getInternOverviewDetail(intern.id)
       .then(data => setDetail(data))
       .catch(err => setDetailError(extractErrorMessage(err)))
       .finally(() => setDetailLoading(false));
+    // Technický komentář: Historii taháme paralelně, aby se modal načetl rychleji.
+    fetchStatusHistory(intern.id);
   }
 
   function closeModal() {
@@ -106,6 +184,72 @@ export default function InternsOverviewPage() {
     setSelected(null);
     setDetail(null);
     setDetailError(null);
+    setStatusForm({ statusCode: '', validFrom: '' });
+    setStatusSubmitError(null);
+    setStatusSubmitSuccess(null);
+    setStatusHistory([]);
+    setStatusHistoryError(null);
+    setStatusHistoryLoading(false);
+  }
+
+  async function handleStatusSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    setStatusSubmitError(null);
+    setStatusSubmitSuccess(null);
+    if (!statusForm.statusCode) {
+      setStatusSubmitError('Vyberte prosím status stážisty.');
+      return;
+    }
+
+    const payload = {
+      statusCode: statusForm.statusCode,
+      validFrom: statusForm.validFrom.trim() ? statusForm.validFrom : undefined,
+    };
+
+    setStatusSubmitting(true);
+    try {
+      const updated = await updateInternStatus(selected.id, payload);
+      // Technický komentář: Po úspěchu hydratujeme lokální seznam i detail, aby FE nemusel čekat na refetch.
+      setInterns(prev =>
+        prev.map(intern =>
+          intern.id === updated.id
+            ? {
+                ...intern,
+                statusCode: updated.statusCode,
+                statusLabel: updated.statusLabel,
+                statusSeverity: updated.statusSeverity,
+              }
+            : intern,
+        ),
+      );
+      setSelected(prev =>
+        prev
+          ? {
+              ...prev,
+              statusCode: updated.statusCode,
+              statusLabel: updated.statusLabel,
+              statusSeverity: updated.statusSeverity,
+            }
+          : prev,
+      );
+      setDetail(prev =>
+        prev
+          ? {
+              ...prev,
+              statusCode: updated.statusCode,
+              statusLabel: updated.statusLabel,
+              statusSeverity: updated.statusSeverity,
+            }
+          : prev,
+      );
+      setStatusSubmitSuccess('Status byl úspěšně aktualizován.');
+      await fetchStatusHistory(updated.id);
+    } catch (error) {
+      setStatusSubmitError(extractErrorMessage(error));
+    } finally {
+      setStatusSubmitting(false);
+    }
   }
 
   let content: ReactNode = null;
@@ -247,6 +391,82 @@ export default function InternsOverviewPage() {
                 <dd>{formatHours(detail.totalHours)}</dd>
               </div>
             </dl>
+            <section className="internsOverview__statusSection" aria-label="Správa statusu stážisty">
+              <h3>Stav stážisty</h3>
+              <div className="internsOverview__statusCurrent">
+                <span className={`internsOverview__statusBadge ${resolveStatusModifier(detail.statusSeverity)}`}>
+                  {detail.statusLabel}
+                </span>
+                <span className="internsOverview__statusCode">{detail.statusCode}</span>
+              </div>
+              {statusOptionsLoading ? (
+                <p className="internsOverview__statusLoading">Načítám seznam statusů…</p>
+              ) : statusOptionsError ? (
+                <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusOptionsError}</p>
+              ) : null}
+              <form className="internsOverview__statusForm" onSubmit={handleStatusSubmit}>
+                <label className="internsOverview__statusField">
+                  <span>Nový status</span>
+                  <select
+                    value={statusForm.statusCode}
+                    onChange={event => setStatusForm(prev => ({ ...prev, statusCode: event.target.value }))}
+                    disabled={statusSubmitting || statusOptionsLoading || Boolean(statusOptionsError)}
+                  >
+                    <option value="">Vyberte stav…</option>
+                    {statusOptions.map(option => (
+                      <option key={option.code} value={option.code}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="internsOverview__statusField">
+                  <span>Platné od (prázdné = dnešní datum)</span>
+                  <input
+                    type="date"
+                    value={statusForm.validFrom}
+                    onChange={event => setStatusForm(prev => ({ ...prev, validFrom: event.target.value }))}
+                    disabled={statusSubmitting}
+                  />
+                </label>
+                {statusSubmitError && (
+                  <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusSubmitError}</p>
+                )}
+                {statusSubmitSuccess && (
+                  <p className="internsOverview__statusMessage internsOverview__statusMessage--success">{statusSubmitSuccess}</p>
+                )}
+                <button
+                  type="submit"
+                  className="internsOverview__statusSubmit"
+                  disabled={statusSubmitting || !statusForm.statusCode || Boolean(statusOptionsError)}
+                >
+                  {statusSubmitting ? 'Ukládám…' : 'Aktualizovat status'}
+                </button>
+              </form>
+              <div className="internsOverview__statusHistory" aria-live="polite">
+                <h4>Historie stavů</h4>
+                {statusHistoryLoading ? (
+                  <p className="internsOverview__statusLoading">Načítám historii…</p>
+                ) : statusHistoryError ? (
+                  <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusHistoryError}</p>
+                ) : statusHistory.length === 0 ? (
+                  <p className="internsOverview__statusEmpty">Zatím nejsou evidované žádné změny.</p>
+                ) : (
+                  <ul>
+                    {statusHistory.map(entry => (
+                      <li key={entry.id}>
+                        <span
+                          className={`internsOverview__statusBadge ${resolveStatusModifier(entry.statusSeverity)}`}
+                        >
+                          {entry.statusLabel}
+                        </span>
+                        <span className="internsOverview__statusRange">{formatHistoryRange(entry)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
             <section aria-label="Přidělené projekty">
               <h3>Projekty a úvazky</h3>
               {detail.projects.length === 0 ? (

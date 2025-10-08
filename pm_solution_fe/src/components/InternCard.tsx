@@ -1,6 +1,13 @@
 import './InternCard.css';
 import type { InternOverview } from '../api';
 
+function resolveStatusClass(severity: number): string {
+  // Technický komentář: Severity mapujeme na CSS modifier, aby byla barva konzistentní napříč kartou i detailem.
+  if (severity >= 30) return 'internCard__status--critical';
+  if (severity >= 20) return 'internCard__status--warning';
+  return 'internCard__status--ok';
+}
+
 type InternCardProps = {
   intern: InternOverview;
   onOpenDetail: (intern: InternOverview) => void;
@@ -20,6 +27,10 @@ export default function InternCard({ intern, onOpenDetail }: InternCardProps) {
           {intern.firstName} {intern.lastName}
         </h3>
         <span className="internCard__username">@{intern.username}</span>
+      </div>
+      <div className={`internCard__status ${resolveStatusClass(intern.statusSeverity)}`}>
+        {/* Technický komentář: Zobrazujeme aktuální status přímo v kartě pro rychlou orientaci v kapacitách. */}
+        {intern.statusLabel}
       </div>
       <dl className="internCard__meta">
         <div className="internCard__metaItem">

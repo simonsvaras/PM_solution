@@ -234,6 +234,9 @@ export type InternDTO = {
   username: string;
   level_id: number;
   level_label: string;
+  status_code: string;
+  status_label: string;
+  status_severity: number;
   groups: InternGroupDTO[];
 };
 export type InternListResponseDTO = {
@@ -245,7 +248,18 @@ export type InternListResponseDTO = {
 };
 
 export type InternGroup = { id: number; code: number; label: string };
-export type Intern = { id: number; firstName: string; lastName: string; username: string; levelId: number; levelLabel: string; groups: InternGroup[] };
+export type Intern = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  levelId: number;
+  levelLabel: string;
+  statusCode: string;
+  statusLabel: string;
+  statusSeverity: number;
+  groups: InternGroup[];
+};
 export type InternListResult = { content: Intern[]; page: number; size: number; totalElements: number; totalPages: number };
 export type InternLevelHistoryEntryDTO = {
   id: number;
@@ -268,6 +282,9 @@ export type InternOverviewDTO = {
   username: string;
   level_id: number;
   level_label: string;
+  status_code: string;
+  status_label: string;
+  status_severity: number;
   groups: InternGroupDTO[];
   total_hours: number | string;
 };
@@ -278,6 +295,9 @@ export type InternOverview = {
   username: string;
   levelId: number;
   levelLabel: string;
+  statusCode: string;
+  statusLabel: string;
+  statusSeverity: number;
   groups: InternGroup[];
   totalHours: number;
 };
@@ -295,6 +315,26 @@ export type InternProjectAllocation = {
 };
 export type InternDetailDTO = InternOverviewDTO & { projects: InternProjectAllocationDTO[] };
 export type InternDetail = InternOverview & { projects: InternProjectAllocation[] };
+
+export type InternStatusOptionDTO = { code: string; label: string; severity: number };
+export type InternStatusOption = { code: string; label: string; severity: number };
+export type InternStatusHistoryEntryDTO = {
+  id: number;
+  status_code: string;
+  status_label: string;
+  status_severity: number;
+  valid_from: string;
+  valid_to: string | null;
+};
+export type InternStatusHistoryEntry = {
+  id: number;
+  statusCode: string;
+  statusLabel: string;
+  statusSeverity: number;
+  validFrom: string;
+  validTo: string | null;
+};
+export type UpdateInternStatusPayload = { statusCode: string; validFrom?: string | null };
 
 export type InternMonthlyHoursRowDTO = {
   internId: number;
@@ -433,6 +473,7 @@ export type ProjectReportDetailParams = {
 
 function mapIntern(dto: InternDTO): Intern {
   const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
+  // Technický komentář: Statusové pole mapujeme přímo z DTO, aby FE vždy pracoval s aktuální kombinací kódu, labelu a severity.
   return {
     id: dto.id,
     firstName: dto.first_name,
@@ -440,6 +481,9 @@ function mapIntern(dto: InternDTO): Intern {
     username: dto.username,
     levelId: dto.level_id,
     levelLabel: dto.level_label,
+    statusCode: dto.status_code,
+    statusLabel: dto.status_label,
+    statusSeverity: dto.status_severity,
     groups,
   };
 }
@@ -469,6 +513,7 @@ function parseNumber(value: number | string | null | undefined): number {
 function mapInternOverview(dto: InternOverviewDTO): InternOverview {
   const groups = (dto.groups ?? []).map(g => ({ id: g.id, code: g.code, label: g.label }));
   const totalHoursRaw = parseNumber(dto.total_hours);
+  // Technický komentář: Přenášíme status i do přehledu, aby se badge a formuláře v modalu propsaly bez dalších dotazů.
   return {
     id: dto.id,
     firstName: dto.first_name,
@@ -476,6 +521,9 @@ function mapInternOverview(dto: InternOverviewDTO): InternOverview {
     username: dto.username,
     levelId: dto.level_id,
     levelLabel: dto.level_label,
+    statusCode: dto.status_code,
+    statusLabel: dto.status_label,
+    statusSeverity: dto.status_severity,
     groups,
     totalHours: Number.isNaN(totalHoursRaw) ? 0 : totalHoursRaw,
   };
@@ -519,6 +567,18 @@ function mapInternDetail(dto: InternDetailDTO): InternDetail {
   return {
     ...overview,
     projects: (dto.projects ?? []).map(mapInternProjectAllocation),
+  };
+}
+
+function mapInternStatusHistoryEntry(dto: InternStatusHistoryEntryDTO): InternStatusHistoryEntry {
+  // Technický komentář: Historii vracíme již ve formátu vhodném pro UI (camelCase + zachovaný rozsah platnosti).
+  return {
+    id: dto.id,
+    statusCode: dto.status_code,
+    statusLabel: dto.status_label,
+    statusSeverity: dto.status_severity,
+    validFrom: dto.valid_from,
+    validTo: dto.valid_to,
   };
 }
 
@@ -1113,6 +1173,48 @@ export async function getInternOverviewDetail(id: number): Promise<InternDetail>
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<InternDetailDTO>(res);
   return mapInternDetail(data);
+}
+
+/**
+ * Načte dostupné statusy stážistů pro formulářové ovladače.
+ */
+export async function listInternStatuses(): Promise<InternStatusOption[]> {
+  const res = await fetch(`${API_BASE}/api/intern-statuses`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternStatusOptionDTO[]>(res);
+  // Technický komentář: Katalog statusů není třeba transformovat, pouze zachováváme pořadí dle závažnosti.
+  return data.map(item => ({ code: item.code, label: item.label, severity: item.severity }));
+}
+
+/**
+ * Vrací chronologickou historii statusů pro konkrétního stážistu.
+ */
+export async function getInternStatusHistory(id: number): Promise<InternStatusHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/api/interns/${id}/status/history`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternStatusHistoryEntryDTO[]>(res);
+  return data.map(mapInternStatusHistoryEntry);
+}
+
+/**
+ * Odesílá změnu statusu daného stážisty a vrací aktualizovaný objekt.
+ */
+export async function updateInternStatus(
+  id: number,
+  payload: UpdateInternStatusPayload,
+): Promise<Intern> {
+  const body = {
+    status_code: payload.statusCode,
+    valid_from: payload.validFrom ?? null,
+  };
+  const res = await fetch(`${API_BASE}/api/interns/${id}/status`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternDTO>(res);
+  return mapIntern(data);
 }
 
 /**

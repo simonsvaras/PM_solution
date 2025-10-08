@@ -169,6 +169,162 @@
   color: #1f2937;
 }
 
+/* Technický komentář: Statusový box kombinuje badge, formulář a historii, proto používáme grid-like layout s mezerami. */
+.internsOverview__statusSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.internsOverview__statusSection h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.internsOverview__statusHistory h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.internsOverview__statusCurrent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.internsOverview__statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.internsOverview__statusBadge--ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+.internsOverview__statusBadge--warning {
+  background: rgba(251, 191, 36, 0.2);
+  color: #92400e;
+}
+
+.internsOverview__statusBadge--critical {
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
+}
+
+.internsOverview__statusCode {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.internsOverview__statusForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.internsOverview__statusField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.internsOverview__statusField span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.internsOverview__statusField select,
+.internsOverview__statusField input[type='date'] {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.internsOverview__statusSubmit {
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.internsOverview__statusSubmit:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.internsOverview__statusMessage {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.internsOverview__statusMessage--error {
+  color: #b91c1c;
+}
+
+.internsOverview__statusMessage--success {
+  color: #047857;
+}
+
+.internsOverview__statusLoading,
+.internsOverview__statusEmpty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.internsOverview__statusHistory ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.internsOverview__statusHistory li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.internsOverview__statusRange {
+  font-size: 0.85rem;
+  color: #374151;
+}
+
 .internsOverview__modalError {
   border: 1px solid #fca5a5;
   background: #fee2e2;
