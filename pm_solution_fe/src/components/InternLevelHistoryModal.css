@@ -8,6 +8,11 @@
   gap: 1rem;
 }
 
+.intern-level-history__toolbar {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .intern-level-history__form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

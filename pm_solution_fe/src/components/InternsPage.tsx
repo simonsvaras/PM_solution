@@ -66,12 +66,6 @@ function validateForm(form: FormState, history: LevelHistoryDraft[]): { valid: b
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-function buildDefaultHistory(levels: LevelOption[]): LevelHistoryDraft[] {
-  if (!levels.length) return [];
-  const today = new Date().toISOString().slice(0, 10);
-  return [{ levelId: levels[0].id, validFrom: today, validTo: null }];
-}
-
 /**
  * Top-level page component. Handles state and orchestrates API calls for the intern module.
  */
@@ -145,12 +139,6 @@ export default function InternsPage() {
     void loadReferences();
   }, [loadReferences]);
 
-  useEffect(() => {
-    if (mode === 'create' && modalOpen && levelHistory.length === 0 && levels.length > 0) {
-      setLevelHistory(buildDefaultHistory(levels));
-    }
-  }, [levels, mode, modalOpen, levelHistory.length]);
-
   const loadInterns = useCallback(async (targetPage: number, targetSearch: string) => {
     setLoading(true);
     setError(null);
@@ -189,7 +177,7 @@ export default function InternsPage() {
     setFormErrors({});
     setSubmitError(null);
     setActiveIntern(null);
-    setLevelHistory(buildDefaultHistory(levels));
+    setLevelHistory([]);
     setLevelHistoryError(null);
     setLevelHistoryLoading(false);
     setLevelHistoryModalOpen(false);

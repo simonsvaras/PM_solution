@@ -30,12 +30,14 @@ export default function InternLevelHistoryModal({
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isFormVisible, setFormVisible] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setForm(emptyForm);
       setEditingIndex(null);
       setLocalError(null);
+      setFormVisible(false);
       return;
     }
     if (levels.length > 0) {
@@ -58,10 +60,34 @@ export default function InternLevelHistoryModal({
   );
   const display = useMemo(() => [...sorted].reverse(), [sorted]);
 
-  function resetForm() {
-    setForm(prev => ({ levelId: levels[0]?.id ?? prev.levelId ?? null, validFrom: '', validTo: '' }));
+  function resetForm(keepVisible = false) {
+    setForm({ levelId: levels[0]?.id ?? null, validFrom: '', validTo: '' });
     setEditingIndex(null);
     setLocalError(null);
+    if (!keepVisible) {
+      setFormVisible(false);
+    }
+  }
+
+  function computeNextValidFrom(): string {
+    if (sorted.length === 0) return '';
+    const last = sorted[sorted.length - 1];
+    if (!last.validTo) return '';
+    const reference = new Date(last.validTo);
+    if (Number.isNaN(reference.getTime())) {
+      return last.validTo;
+    }
+    reference.setDate(reference.getDate() + 1);
+    return reference.toISOString().slice(0, 10);
+  }
+
+  function startAdd() {
+    const defaultLevelId = form.levelId ?? levels[0]?.id ?? null;
+    const defaultFrom = computeNextValidFrom();
+    setForm({ levelId: defaultLevelId, validFrom: defaultFrom, validTo: '' });
+    setEditingIndex(null);
+    setLocalError(null);
+    setFormVisible(true);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -92,6 +118,7 @@ export default function InternLevelHistoryModal({
       validTo: entry.validTo ?? '',
     });
     setLocalError(null);
+    setFormVisible(true);
   }
 
   function handleDelete(displayIndex: number) {
@@ -112,7 +139,7 @@ export default function InternLevelHistoryModal({
     resetForm();
   }
 
-  function handleCancelEdit() {
+  function handleCancel() {
     resetForm();
   }
 
@@ -131,53 +158,65 @@ export default function InternLevelHistoryModal({
         {!loading && error && <div className="errorText">{error.error.message}</div>}
         {!loading && !error && (
           <>
-            <form className="intern-level-history__form" onSubmit={handleSubmit}>
-              <div className="field">
-                <label htmlFor="history-level">Úroveň</label>
-                <select
-                  id="history-level"
-                  value={form.levelId ?? ''}
-                  onChange={e => setForm(current => ({ ...current, levelId: e.target.value ? Number(e.target.value) : null }))}
+            <div className="intern-level-history__toolbar">
+              {!isFormVisible && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={startAdd}
                   disabled={levels.length === 0}
                 >
-                  {levels.length === 0 && <option value="">Žádné úrovně</option>}
-                  {levels.map(level => (
-                    <option key={level.id} value={level.id}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="history-from">Datum od</label>
-                <input
-                  id="history-from"
-                  type="date"
-                  value={form.validFrom}
-                  onChange={e => setForm(current => ({ ...current, validFrom: e.target.value }))}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="history-to">Datum do</label>
-                <input
-                  id="history-to"
-                  type="date"
-                  value={form.validTo}
-                  onChange={e => setForm(current => ({ ...current, validTo: e.target.value }))}
-                />
-                <span className="hint">Prázdné = aktuální úroveň</span>
-              </div>
-              <div className="field buttons">
-                <button type="submit" className="btn btn-primary">
-                  {editingIndex !== null ? 'Uložit změny' : 'Přidat období'}
+                  Přidat období
                 </button>
-                {editingIndex !== null && (
-                  <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>
-                    Zrušit úpravu
+              )}
+            </div>
+            {isFormVisible && (
+              <form className="intern-level-history__form" onSubmit={handleSubmit}>
+                <div className="field">
+                  <label htmlFor="history-level">Úroveň</label>
+                  <select
+                    id="history-level"
+                    value={form.levelId ?? ''}
+                    onChange={e => setForm(current => ({ ...current, levelId: e.target.value ? Number(e.target.value) : null }))}
+                    disabled={levels.length === 0}
+                  >
+                    {levels.length === 0 && <option value="">Žádné úrovně</option>}
+                    {levels.map(level => (
+                      <option key={level.id} value={level.id}>
+                        {level.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="history-from">Datum od</label>
+                  <input
+                    id="history-from"
+                    type="date"
+                    value={form.validFrom}
+                    onChange={e => setForm(current => ({ ...current, validFrom: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="history-to">Datum do</label>
+                  <input
+                    id="history-to"
+                    type="date"
+                    value={form.validTo}
+                    onChange={e => setForm(current => ({ ...current, validTo: e.target.value }))}
+                  />
+                  <span className="hint">Prázdné = aktuální úroveň</span>
+                </div>
+                <div className="field buttons">
+                  <button type="submit" className="btn btn-primary">
+                    {editingIndex !== null ? 'Uložit změny' : 'Přidat období'}
                   </button>
-                )}
-              </div>
-            </form>
+                  <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+                    {editingIndex !== null ? 'Zrušit úpravu' : 'Zrušit'}
+                  </button>
+                </div>
+              </form>
+            )}
             {localError && <div className="errorText">{localError}</div>}
             <div className="intern-level-history__list">
               {display.length === 0 && <div className="notice">Zatím není nastavena žádná historie.</div>}
