@@ -31,6 +31,7 @@ export default function InternLevelHistoryModal({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isFormVisible, setFormVisible] = useState(false);
+  const [lockedValidFrom, setLockedValidFrom] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -38,6 +39,7 @@ export default function InternLevelHistoryModal({
       setEditingIndex(null);
       setLocalError(null);
       setFormVisible(false);
+      setLockedValidFrom(null);
       return;
     }
     if (levels.length > 0) {
@@ -64,6 +66,7 @@ export default function InternLevelHistoryModal({
     setForm({ levelId: levels[0]?.id ?? null, validFrom: '', validTo: '' });
     setEditingIndex(null);
     setLocalError(null);
+    setLockedValidFrom(null);
     if (!keepVisible) {
       setFormVisible(false);
     }
@@ -87,6 +90,7 @@ export default function InternLevelHistoryModal({
     setForm({ levelId: defaultLevelId, validFrom: defaultFrom, validTo: '' });
     setEditingIndex(null);
     setLocalError(null);
+    setLockedValidFrom(sorted.length > 0 && defaultFrom ? defaultFrom : null);
     setFormVisible(true);
   }
 
@@ -99,7 +103,7 @@ export default function InternLevelHistoryModal({
       validTo: form.validTo ? form.validTo : null,
     };
     const base = editingIndex !== null ? sorted.map((item, idx) => (idx === editingIndex ? nextEntry : item)) : [...sorted, nextEntry];
-    const { error: validationError, sorted: normalized } = normalizeLevelHistoryDraft(base);
+    const { error: validationError, sorted: normalized } = normalizeLevelHistoryDraft(base, { requireOpenLevel: false });
     if (validationError) {
       setLocalError(validationError);
       return;
@@ -118,6 +122,7 @@ export default function InternLevelHistoryModal({
       validTo: entry.validTo ?? '',
     });
     setLocalError(null);
+    setLockedValidFrom(null);
     setFormVisible(true);
   }
 
@@ -130,7 +135,7 @@ export default function InternLevelHistoryModal({
       resetForm();
       return;
     }
-    const { error: validationError, sorted: normalized } = normalizeLevelHistoryDraft(next);
+    const { error: validationError, sorted: normalized } = normalizeLevelHistoryDraft(next, { requireOpenLevel: false });
     if (validationError) {
       setLocalError(validationError);
       return;
@@ -143,16 +148,30 @@ export default function InternLevelHistoryModal({
     resetForm();
   }
 
+  function handleDone() {
+    if (loading) return;
+    if (value.length === 0) {
+      onClose();
+      return;
+    }
+    const { error: validationError } = normalizeLevelHistoryDraft(value);
+    if (validationError) {
+      setLocalError(validationError);
+      return;
+    }
+    onClose();
+  }
+
   const footer = (
     <div className="intern-level-history__footer">
-      <button type="button" className="btn btn-secondary" onClick={onClose}>
+      <button type="button" className="btn btn-secondary" onClick={handleDone}>
         Hotovo
       </button>
     </div>
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Historie úrovní" footer={footer} className="intern-level-history-modal">
+    <Modal isOpen={isOpen} onClose={handleDone} title="Historie úrovní" footer={footer} className="intern-level-history-modal">
       <div className="intern-level-history">
         {loading && <div className="notice">Načítání historie…</div>}
         {!loading && error && <div className="errorText">{error.error.message}</div>}
@@ -190,12 +209,18 @@ export default function InternLevelHistoryModal({
                 </div>
                 <div className="field">
                   <label htmlFor="history-from">Datum od</label>
-                  <input
-                    id="history-from"
-                    type="date"
-                    value={form.validFrom}
-                    onChange={e => setForm(current => ({ ...current, validFrom: e.target.value }))}
-                  />
+                  {lockedValidFrom ? (
+                    <div className="intern-level-history__value" id="history-from">
+                      {lockedValidFrom}
+                    </div>
+                  ) : (
+                    <input
+                      id="history-from"
+                      type="date"
+                      value={form.validFrom}
+                      onChange={e => setForm(current => ({ ...current, validFrom: e.target.value }))}
+                    />
+                  )}
                 </div>
                 <div className="field">
                   <label htmlFor="history-to">Datum do</label>

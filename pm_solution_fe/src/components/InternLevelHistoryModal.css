@@ -26,6 +26,16 @@
   gap: 0.25rem;
 }
 
+.intern-level-history__value {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f7f7f7;
+  min-height: 2.5rem;
+  display: flex;
+  align-items: center;
+}
+
 .intern-level-history__form .field.buttons {
   display: flex;
   flex-direction: row;

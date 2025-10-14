@@ -4,7 +4,14 @@ export type LevelHistoryDraft = {
   validTo: string | null;
 };
 
-export function normalizeLevelHistoryDraft(entries: LevelHistoryDraft[]): { error: string | null; sorted: LevelHistoryDraft[] } {
+type NormalizeOptions = {
+  requireOpenLevel?: boolean;
+};
+
+export function normalizeLevelHistoryDraft(
+  entries: LevelHistoryDraft[],
+  { requireOpenLevel = true }: NormalizeOptions = {},
+): { error: string | null; sorted: LevelHistoryDraft[] } {
   if (!entries || entries.length === 0) {
     return { error: 'Přidejte alespoň jednu úroveň.', sorted: [] };
   }
@@ -47,10 +54,14 @@ export function normalizeLevelHistoryDraft(entries: LevelHistoryDraft[]): { erro
       }
     }
   }
-  if (openIndex === -1) {
-    return { error: 'Jedna úroveň musí být aktuálně otevřená.', sorted: [] };
-  }
-  if (openIndex !== sorted.length - 1) {
+  if (requireOpenLevel) {
+    if (openIndex === -1) {
+      return { error: 'Jedna úroveň musí být aktuálně otevřená.', sorted: [] };
+    }
+    if (openIndex !== sorted.length - 1) {
+      return { error: 'Aktuální úroveň musí být poslední v pořadí.', sorted: [] };
+    }
+  } else if (openIndex !== -1 && openIndex !== sorted.length - 1) {
     return { error: 'Aktuální úroveň musí být poslední v pořadí.', sorted: [] };
   }
   return { error: null, sorted };
