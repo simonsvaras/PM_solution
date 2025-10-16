@@ -1496,20 +1496,20 @@ public class SyncDao {
                     JOIN project p ON p.id = ptr.project_id
                     GROUP BY ptr.repository_id
                 )
-                UPDATE report
+                UPDATE report r
                 SET cost = CASE
                         WHEN COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) IS NULL THEN NULL
-                        ELSE ROUND(COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) * report.time_spent_hours, 2)
+                        ELSE ROUND(COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) * r.time_spent_hours, 2)
                     END,
                     hourly_rate_czk = l.hourly_rate_czk
                 FROM intern i
                 JOIN intern_level_history h ON h.intern_id = i.id
                 JOIN level l ON l.id = h.level_id
-                LEFT JOIN project_rate ON project_rate.repository_id = report.repository_id
+                LEFT JOIN project_rate ON project_rate.repository_id = r.repository_id
                 WHERE i.id = ?
-                  AND report.username = i.username
-                  AND report.spent_at::date >= h.valid_from
-                  AND (h.valid_to IS NULL OR report.spent_at::date <= h.valid_to)
+                  AND r.username = i.username
+                  AND r.spent_at::date >= h.valid_from
+                  AND (h.valid_to IS NULL OR r.spent_at::date <= h.valid_to)
                 """;
         return jdbc.update(sql, internId);
     }
