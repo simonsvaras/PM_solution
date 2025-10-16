@@ -210,6 +210,13 @@ public class InternDao {
     /**
      * Inserts a new intern and returns the stored row.
      */
+    public InternRow insert(String firstName, String lastName, String username, long levelId) {
+        return insert(firstName, lastName, username, levelId, "VOLNE_CAPACITY");
+    }
+
+    /**
+     * Inserts a new intern and returns the stored row.
+     */
     public InternRow insert(String firstName, String lastName, String username, long levelId, String statusCode) {
         InternRow inserted = jdbc.queryForObject(
                 """

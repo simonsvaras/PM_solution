@@ -2,6 +2,7 @@ package czm.pm_solution_be.intern;
 
 import czm.pm_solution_be.sync.SyncDao;
 import czm.pm_solution_be.sync.SyncDao.InternMonthlyHoursRow;
+import czm.pm_solution_be.sync.SyncDao.InternPerformanceRow;
 import czm.pm_solution_be.sync.SyncDao.ReportRow;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assumptions;
@@ -166,6 +167,35 @@ class InternMonthlyHoursIntegrationTest {
                         assertThat(row.levelCode()).isEqualTo("junior");
                         assertThat(row.levelLabel()).isEqualTo("Level junior");
                     });
+
+            OffsetDateTime performanceFrom = OffsetDateTime.parse("2024-02-05T00:00:00Z");
+            OffsetDateTime performanceTo = OffsetDateTime.parse("2024-03-18T00:00:00Z");
+            List<InternPerformanceRow> performanceRows = syncDao.listInternPerformance(
+                    performanceFrom,
+                    performanceTo,
+                    "week",
+                    List.of(juniorIntern.id(), employeeIntern.id(), idleIntern.id()),
+                    List.of());
+
+            assertThat(performanceRows).hasSize(18);
+
+            Map<Long, Map<LocalDate, BigDecimal>> weeklyHours = performanceRows.stream()
+                    .collect(Collectors.groupingBy(
+                            InternPerformanceRow::internId,
+                            Collectors.toMap(row -> row.periodStart().toLocalDate(), InternPerformanceRow::hours)));
+
+            Map<LocalDate, BigDecimal> juniorWeeks = weeklyHours.get(juniorIntern.id());
+            assertThat(juniorWeeks.get(LocalDate.of(2024, 2, 5))).isEqualByComparingTo(twoHours);
+            assertThat(juniorWeeks.get(LocalDate.of(2024, 2, 12))).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(juniorWeeks.get(LocalDate.of(2024, 3, 4))).isEqualByComparingTo(twoHours);
+
+            Map<LocalDate, BigDecimal> employeeWeeks = weeklyHours.get(employeeIntern.id());
+            assertThat(employeeWeeks.get(LocalDate.of(2024, 2, 12))).isEqualByComparingTo(fourHours);
+            assertThat(employeeWeeks.get(LocalDate.of(2024, 2, 5))).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(employeeWeeks.get(LocalDate.of(2024, 3, 4))).isEqualByComparingTo(BigDecimal.ZERO);
+
+            Map<LocalDate, BigDecimal> idleWeeks = weeklyHours.get(idleIntern.id());
+            assertThat(idleWeeks.values()).allSatisfy(value -> assertThat(value).isEqualByComparingTo(BigDecimal.ZERO));
         }
     }
 

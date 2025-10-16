@@ -146,6 +146,13 @@ public class SyncDao {
                                         Long levelId,
                                         String levelCode,
                                         String levelLabel) {}
+
+    public record InternPerformanceRow(Long internId,
+                                       String username,
+                                       String firstName,
+                                       String lastName,
+                                       OffsetDateTime periodStart,
+                                       BigDecimal hours) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project ORDER BY name",
                 (rs, rn) -> new ProjectRow(
@@ -1133,6 +1140,94 @@ public class SyncDao {
                 to);
     }
 
+    public List<InternPerformanceRow> listInternPerformance(OffsetDateTime from,
+                                                            OffsetDateTime to,
+                                                            String unit,
+                                                            List<Long> internIds,
+                                                            List<Long> groupIds) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        Objects.requireNonNull(unit, "unit");
+
+        String interval;
+        if ("week".equals(unit)) {
+            interval = "interval '1 week'";
+        } else if ("month".equals(unit)) {
+            interval = "interval '1 month'";
+        } else {
+            throw new IllegalArgumentException("Unsupported performance unit: " + unit);
+        }
+
+        List<Object> params = new ArrayList<>();
+        params.add(from);
+        params.add(to);
+
+        StringBuilder filterClause = new StringBuilder();
+        if (internIds != null && !internIds.isEmpty()) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(internIds.size(), "?"));
+            filterClause.append("\n              AND i.id IN (").append(placeholders).append(')');
+            params.addAll(internIds);
+        }
+        if (groupIds != null && !groupIds.isEmpty()) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(groupIds.size(), "?"));
+            filterClause.append("\n              AND i.id IN (SELECT intern_id FROM intern_group WHERE group_id IN (")
+                    .append(placeholders)
+                    .append("))");
+            params.addAll(groupIds);
+        }
+
+        String sqlTemplate = """
+                WITH period_series AS (
+                    SELECT generate_series(
+                               date_trunc('%1$s', ?::timestamptz),
+                               date_trunc('%1$s', (?::timestamptz - interval '1 second')),
+                               %2$s
+                           ) AS period_start
+                ),
+                filtered_interns AS (
+                    SELECT i.id,
+                           i.username,
+                           i.first_name,
+                           i.last_name
+                    FROM intern i
+                    WHERE 1 = 1%3$s
+                ),
+                report_periods AS (
+                    SELECT fi.id AS intern_id,
+                           date_trunc('%1$s', r.spent_at AT TIME ZONE 'UTC') AS period_start,
+                           SUM(r.time_spent_hours) AS hours
+                    FROM report r
+                    JOIN filtered_interns fi ON fi.username = r.username
+                    WHERE r.spent_at >= ?
+                      AND r.spent_at < ?
+                    GROUP BY fi.id, period_start
+                )
+                SELECT fi.id AS intern_id,
+                       fi.username,
+                       fi.first_name,
+                       fi.last_name,
+                       ps.period_start,
+                       COALESCE(rp.hours, 0) AS hours
+                FROM filtered_interns fi
+                CROSS JOIN period_series ps
+                LEFT JOIN report_periods rp ON rp.intern_id = fi.id AND rp.period_start = ps.period_start
+                ORDER BY LOWER(fi.last_name), LOWER(fi.first_name), fi.username, ps.period_start
+                """;
+
+        String sql = sqlTemplate.formatted(unit, interval, filterClause.toString());
+        params.add(from);
+        params.add(to);
+
+        return jdbc.query(sql,
+                (rs, rn) -> new InternPerformanceRow(
+                        rs.getLong("intern_id"),
+                        rs.getString("username"),
+                        rs.getString("first_name"),
+                        rs.getString("last_name"),
+                        rs.getObject("period_start", OffsetDateTime.class),
+                        rs.getBigDecimal("hours")),
+                params.toArray());
+    }
     public List<ProjectInternOpenIssueRow> listProjectInternOpenIssues(long projectId, String internUsername) {
         if (internUsername == null || internUsername.isBlank()) {
             return List.of();

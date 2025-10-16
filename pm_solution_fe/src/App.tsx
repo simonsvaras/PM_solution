@@ -11,6 +11,7 @@ import ProjectReportLongTermPage from './components/ProjectReportLongTermPage';
 import ProjectCapacityReportPage from './components/ProjectCapacityReportPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
+import InternPerformancePage from './components/InternPerformancePage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
 import SyncReportsOverviewPage from './components/SyncReportsOverviewPage';
 import PlanningResourcesPage from './components/PlanningResourcesPage';
@@ -58,6 +59,7 @@ const modules: Module[] = [
     name: 'Stážisti',
     submodules: [
       { key: 'interns-overview', name: 'Přehled stážistů' },
+      { key: 'interns-performance', name: 'Výkon stážistů' },
       { key: 'interns-admin', name: 'Správa uživatelů' },
     ],
   },
@@ -396,6 +398,7 @@ function App() {
   const isProjectsAdmin = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-admin';
   const isProjectsTeams = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-teams';
   const isInternsOverview = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-overview';
+  const isInternsPerformance = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-performance';
   const isInternsAdmin = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-admin';
   const isPlanningResources = activeModuleKey === 'planning' && activeSubmoduleKey === 'planning-resources';
   const isPlanningCurrent = activeModuleKey === 'planning' && activeSubmoduleKey === 'planning-current';
@@ -458,6 +461,8 @@ function App() {
     headerDescription = 'Získejte rychlý přehled o projektech, jejich týmech a otevřených issue.';
   } else if (isProjectsAdmin) {
     headerDescription = 'Vytvářejte a spravujte projekty v aplikaci.';
+  } else if (isInternsPerformance) {
+    headerDescription = 'Porovnejte vykázané hodiny stážistů v čase a sledujte trendy napříč obdobími.';
   } else if (isInternsAdmin) {
     headerDescription = 'Spravujte evidenci stážistů včetně registrace, úprav a mazání.';
   } else if (isPlanningCurrent) {
@@ -474,6 +479,7 @@ function App() {
     !isOnDemand &&
     !isProjectsOverview &&
     !isProjectsAdmin &&
+    !isInternsPerformance &&
     !isInternsAdmin &&
     !isPlanningCurrent &&
     !isPlanningResources &&
@@ -978,6 +984,8 @@ function App() {
             <ProjectsPage />
           ) : isInternsOverview ? (
             <InternsOverviewPage />
+          ) : isInternsPerformance ? (
+            <InternPerformancePage />
           ) : isInternsAdmin ? (
             <InternsPage />
           ) : isPlanningResources ? (

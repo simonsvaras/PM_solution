@@ -1,0 +1,258 @@
+.internPerformance {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.internPerformance__controlsCard,
+.internPerformance__chartCard {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.internPerformance__sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.internPerformance__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.internPerformance__subtitle {
+  margin: 0.25rem 0 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+  max-width: 60ch;
+}
+
+.internPerformance__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.internPerformance__fieldset {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f9fafb;
+  min-width: 0;
+}
+
+.internPerformance__fieldset legend {
+  font-weight: 600;
+  color: #1f2937;
+  padding: 0 0.25rem;
+}
+
+.internPerformance__fieldset:disabled {
+  opacity: 0.6;
+}
+
+.internPerformance__radioGroup {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  color: #1f2937;
+}
+
+.internPerformance__inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.internPerformance__inputGroup label {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.internPerformance__inputGroup input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  width: 100%;
+  max-width: 160px;
+}
+
+.internPerformance__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.internPerformance__groupActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.internPerformance__filterSummary {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.internPerformance__textButton {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.internPerformance__textButton:disabled {
+  color: #9ca3af;
+  cursor: default;
+}
+
+.internPerformance__groupList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.internPerformance__checkboxLabel {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+.internPerformance__checkboxLabel input {
+  margin-top: 0.2rem;
+}
+
+.internPerformance__checkboxLabel small {
+  display: block;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.internPerformance__internHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.internPerformance__internActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.internPerformance__searchLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.internPerformance__searchCaption {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+.internPerformance__searchLabel input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+}
+
+.internPerformance__internList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.internPerformance__placeholder {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.internPerformance__chartWrapper {
+  width: 100%;
+  min-height: 320px;
+}
+
+.internPerformance__status {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+  padding: 1rem 0;
+}
+
+.internPerformance__error {
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.internPerformance__error pre {
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.internPerformance__bucketList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.internPerformance__bucketList li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.internPerformance__bucketSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+@media (max-width: 720px) {
+  .internPerformance__sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .internPerformance__internHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

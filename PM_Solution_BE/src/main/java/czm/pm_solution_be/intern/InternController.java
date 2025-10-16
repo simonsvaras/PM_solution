@@ -71,6 +71,21 @@ public class InternController {
         return service.monthlyHours(from, to);
     }
 
+    @GetMapping("/performance")
+    @Operation(summary = "Výkon stážistů",
+            description = "Vrací porovnání odpracovaných hodin napříč týdny nebo měsíci pro vybranou množinu stážistů.")
+    public InternService.InternPerformanceResponse performance(
+            @Parameter(description = "Typ období (week nebo month)")
+            @RequestParam(value = "period", required = false, defaultValue = "week") String period,
+            @Parameter(description = "Počet období pro porovnání (2–5)")
+            @RequestParam(value = "periods", required = false, defaultValue = "2") Integer periods,
+            @Parameter(description = "Filtrovaní stážisti podle ID")
+            @RequestParam(value = "internId", required = false) List<Long> internIds,
+            @Parameter(description = "Filtrované skupiny podle ID")
+            @RequestParam(value = "groupId", required = false) List<Long> groupIds) {
+        return service.performance(period, periods, internIds, groupIds);
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Detail stážisty")
     public InternResponse get(@PathVariable long id) {

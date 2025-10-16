@@ -11,6 +11,7 @@ import czm.pm_solution_be.intern.InternLevelHistoryResponse;
 import czm.pm_solution_be.intern.InternStatusHistoryResponse;
 import czm.pm_solution_be.intern.InternStatusUpdateRequest;
 import czm.pm_solution_be.sync.SyncDao;
+import czm.pm_solution_be.sync.SyncDao.InternPerformanceRow;
 import czm.pm_solution_be.web.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,12 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -45,6 +50,8 @@ public class InternService {
     private static final int MAX_SIZE = 100;
     /** Default status used when the caller does not specify an explicit code on create. */
     private static final String DEFAULT_STATUS_CODE = "VOLNE_CAPACITY";
+    private static final Locale LOCALE_CS = Locale.forLanguageTag("cs-CZ");
+    private static final DateTimeFormatter PERIOD_LABEL_FORMAT = DateTimeFormatter.ofPattern("d. M. yyyy", LOCALE_CS);
 
     private final InternDao dao;
     private final SyncDao syncDao;
@@ -197,6 +204,70 @@ public class InternService {
                             row.levelLabel());
                 })
                 .toList();
+    }
+
+    /**
+     * Aggregates the worked hours per intern across recent week or month buckets for performance comparison.
+     */
+    public InternPerformanceResponse performance(String periodParam,
+                                                 Integer periodsParam,
+                                                 List<Long> internIds,
+                                                 List<Long> groupIds) {
+        PerformancePeriod period = PerformancePeriod.fromParameter(periodParam);
+        int periods = periodsParam != null ? periodsParam : 2;
+        if (periods < 2 || periods > 5) {
+            throw ApiException.validation("Počet období musí být v rozmezí 2 až 5.", "performance_periods_invalid");
+        }
+
+        List<Long> sanitizedInternIds = sanitizeInternIds(internIds);
+        List<Long> sanitizedGroupIds = sanitizeGroupIds(groupIds);
+        List<PerformanceBucket> buckets = buildBuckets(period, periods);
+        if (buckets.isEmpty()) {
+            return new InternPerformanceResponse(List.of(), List.of());
+        }
+
+        Map<LocalDate, Integer> bucketIndexByStart = new HashMap<>();
+        for (PerformanceBucket bucket : buckets) {
+            bucketIndexByStart.put(bucket.from(), bucket.index());
+        }
+
+        OffsetDateTime from = buckets.get(0).from().atStartOfDay().atOffset(ZoneOffset.UTC);
+        LocalDate lastStart = buckets.get(buckets.size() - 1).from();
+        OffsetDateTime to = period.nextStart(lastStart).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        List<InternPerformanceRow> rows = syncDao.listInternPerformance(
+                from,
+                to,
+                period.sqlUnit(),
+                sanitizedInternIds,
+                sanitizedGroupIds);
+
+        Map<Long, InternPerformanceAccumulator> accumulatorMap = new LinkedHashMap<>();
+        for (InternPerformanceRow row : rows) {
+            if (row.periodStart() == null) {
+                continue;
+            }
+            LocalDate bucketStart = row.periodStart().toLocalDate();
+            Integer bucketIndex = bucketIndexByStart.get(bucketStart);
+            if (bucketIndex == null) {
+                continue;
+            }
+            InternPerformanceAccumulator accumulator = accumulatorMap.computeIfAbsent(
+                    row.internId(),
+                    id -> new InternPerformanceAccumulator(
+                            row.internId(),
+                            row.username(),
+                            row.firstName(),
+                            row.lastName(),
+                            buckets.size()));
+            accumulator.setHours(bucketIndex, row.hours());
+        }
+
+        List<InternPerformanceIntern> internRows = accumulatorMap.values().stream()
+                .map(InternPerformanceAccumulator::toResponse)
+                .toList();
+
+        return new InternPerformanceResponse(buckets, internRows);
     }
 
     /**
@@ -484,6 +555,45 @@ public class InternService {
         return new ArrayList<>(unique);
     }
 
+    private List<Long> sanitizeInternIds(List<Long> source) {
+        if (source == null || source.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> unique = new LinkedHashSet<>();
+        for (Long id : source) {
+            if (id == null) {
+                throw ApiException.validation("ID stážisty nesmí být prázdné.", "intern_id_null");
+            }
+            if (id <= 0) {
+                throw ApiException.validation("ID stážisty musí být kladné.", "intern_id_invalid");
+            }
+            unique.add(id);
+        }
+        return new ArrayList<>(unique);
+    }
+
+    private List<PerformanceBucket> buildBuckets(PerformancePeriod period, int count) {
+        if (count <= 0) {
+            return List.of();
+        }
+        LocalDate today = LocalDate.now();
+        LocalDate anchor = period.alignStart(today);
+        LocalDate firstStart = period.addPeriods(anchor, -(count - 1));
+        List<PerformanceBucket> buckets = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            LocalDate start = period.addPeriods(firstStart, index);
+            LocalDate nextStart = period.addPeriods(start, 1);
+            LocalDate endInclusive = nextStart.minusDays(1);
+            String label = formatPeriodLabel(start, endInclusive);
+            buckets.add(new PerformanceBucket(index, start, endInclusive, label));
+        }
+        return List.copyOf(buckets);
+    }
+
+    private String formatPeriodLabel(LocalDate from, LocalDate to) {
+        return PERIOD_LABEL_FORMAT.format(from) + " – " + PERIOD_LABEL_FORMAT.format(to);
+    }
+
     private String normalizeName(String value, boolean firstName) {
         if (value == null) {
             if (firstName) {
@@ -690,6 +800,102 @@ public class InternService {
                 groupResponses,
                 hours);
     }
+
+    private enum PerformancePeriod {
+        WEEK("week") {
+            @Override
+            LocalDate alignStart(LocalDate date) {
+                return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            }
+
+            @Override
+            LocalDate addPeriods(LocalDate date, int amount) {
+                return date.plusWeeks(amount);
+            }
+        },
+        MONTH("month") {
+            @Override
+            LocalDate alignStart(LocalDate date) {
+                return date.withDayOfMonth(1);
+            }
+
+            @Override
+            LocalDate addPeriods(LocalDate date, int amount) {
+                return date.plusMonths(amount);
+            }
+        };
+
+        private final String sqlUnit;
+
+        PerformancePeriod(String sqlUnit) {
+            this.sqlUnit = sqlUnit;
+        }
+
+        String sqlUnit() {
+            return sqlUnit;
+        }
+
+        abstract LocalDate alignStart(LocalDate date);
+
+        abstract LocalDate addPeriods(LocalDate date, int amount);
+
+        LocalDate nextStart(LocalDate date) {
+            return addPeriods(date, 1);
+        }
+
+        static PerformancePeriod fromParameter(String value) {
+            if (value == null || value.isBlank()) {
+                return WEEK;
+            }
+            return switch (value.toLowerCase(Locale.ROOT)) {
+                case "week", "weeks" -> WEEK;
+                case "month", "months" -> MONTH;
+                default -> throw ApiException.validation("Parametr period má neplatnou hodnotu.", "performance_period_invalid");
+            };
+        }
+    }
+
+    private static class InternPerformanceAccumulator {
+        private final long internId;
+        private final String username;
+        private final String firstName;
+        private final String lastName;
+        private final BigDecimal[] hours;
+
+        InternPerformanceAccumulator(long internId, String username, String firstName, String lastName, int bucketCount) {
+            this.internId = internId;
+            this.username = username;
+            this.firstName = firstName;
+            this.lastName = lastName;
+            this.hours = new BigDecimal[bucketCount];
+            for (int i = 0; i < bucketCount; i++) {
+                this.hours[i] = BigDecimal.ZERO;
+            }
+        }
+
+        void setHours(int index, BigDecimal value) {
+            this.hours[index] = value != null ? value : BigDecimal.ZERO;
+        }
+
+        InternPerformanceIntern toResponse() {
+            List<BigDecimal> values = new ArrayList<>(hours.length);
+            for (BigDecimal hour : hours) {
+                values.add(hour);
+            }
+            return new InternPerformanceIntern(internId, username, firstName, lastName, values);
+        }
+    }
+
+    public record PerformanceBucket(int index, LocalDate from, LocalDate to, String label) {}
+
+    public record InternPerformanceIntern(long internId,
+                                          String username,
+                                          String firstName,
+                                          String lastName,
+                                          List<BigDecimal> hours) {}
+
+    public record InternPerformanceResponse(List<PerformanceBucket> buckets,
+                                            List<InternPerformanceIntern> interns) {}
 
     private record NormalizedInput(String firstName,
                                    String lastName,

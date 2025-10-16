@@ -377,6 +377,19 @@ export type InternMonthlyHoursRowDTO = {
   levelLabel: string | null;
 };
 
+export type InternPerformanceBucketDTO = { index: number; from: string; to: string; label: string };
+export type InternPerformanceRowDTO = {
+  internId: number;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  hours: (number | string)[];
+};
+export type InternPerformanceResponseDTO = {
+  buckets: InternPerformanceBucketDTO[];
+  interns: InternPerformanceRowDTO[];
+};
+
 export type InternMonthlyHoursRow = {
   internId: number;
   username: string;
@@ -390,6 +403,25 @@ export type InternMonthlyHoursRow = {
   levelId: number | null;
   levelCode: string | null;
   levelLabel: string | null;
+};
+
+export type InternPerformanceBucket = { index: number; from: string; to: string; label: string };
+export type InternPerformanceRow = {
+  internId: number;
+  username: string;
+  firstName: string;
+  lastName: string;
+  hours: number[];
+};
+export type InternPerformanceResponse = {
+  buckets: InternPerformanceBucket[];
+  interns: InternPerformanceRow[];
+};
+export type InternPerformanceParams = {
+  period?: 'week' | 'month';
+  periods?: number;
+  internIds?: number[];
+  groupIds?: number[];
 };
 
 export type TeamReportInternDTO = {
@@ -624,6 +656,20 @@ function mapInternMonthlyHoursRow(dto: InternMonthlyHoursRowDTO): InternMonthlyH
     levelId: dto.levelId ?? null,
     levelCode: dto.levelCode ?? null,
     levelLabel: dto.levelLabel ?? null,
+  };
+}
+
+function mapInternPerformanceRow(dto: InternPerformanceRowDTO): InternPerformanceRow {
+  const hours = (dto.hours ?? []).map(value => {
+    const parsed = parseNumber(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  });
+  return {
+    internId: dto.internId,
+    username: dto.username,
+    firstName: dto.firstName ?? '',
+    lastName: dto.lastName ?? '',
+    hours,
   };
 }
 
@@ -1195,6 +1241,24 @@ export async function getInternMonthlyHours(from: string, to: string): Promise<I
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<InternMonthlyHoursRowDTO[]>(res);
   return data.map(mapInternMonthlyHoursRow);
+}
+
+export async function getInternPerformance(
+  params: InternPerformanceParams = {},
+): Promise<InternPerformanceResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.period) searchParams.set('period', params.period);
+  if (typeof params.periods === 'number') searchParams.set('periods', String(params.periods));
+  (params.internIds ?? []).forEach(id => searchParams.append('internId', String(id)));
+  (params.groupIds ?? []).forEach(id => searchParams.append('groupId', String(id)));
+  const query = searchParams.toString();
+  const res = await fetch(`${API_BASE}/api/interns/performance${query ? `?${query}` : ''}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<InternPerformanceResponseDTO>(res);
+  return {
+    buckets: data.buckets.map(bucket => ({ ...bucket })),
+    interns: data.interns.map(mapInternPerformanceRow),
+  };
 }
 
 /**
