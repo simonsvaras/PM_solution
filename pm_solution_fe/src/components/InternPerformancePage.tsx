@@ -3,7 +3,7 @@ import './InternPerformancePage.css';
 import {
   getGroups,
   getInternPerformance,
-  listInterns,
+  listAllInterns,
   type ErrorResponse,
   type GroupOption,
   type Intern,
@@ -48,11 +48,11 @@ export default function InternPerformancePage() {
     setReferenceError(null);
     Promise.all([
       getGroups(),
-      listInterns({ page: 0, size: 500, sort: 'last_name,asc' }),
+      listAllInterns('last_name,asc'),
     ])
       .then(([groupOptions, internList]) => {
         setGroups(groupOptions);
-        setInterns(internList.content);
+        setInterns(internList);
       })
       .catch(err => setReferenceError(err as ErrorResponse))
       .finally(() => setReferenceLoading(false));

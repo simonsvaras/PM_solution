@@ -1221,6 +1221,27 @@ export async function listInterns(params: InternListParams = {}): Promise<Intern
 }
 
 /**
+ * Fetches all interns by iterating through paginated results while respecting the backend page size limit.
+ */
+export async function listAllInterns(sort: string = "last_name,asc"): Promise<Intern[]> {
+  const PAGE_SIZE = 100;
+  const firstPage = await listInterns({ page: 0, size: PAGE_SIZE, sort });
+  if (firstPage.totalPages <= 1) {
+    return firstPage.content;
+  }
+
+  const byId = new Map<number, Intern>();
+  firstPage.content.forEach(intern => byId.set(intern.id, intern));
+
+  for (let page = 1; page < firstPage.totalPages; page += 1) {
+    const nextPage = await listInterns({ page, size: PAGE_SIZE, sort });
+    nextPage.content.forEach(intern => byId.set(intern.id, intern));
+  }
+
+  return Array.from(byId.values());
+}
+
+/**
  * Loads the full overview including total tracked hours for each intern.
  */
 export async function listInternOverview(): Promise<InternOverview[]> {
