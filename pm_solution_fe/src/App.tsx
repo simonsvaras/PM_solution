@@ -420,6 +420,9 @@ function App() {
   if (isInternsOverview) {
     appContentInnerClassNames.push('app-content__inner--interns-overview');
   }
+  if (isInternsPerformance) {
+    appContentInnerClassNames.push('app-content__inner--interns-performance');
+  }
   if (activeModuleKey === 'planning') {
     appContentInnerClassNames.push('app-content__inner--planning');
   }

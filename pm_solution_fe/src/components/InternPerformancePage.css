@@ -66,6 +66,13 @@
   color: #1f2937;
 }
 
+.internPerformance__periodBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
 .internPerformance__inputGroup {
   display: flex;
   flex-direction: column;

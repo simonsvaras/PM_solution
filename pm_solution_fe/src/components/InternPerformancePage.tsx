@@ -14,7 +14,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -242,46 +241,47 @@ export default function InternPerformancePage() {
         ) : null}
         <div className="internPerformance__grid">
           <fieldset className="internPerformance__fieldset" disabled={controlsDisabled}>
-            <legend>Typ období</legend>
-            <div className="internPerformance__radioGroup">
-              <label>
+            <legend>Období</legend>
+            <div className="internPerformance__periodBlock">
+              <div className="internPerformance__radioGroup">
+                <label>
+                  <input
+                    type="radio"
+                    name="performance-period"
+                    value="week"
+                    checked={period === 'week'}
+                    onChange={() => handlePeriodChange('week')}
+                  />
+                  Týdny
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="performance-period"
+                    value="month"
+                    checked={period === 'month'}
+                    onChange={() => handlePeriodChange('month')}
+                  />
+                  Měsíce
+                </label>
+              </div>
+              <div className="internPerformance__inputGroup">
+                <label htmlFor="performance-periods">Počet období</label>
                 <input
-                  type="radio"
-                  name="performance-period"
-                  value="week"
-                  checked={period === 'week'}
-                  onChange={() => handlePeriodChange('week')}
+                  id="performance-periods"
+                  type="number"
+                  min={2}
+                  max={5}
+                  value={periods}
+                  onChange={event => handlePeriodsChange(event.target.value)}
+                  disabled={controlsDisabled}
                 />
-                Týdny
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="performance-period"
-                  value="month"
-                  checked={period === 'month'}
-                  onChange={() => handlePeriodChange('month')}
-                />
-                Měsíce
-              </label>
+                <p className="internPerformance__hint">
+                  Porovnává se posledních {periods} {periodLabel} včetně aktuálního.
+                </p>
+              </div>
             </div>
           </fieldset>
-
-          <div className="internPerformance__inputGroup">
-            <label htmlFor="performance-periods">Počet období</label>
-            <input
-              id="performance-periods"
-              type="number"
-              min={2}
-              max={5}
-              value={periods}
-              onChange={event => handlePeriodsChange(event.target.value)}
-              disabled={controlsDisabled}
-            />
-            <p className="internPerformance__hint">
-              Porovnává se posledních {periods} {periodLabel} včetně aktuálního.
-            </p>
-          </div>
 
           <fieldset className="internPerformance__fieldset" disabled={controlsDisabled}>
             <legend>Skupiny</legend>
@@ -419,7 +419,6 @@ export default function InternPerformancePage() {
                   ]}
                   labelFormatter={value => `@${value as string}`}
                 />
-                <Legend />
                 {performance.buckets.map((bucket, index) => (
                   <Bar
                     key={bucket.index}
