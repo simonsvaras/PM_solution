@@ -38,6 +38,7 @@ export default function InternPerformancePage() {
   const [selectedInternIds, setSelectedInternIds] = useState<Set<number>>(new Set());
   const [selectAllInterns, setSelectAllInterns] = useState(true);
   const [internSearch, setInternSearch] = useState('');
+  const [internListOpen, setInternListOpen] = useState(false);
   const [performance, setPerformance] = useState<InternPerformanceResponse | null>(null);
   const [performanceLoading, setPerformanceLoading] = useState(false);
   const [performanceError, setPerformanceError] = useState<ErrorResponse | null>(null);
@@ -218,6 +219,18 @@ export default function InternPerformancePage() {
     setSelectedInternIds(new Set());
   }
 
+  useEffect(() => {
+    if (controlsDisabled) {
+      setInternListOpen(false);
+    }
+  }, [controlsDisabled]);
+
+  useEffect(() => {
+    if (internSearch.trim().length > 0) {
+      setInternListOpen(true);
+    }
+  }, [internSearch]);
+
   function formatHours(value: number): string {
     return `${numberFormatter.format(value)} h`;
   }
@@ -346,16 +359,38 @@ export default function InternPerformancePage() {
             </div>
             <label className="internPerformance__searchLabel" htmlFor="performance-search">
               <span className="internPerformance__searchCaption">Hledat stážistu</span>
-              <input
-                id="performance-search"
-                type="search"
-                placeholder="Jméno nebo username"
-                value={internSearch}
-                onChange={event => setInternSearch(event.target.value)}
-                disabled={controlsDisabled}
-              />
+              <div className="internPerformance__searchWrapper">
+                <input
+                  id="performance-search"
+                  className="internPerformance__searchInput"
+                  type="search"
+                  placeholder="Jméno nebo username"
+                  value={internSearch}
+                  onChange={event => setInternSearch(event.target.value)}
+                  onFocus={() => setInternListOpen(true)}
+                  disabled={controlsDisabled}
+                  aria-controls="performance-search-list"
+                />
+                <button
+                  type="button"
+                  className="internPerformance__searchToggle"
+                  onClick={() => setInternListOpen(prev => !prev)}
+                  aria-label={internListOpen ? 'Skrýt seznam stážistů' : 'Zobrazit seznam stážistů'}
+                  aria-expanded={internListOpen}
+                  aria-controls="performance-search-list"
+                  disabled={controlsDisabled}
+                >
+                  <span aria-hidden="true">{internListOpen ? '▴' : '▾'}</span>
+                </button>
+              </div>
             </label>
-            <div className="internPerformance__internList" role="group" aria-label="Výběr stážistů">
+            <div
+              id="performance-search-list"
+              className={`internPerformance__internList${internListOpen ? '' : ' internPerformance__internList--hidden'}`}
+              role="group"
+              aria-label="Výběr stážistů"
+              aria-hidden={!internListOpen}
+            >
               {filteredInterns.length === 0 ? (
                 <p className="internPerformance__placeholder">
                   {groupFilteredInterns.length === 0
