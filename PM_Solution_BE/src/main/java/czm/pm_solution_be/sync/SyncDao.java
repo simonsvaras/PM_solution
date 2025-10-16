@@ -1495,21 +1495,28 @@ public class SyncDao {
                     FROM projects_to_repositorie ptr
                     JOIN project p ON p.id = ptr.project_id
                     GROUP BY ptr.repository_id
+                ),
+                target_rows AS (
+                    SELECT r.id,
+                           COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) AS resolved_rate,
+                           l.hourly_rate_czk AS level_rate
+                    FROM report r
+                    JOIN intern i ON r.username = i.username
+                    JOIN intern_level_history h ON h.intern_id = i.id
+                    JOIN level l ON l.id = h.level_id
+                    LEFT JOIN project_rate ON project_rate.repository_id = r.repository_id
+                    WHERE i.id = ?
+                      AND r.spent_at::date >= h.valid_from
+                      AND (h.valid_to IS NULL OR r.spent_at::date <= h.valid_to)
                 )
                 UPDATE report r
                 SET cost = CASE
-                        WHEN COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) IS NULL THEN NULL
-                        ELSE ROUND(COALESCE(project_rate.hourly_rate_czk, l.hourly_rate_czk) * r.time_spent_hours, 2)
+                        WHEN target_rows.resolved_rate IS NULL THEN NULL
+                        ELSE ROUND(target_rows.resolved_rate * r.time_spent_hours, 2)
                     END,
-                    hourly_rate_czk = l.hourly_rate_czk
-                FROM intern i
-                JOIN intern_level_history h ON h.intern_id = i.id
-                JOIN level l ON l.id = h.level_id
-                LEFT JOIN project_rate ON project_rate.repository_id = r.repository_id
-                WHERE i.id = ?
-                  AND r.username = i.username
-                  AND r.spent_at::date >= h.valid_from
-                  AND (h.valid_to IS NULL OR r.spent_at::date <= h.valid_to)
+                    hourly_rate_czk = target_rows.level_rate
+                FROM target_rows
+                WHERE target_rows.id = r.id
                 """;
         return jdbc.update(sql, internId);
     }
