@@ -152,6 +152,8 @@ public class SyncDao {
                                        String firstName,
                                        String lastName,
                                        OffsetDateTime periodStart,
+                                       Long projectId,
+                                       String projectName,
                                        BigDecimal hours) {}
     public List<ProjectRow> listProjects() {
         return jdbc.query("SELECT id, namespace_id, namespace_name, name, budget, budget_from, budget_to, is_external, hourly_rate_czk, reported_cost FROM project ORDER BY name",
@@ -1192,7 +1194,7 @@ public class SyncDao {
                     FROM intern i
                     WHERE 1 = 1%3$s
                 ),
-                report_periods AS (
+                report_totals AS (
                     SELECT fi.id AS intern_id,
                            date_trunc('%1$s', r.spent_at AT TIME ZONE 'UTC') AS period_start,
                            SUM(r.time_spent_hours) AS hours
@@ -1201,20 +1203,52 @@ public class SyncDao {
                     WHERE r.spent_at >= ?
                       AND r.spent_at < ?
                     GROUP BY fi.id, period_start
+                ),
+                report_projects AS (
+                    SELECT fi.id AS intern_id,
+                           ptr.project_id,
+                           p.name AS project_name,
+                           date_trunc('%1$s', r.spent_at AT TIME ZONE 'UTC') AS period_start,
+                           SUM(r.time_spent_hours) AS hours
+                    FROM report r
+                    JOIN filtered_interns fi ON fi.username = r.username
+                    LEFT JOIN projects_to_repositorie ptr ON ptr.repository_id = r.repository_id
+                    LEFT JOIN project p ON p.id = ptr.project_id
+                    WHERE r.spent_at >= ?
+                      AND r.spent_at < ?
+                    GROUP BY fi.id, ptr.project_id, p.name, period_start
                 )
-                SELECT fi.id AS intern_id,
-                       fi.username,
-                       fi.first_name,
-                       fi.last_name,
-                       ps.period_start,
-                       COALESCE(rp.hours, 0) AS hours
-                FROM filtered_interns fi
-                CROSS JOIN period_series ps
-                LEFT JOIN report_periods rp ON rp.intern_id = fi.id AND rp.period_start = ps.period_start
-                ORDER BY LOWER(fi.last_name), LOWER(fi.first_name), fi.username, ps.period_start
+                SELECT *
+                FROM (
+                    SELECT fi.id AS intern_id,
+                           fi.username,
+                           fi.first_name,
+                           fi.last_name,
+                           ps.period_start,
+                           NULL::bigint AS project_id,
+                           NULL::text AS project_name,
+                           COALESCE(rt.hours, 0) AS hours
+                    FROM filtered_interns fi
+                    CROSS JOIN period_series ps
+                    LEFT JOIN report_totals rt ON rt.intern_id = fi.id AND rt.period_start = ps.period_start
+                    UNION ALL
+                    SELECT rp.intern_id,
+                           fi.username,
+                           fi.first_name,
+                           fi.last_name,
+                           rp.period_start,
+                           rp.project_id,
+                           rp.project_name,
+                           rp.hours
+                    FROM report_projects rp
+                    JOIN filtered_interns fi ON fi.id = rp.intern_id
+                ) AS rows
+                ORDER BY LOWER(rows.last_name), LOWER(rows.first_name), rows.username, (rows.project_id IS NOT NULL), rows.project_name, rows.period_start
                 """;
 
         String sql = sqlTemplate.formatted(unit, interval, filterClause.toString());
+        params.add(from);
+        params.add(to);
         params.add(from);
         params.add(to);
 
@@ -1225,6 +1259,8 @@ public class SyncDao {
                         rs.getString("first_name"),
                         rs.getString("last_name"),
                         rs.getObject("period_start", OffsetDateTime.class),
+                        (Long) rs.getObject("project_id"),
+                        rs.getString("project_name"),
                         rs.getBigDecimal("hours")),
                 params.toArray());
     }

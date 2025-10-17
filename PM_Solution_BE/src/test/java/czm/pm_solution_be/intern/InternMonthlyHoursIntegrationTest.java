@@ -177,9 +177,16 @@ class InternMonthlyHoursIntegrationTest {
                     List.of(juniorIntern.id(), employeeIntern.id(), idleIntern.id()),
                     List.of());
 
-            assertThat(performanceRows).hasSize(18);
+            List<InternPerformanceRow> totalRows = performanceRows.stream()
+                    .filter(row -> row.projectId() == null)
+                    .toList();
+            List<InternPerformanceRow> projectRows = performanceRows.stream()
+                    .filter(row -> row.projectId() != null)
+                    .toList();
 
-            Map<Long, Map<LocalDate, BigDecimal>> weeklyHours = performanceRows.stream()
+            assertThat(totalRows).hasSize(18);
+
+            Map<Long, Map<LocalDate, BigDecimal>> weeklyHours = totalRows.stream()
                     .collect(Collectors.groupingBy(
                             InternPerformanceRow::internId,
                             Collectors.toMap(row -> row.periodStart().toLocalDate(), InternPerformanceRow::hours)));
@@ -196,6 +203,23 @@ class InternMonthlyHoursIntegrationTest {
 
             Map<LocalDate, BigDecimal> idleWeeks = weeklyHours.get(idleIntern.id());
             assertThat(idleWeeks.values()).allSatisfy(value -> assertThat(value).isEqualByComparingTo(BigDecimal.ZERO));
+
+            Map<Long, Map<LocalDate, BigDecimal>> projectHourSums = projectRows.stream()
+                    .collect(Collectors.groupingBy(
+                            InternPerformanceRow::internId,
+                            Collectors.groupingBy(
+                                    row -> row.periodStart().toLocalDate(),
+                                    Collectors.reducing(
+                                            BigDecimal.ZERO,
+                                            row -> row.hours() != null ? row.hours() : BigDecimal.ZERO,
+                                            BigDecimal::add))));
+
+            projectHourSums.forEach((internId, periodsByProject) -> {
+                Map<LocalDate, BigDecimal> totals = weeklyHours.get(internId);
+                assertThat(totals).isNotNull();
+                periodsByProject.forEach((periodStart, value) ->
+                        assertThat(totals.get(periodStart)).isEqualByComparingTo(value));
+            });
         }
     }
 

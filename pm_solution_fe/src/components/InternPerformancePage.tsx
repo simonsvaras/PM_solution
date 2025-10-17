@@ -25,7 +25,37 @@ type ChartDatum = {
   label: string;
 } & Record<string, number | string>;
 
-const BAR_COLORS = ['#2563eb', '#ea580c', '#16a34a', '#7c3aed', '#ef4444'];
+type ProjectDescriptor = {
+  key: string;
+  projectId: number | null;
+  name: string;
+  color: string;
+};
+
+type SeriesDescriptor = {
+  key: string;
+  dataKey: string;
+  stackId: string;
+  fill: string;
+  projectName: string;
+  bucketLabel: string;
+  isTop: boolean;
+};
+
+const PROJECT_COLORS = [
+  '#2563eb',
+  '#ea580c',
+  '#16a34a',
+  '#7c3aed',
+  '#ef4444',
+  '#0ea5e9',
+  '#f59e0b',
+  '#14b8a6',
+  '#d946ef',
+  '#65a30d',
+  '#f97316',
+  '#8b5cf6',
+];
 
 export default function InternPerformancePage() {
   const [period, setPeriod] = useState<'week' | 'month'>('week');
@@ -130,6 +160,57 @@ export default function InternPerformancePage() {
     [],
   );
 
+  const projectDescriptors = useMemo<ProjectDescriptor[]>(() => {
+    if (!performance) return [];
+    const entries: ProjectDescriptor[] = [];
+    const indexByKey = new Map<string, number>();
+    performance.interns.forEach(intern => {
+      intern.projects.forEach(project => {
+        const key = buildProjectKey(project.projectId);
+        if (indexByKey.has(key)) {
+          return;
+        }
+        const nextIndex = entries.length;
+        indexByKey.set(key, nextIndex);
+        entries.push({
+          key,
+          projectId: project.projectId,
+          name: resolveProjectName(project.projectName),
+          color: PROJECT_COLORS[nextIndex % PROJECT_COLORS.length],
+        });
+      });
+    });
+    const hasAnyHours = performance.interns.some(intern => intern.hours.some(value => value > 0));
+    if (entries.length === 0 && hasAnyHours) {
+      entries.push({
+        key: buildProjectKey(null),
+        projectId: null,
+        name: resolveProjectName(null),
+        color: PROJECT_COLORS[0],
+      });
+    }
+    return entries;
+  }, [performance]);
+
+  const chartSeries = useMemo<SeriesDescriptor[]>(() => {
+    if (!performance) return [];
+    const descriptors: SeriesDescriptor[] = [];
+    performance.buckets.forEach((bucket, bucketIndex) => {
+      projectDescriptors.forEach((project, projectIndex) => {
+        descriptors.push({
+          key: `${bucket.index}-${project.key}`,
+          dataKey: `period${bucketIndex}__project${project.key}`,
+          stackId: `period${bucketIndex}`,
+          fill: project.color,
+          projectName: project.name,
+          bucketLabel: bucket.label,
+          isTop: projectIndex === projectDescriptors.length - 1,
+        });
+      });
+    });
+    return descriptors;
+  }, [performance, projectDescriptors]);
+
   const chartData = useMemo<ChartDatum[]>(() => {
     if (!performance) return [];
     return performance.interns.map(intern => {
@@ -137,12 +218,28 @@ export default function InternPerformancePage() {
         username: intern.username,
         label: buildInternLabel(intern.firstName, intern.lastName, intern.username),
       };
-      performance.buckets.forEach((_, index) => {
-        entry[`period${index}`] = intern.hours[index] ?? 0;
+      const hoursByProject = new Map<string, number[]>();
+      intern.projects.forEach(project => {
+        hoursByProject.set(buildProjectKey(project.projectId), project.hours);
+      });
+      performance.buckets.forEach((_, bucketIndex) => {
+        projectDescriptors.forEach(project => {
+          const source = hoursByProject.get(project.key) ?? (project.key === buildProjectKey(null) ? intern.hours : undefined);
+          const value = source && source[bucketIndex] != null ? source[bucketIndex] : 0;
+          entry[`period${bucketIndex}__project${project.key}`] = value;
+        });
       });
       return entry;
     });
-  }, [performance]);
+  }, [performance, projectDescriptors]);
+
+  const seriesMetadata = useMemo(() => {
+    const map = new Map<string, { projectName: string; bucketLabel: string }>();
+    chartSeries.forEach(series => {
+      map.set(series.dataKey, { projectName: series.projectName, bucketLabel: series.bucketLabel });
+    });
+    return map;
+  }, [chartSeries]);
 
   const hasAnyHours = useMemo(() => {
     if (!performance) return false;
@@ -425,7 +522,7 @@ export default function InternPerformancePage() {
           <div>
             <h2 className="internPerformance__title">Porovnání výkonu</h2>
             <p className="internPerformance__subtitle">
-              Sloupce na ose X reprezentují jednotlivé stážisty. Každé období je znázorněno samostatnou barvou.
+              Sloupce na ose X reprezentují jednotlivé stážisty. Každé období je rozděleno na části podle projektů.
             </p>
           </div>
         </header>
@@ -448,19 +545,28 @@ export default function InternPerformancePage() {
                 <XAxis dataKey="username" tickFormatter={value => `@${value as string}`} interval={0} angle={-15} dy={10} />
                 <YAxis tickFormatter={value => numberFormatter.format(value as number)} />
                 <Tooltip
-                  formatter={(value, name) => [
-                    formatHours(typeof value === 'number' ? value : Number(value)),
-                    name as string,
-                  ]}
-                  labelFormatter={value => `@${value as string}`}
+                  formatter={(value, _name, payload) => {
+                    const numeric = typeof value === 'number' ? value : Number(value);
+                    const meta = payload ? seriesMetadata.get(payload.dataKey as string) : undefined;
+                    const label = meta ? `${meta.projectName} (${meta.bucketLabel})` : payload?.name ?? '';
+                    return [formatHours(Number.isNaN(numeric) ? 0 : numeric), label];
+                  }}
+                  labelFormatter={(value, payload) => {
+                    if (!payload || payload.length === 0) {
+                      return `@${value as string}`;
+                    }
+                    const meta = seriesMetadata.get(payload[0].dataKey as string);
+                    return meta ? `@${value as string} • ${meta.bucketLabel}` : `@${value as string}`;
+                  }}
                 />
-                {performance.buckets.map((bucket, index) => (
+                {chartSeries.map(series => (
                   <Bar
-                    key={bucket.index}
-                    dataKey={`period${index}`}
-                    name={bucket.label}
-                    fill={BAR_COLORS[index % BAR_COLORS.length]}
-                    radius={[4, 4, 0, 0]}
+                    key={series.key}
+                    dataKey={series.dataKey}
+                    name={series.projectName}
+                    stackId={series.stackId}
+                    fill={series.fill}
+                    radius={series.isTop ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                   />
                 ))}
               </BarChart>
@@ -471,12 +577,12 @@ export default function InternPerformancePage() {
             Stážisti nemají v posledních {periods} {periodLabel} vykázané žádné hodiny.
           </p>
         )}
-        {performance && performance.buckets.length > 0 ? (
+        {performance && projectDescriptors.length > 0 ? (
           <ul className="internPerformance__bucketList">
-            {performance.buckets.map(bucket => (
-              <li key={bucket.index}>
-                <span className="internPerformance__bucketSwatch" style={{ backgroundColor: BAR_COLORS[bucket.index % BAR_COLORS.length] }} />
-                <span>{bucket.label}</span>
+            {projectDescriptors.map(project => (
+              <li key={project.key}>
+                <span className="internPerformance__bucketSwatch" style={{ backgroundColor: project.color }} />
+                <span>{project.name}</span>
               </li>
             ))}
           </ul>
@@ -489,4 +595,13 @@ export default function InternPerformancePage() {
 function buildInternLabel(firstName: string, lastName: string, username: string): string {
   const combined = `${firstName ?? ''} ${lastName ?? ''}`.trim();
   return combined.length > 0 ? combined : `@${username}`;
+}
+
+function buildProjectKey(projectId: number | null): string {
+  return projectId == null ? 'none' : String(projectId);
+}
+
+function resolveProjectName(projectName: string | null | undefined): string {
+  const trimmed = projectName?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : 'Nezařazený projekt';
 }

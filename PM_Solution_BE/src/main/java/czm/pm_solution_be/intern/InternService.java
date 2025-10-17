@@ -260,7 +260,11 @@ public class InternService {
                             row.firstName(),
                             row.lastName(),
                             buckets.size()));
-            accumulator.setHours(bucketIndex, row.hours());
+            if (row.projectId() == null) {
+                accumulator.setTotalHours(bucketIndex, row.hours());
+            } else {
+                accumulator.addProjectHours(bucketIndex, row.projectId(), row.projectName(), row.hours());
+            }
         }
 
         List<InternPerformanceIntern> internRows = accumulatorMap.values().stream()
@@ -861,6 +865,7 @@ public class InternService {
         private final String firstName;
         private final String lastName;
         private final BigDecimal[] hours;
+        private final Map<Long, InternPerformanceProjectAccumulator> projects;
 
         InternPerformanceAccumulator(long internId, String username, String firstName, String lastName, int bucketCount) {
             this.internId = internId;
@@ -868,13 +873,22 @@ public class InternService {
             this.firstName = firstName;
             this.lastName = lastName;
             this.hours = new BigDecimal[bucketCount];
+            this.projects = new LinkedHashMap<>();
             for (int i = 0; i < bucketCount; i++) {
                 this.hours[i] = BigDecimal.ZERO;
             }
         }
 
-        void setHours(int index, BigDecimal value) {
+        void setTotalHours(int index, BigDecimal value) {
             this.hours[index] = value != null ? value : BigDecimal.ZERO;
+        }
+
+        void addProjectHours(int index, Long projectId, String projectName, BigDecimal value) {
+            BigDecimal normalized = value != null ? value : BigDecimal.ZERO;
+            InternPerformanceProjectAccumulator accumulator = projects.computeIfAbsent(
+                    projectId,
+                    id -> new InternPerformanceProjectAccumulator(id, projectName, hours.length));
+            accumulator.addHours(index, normalized);
         }
 
         InternPerformanceIntern toResponse() {
@@ -882,17 +896,52 @@ public class InternService {
             for (BigDecimal hour : hours) {
                 values.add(hour);
             }
-            return new InternPerformanceIntern(internId, username, firstName, lastName, values);
+            List<InternPerformanceProject> projectValues = projects.values().stream()
+                    .map(InternPerformanceProjectAccumulator::toResponse)
+                    .toList();
+            return new InternPerformanceIntern(internId, username, firstName, lastName, values, projectValues);
+        }
+    }
+
+    private static class InternPerformanceProjectAccumulator {
+        private final Long projectId;
+        private final String projectName;
+        private final BigDecimal[] hours;
+
+        InternPerformanceProjectAccumulator(Long projectId, String projectName, int bucketCount) {
+            this.projectId = projectId;
+            this.projectName = projectName;
+            this.hours = new BigDecimal[bucketCount];
+            for (int i = 0; i < bucketCount; i++) {
+                this.hours[i] = BigDecimal.ZERO;
+            }
+        }
+
+        void addHours(int index, BigDecimal value) {
+            this.hours[index] = this.hours[index].add(value != null ? value : BigDecimal.ZERO);
+        }
+
+        InternPerformanceProject toResponse() {
+            List<BigDecimal> values = new ArrayList<>(hours.length);
+            for (BigDecimal hour : hours) {
+                values.add(hour);
+            }
+            return new InternPerformanceProject(projectId, projectName, values);
         }
     }
 
     public record PerformanceBucket(int index, LocalDate from, LocalDate to, String label) {}
 
+    public record InternPerformanceProject(Long projectId,
+                                            String projectName,
+                                            List<BigDecimal> hours) {}
+
     public record InternPerformanceIntern(long internId,
                                           String username,
                                           String firstName,
                                           String lastName,
-                                          List<BigDecimal> hours) {}
+                                          List<BigDecimal> hours,
+                                          List<InternPerformanceProject> projects) {}
 
     public record InternPerformanceResponse(List<PerformanceBucket> buckets,
                                             List<InternPerformanceIntern> interns) {}

@@ -378,12 +378,19 @@ export type InternMonthlyHoursRowDTO = {
 };
 
 export type InternPerformanceBucketDTO = { index: number; from: string; to: string; label: string };
+export type InternPerformanceProjectDTO = {
+  projectId: number | null;
+  projectName: string | null;
+  hours: (number | string)[];
+};
+
 export type InternPerformanceRowDTO = {
   internId: number;
   username: string;
   firstName: string | null;
   lastName: string | null;
   hours: (number | string)[];
+  projects?: InternPerformanceProjectDTO[];
 };
 export type InternPerformanceResponseDTO = {
   buckets: InternPerformanceBucketDTO[];
@@ -406,12 +413,18 @@ export type InternMonthlyHoursRow = {
 };
 
 export type InternPerformanceBucket = { index: number; from: string; to: string; label: string };
+export type InternPerformanceProject = {
+  projectId: number | null;
+  projectName: string | null;
+  hours: number[];
+};
 export type InternPerformanceRow = {
   internId: number;
   username: string;
   firstName: string;
   lastName: string;
   hours: number[];
+  projects: InternPerformanceProject[];
 };
 export type InternPerformanceResponse = {
   buckets: InternPerformanceBucket[];
@@ -659,6 +672,18 @@ function mapInternMonthlyHoursRow(dto: InternMonthlyHoursRowDTO): InternMonthlyH
   };
 }
 
+function mapInternPerformanceProject(dto: InternPerformanceProjectDTO): InternPerformanceProject {
+  const hours = (dto.hours ?? []).map(value => {
+    const parsed = parseNumber(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  });
+  return {
+    projectId: dto.projectId ?? null,
+    projectName: dto.projectName ?? null,
+    hours,
+  };
+}
+
 function mapInternPerformanceRow(dto: InternPerformanceRowDTO): InternPerformanceRow {
   const hours = (dto.hours ?? []).map(value => {
     const parsed = parseNumber(value);
@@ -670,6 +695,7 @@ function mapInternPerformanceRow(dto: InternPerformanceRowDTO): InternPerformanc
     firstName: dto.firstName ?? '',
     lastName: dto.lastName ?? '',
     hours,
+    projects: (dto.projects ?? []).map(mapInternPerformanceProject),
   };
 }
 
