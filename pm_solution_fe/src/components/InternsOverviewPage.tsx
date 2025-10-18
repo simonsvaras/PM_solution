@@ -15,6 +15,10 @@ import {
   type InternStatusOption,
 } from '../api';
 
+type InternsOverviewPageProps = {
+  onNavigateInternDetail: (intern: InternOverview) => void;
+};
+
 function formatHours(hours: number | null): string {
   if (hours === null || Number.isNaN(hours)) return 'N/A';
   return `${hours.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h`;
@@ -53,7 +57,7 @@ function formatHistoryRange(entry: InternStatusHistoryEntry): string {
   return `${from} – ${to}`;
 }
 
-export default function InternsOverviewPage() {
+export default function InternsOverviewPage({ onNavigateInternDetail }: InternsOverviewPageProps) {
   const [interns, setInterns] = useState<InternOverview[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -352,7 +356,11 @@ export default function InternsOverviewPage() {
         <div className="internsOverview__grid" role="list">
           {visibleInterns.map(intern => (
             <div key={intern.id} role="listitem">
-              <InternCard intern={intern} onOpenDetail={openDetail} />
+              <InternCard
+                intern={intern}
+                onOpenDetail={openDetail}
+                onNavigateInternDetail={onNavigateInternDetail}
+              />
             </div>
           ))}
         </div>

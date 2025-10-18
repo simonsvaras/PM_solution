@@ -1,7 +1,7 @@
 .internCard {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
   width: 100%;
   padding: 1.5rem;
   border: 1px solid #d5d9e0;
@@ -9,19 +9,31 @@
   background: #fff;
   box-shadow: 0 2px 6px rgba(31, 41, 55, 0.08);
   text-align: left;
-  cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
 
-.internCard:focus-visible {
-  outline: 3px solid #2563eb;
-  outline-offset: 3px;
-}
-
-.internCard:hover {
+.internCard:hover,
+.internCard:focus-within {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(31, 41, 55, 0.16);
   border-color: #b9c2cf;
+}
+
+.internCard__primaryAction {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.internCard__primaryAction:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 
 .internCard__header {
@@ -99,6 +111,35 @@
   margin: 0;
   font-size: 0.85rem;
   color: #6b7280;
+}
+
+.internCard__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.internCard__detailButton {
+  border: 1px solid rgba(37, 99, 235, 0.4);
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.55rem 1.2rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.internCard__detailButton:hover,
+.internCard__detailButton:focus-visible {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.6);
+  color: #1e3a8a;
+}
+
+.internCard__detailButton:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
 }
 
 @media (max-width: 600px) {

@@ -11,6 +11,7 @@ import ProjectReportLongTermPage from './components/ProjectReportLongTermPage';
 import ProjectCapacityReportPage from './components/ProjectCapacityReportPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
+import InternDetailPage from './components/InternDetailPage';
 import InternPerformancePage from './components/InternPerformancePage';
 import ReportsTeamsPage from './components/ReportsTeamsPage';
 import SyncReportsOverviewPage from './components/SyncReportsOverviewPage';
@@ -107,6 +108,7 @@ type ParsedRoute = {
   submoduleKey?: string | null;
   projectId?: number | null;
   view?: ReportDetailView | null;
+  internId?: number | null;
 };
 
 type NormalizedRoute = {
@@ -114,6 +116,7 @@ type NormalizedRoute = {
   submoduleKey: string;
   projectId: number | null;
   view: ReportDetailView | null;
+  internId: number | null;
 };
 
 function parseRoute(search: string): ParsedRoute {
@@ -124,8 +127,11 @@ function parseRoute(search: string): ParsedRoute {
   const viewParam = params.get('view');
   const parsedId = projectIdParam !== null ? Number.parseInt(projectIdParam, 10) : null;
   const projectId = Number.isNaN(parsedId) ? null : parsedId;
+  const internIdParam = params.get('internId');
+  const parsedInternId = internIdParam !== null ? Number.parseInt(internIdParam, 10) : null;
+  const internId = Number.isNaN(parsedInternId) ? null : parsedInternId;
   const view = isReportDetailView(viewParam) ? viewParam : null;
-  return { moduleKey, submoduleKey, projectId, view };
+  return { moduleKey, submoduleKey, projectId, view, internId };
 }
 
 function normalizeRoute(route: ParsedRoute): NormalizedRoute {
@@ -147,6 +153,7 @@ function normalizeRoute(route: ParsedRoute): NormalizedRoute {
       : fallbackSubmodule;
 
   const isProjectsOverview = moduleDef.key === 'projects' && submoduleDef?.key === 'projects-overview';
+  const isInternsOverview = moduleDef.key === 'interns' && submoduleDef?.key === 'interns-overview';
   const projectId = isProjectsOverview && typeof route.projectId === 'number' && !Number.isNaN(route.projectId)
     ? route.projectId
     : null;
@@ -161,11 +168,17 @@ function normalizeRoute(route: ParsedRoute): NormalizedRoute {
     }
   }
 
+  const internId =
+    isInternsOverview && typeof route.internId === 'number' && !Number.isNaN(route.internId)
+      ? route.internId
+      : null;
+
   return {
     moduleKey: moduleDef.key,
     submoduleKey: submoduleDef?.key ?? fallbackSubmodule.key,
     projectId,
     view,
+    internId,
   };
 }
 
@@ -177,6 +190,8 @@ function pushRoute(route: NormalizedRoute, replace = false) {
   params.set('submodule', route.submoduleKey);
   if (route.projectId !== null) params.set('projectId', String(route.projectId));
   else params.delete('projectId');
+  if (route.internId !== null) params.set('internId', String(route.internId));
+  else params.delete('internId');
   if (route.view) params.set('view', route.view);
   else params.delete('view');
   url.search = params.toString();
@@ -220,6 +235,7 @@ function App() {
   const [projectLoadError, setProjectLoadError] = useState<string | null>(null);
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [reportProjectsCache, setReportProjectsCache] = useState<Map<number, ProjectOverviewDTO>>(() => new Map());
+  const [activeInternId, setActiveInternId] = useState<number | null>(initialRoute.internId);
 
   const [activeModuleKey, setActiveModuleKey] = useState<string>(initialRoute.moduleKey);
   const [activeSubmoduleKey, setActiveSubmoduleKey] = useState<string>(initialRoute.submoduleKey);
@@ -335,6 +351,7 @@ function App() {
       setActiveSubmoduleKey(nextRoute.submoduleKey);
       setReportView(nextRoute.view);
       setPendingReportProjectId(nextRoute.projectId);
+      setActiveInternId(nextRoute.internId);
       if (nextRoute.projectId === null) {
         setSelectedReportProject(null);
         return;
@@ -398,6 +415,7 @@ function App() {
   const isProjectsAdmin = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-admin';
   const isProjectsTeams = activeModuleKey === 'projects' && activeSubmoduleKey === 'projects-teams';
   const isInternsOverview = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-overview';
+  const isInternDetailRoute = isInternsOverview && activeInternId !== null;
   const isInternsPerformance = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-performance';
   const isInternsAdmin = activeModuleKey === 'interns' && activeSubmoduleKey === 'interns-admin';
   const isPlanningResources = activeModuleKey === 'planning' && activeSubmoduleKey === 'planning-resources';
@@ -417,7 +435,9 @@ function App() {
   if (shouldUseFullWidthContent) {
     appContentInnerClassNames.push('app-content__inner--full');
   }
-  if (isInternsOverview) {
+  if (isInternDetailRoute) {
+    appContentInnerClassNames.push('app-content__inner--intern-detail');
+  } else if (isInternsOverview) {
     appContentInnerClassNames.push('app-content__inner--interns-overview');
   }
   if (isInternsPerformance) {
@@ -443,6 +463,8 @@ function App() {
     } else if (reportView === 'detail-project') {
       headerTitle = 'Detail projektu';
     }
+  } else if (isInternDetailRoute) {
+    headerTitle = 'Detail stážisty';
   } else if (selectedReportProject) {
     headerTitle = selectedReportProject.name;
   }
@@ -458,6 +480,8 @@ function App() {
     } else if (reportView === 'detail-capacity') {
       headerDescription = 'Zaznamenejte aktuální stav kapacit projektu a sdílejte kontext s dodavatelským týmem.';
     }
+  } else if (isInternDetailRoute) {
+    headerDescription = 'Zobrazte kompletní přehled o vytížení a historii stážisty.';
   } else if (isOnDemand) {
     headerDescription = 'Manuálně spusťte synchronizaci projektových dat mezi GitLabem a aplikací.';
   } else if (isProjectsOverview && !isProjectReportActive) {
@@ -547,9 +571,11 @@ function App() {
 
     setActiveModuleKey(moduleDef.key);
     setActiveSubmoduleKey(nextSubmoduleKey);
+    setActiveInternId(null);
 
     let nextProjectId = selectedReportProject?.id ?? pendingReportProjectId;
     let nextView: ReportDetailView | null = reportView;
+    let nextInternId: number | null = null;
 
     if (moduleDef.key !== 'projects' || nextSubmoduleKey !== 'projects-overview') {
       nextProjectId = null;
@@ -569,6 +595,7 @@ function App() {
         submoduleKey: nextSubmoduleKey,
         projectId: nextProjectId,
         view: nextView,
+        internId: nextInternId,
       }),
     );
   }
@@ -576,6 +603,7 @@ function App() {
   function handleSelectReportProject(project: ProjectOverviewDTO) {
     setActiveModuleKey('projects');
     setActiveSubmoduleKey('projects-overview');
+    setActiveInternId(null);
     setSelectedReportProject(project);
     setReportView('summary');
     setPendingReportProjectId(project.id);
@@ -641,6 +669,39 @@ function App() {
   function handleHideReportDetail() {
     if (!selectedReportProject) return;
     handleSetReportView('summary');
+  }
+
+  function handleOpenInternDetailPage(internId: number) {
+    setActiveModuleKey('interns');
+    setActiveSubmoduleKey('interns-overview');
+    setActiveInternId(internId);
+    setSelectedReportProject(null);
+    setReportView(null);
+    setPendingReportProjectId(null);
+    pushRoute(
+      normalizeRoute({
+        moduleKey: 'interns',
+        submoduleKey: 'interns-overview',
+        projectId: null,
+        view: null,
+        internId,
+      }),
+    );
+  }
+
+  function handleExitInternDetailPage() {
+    setActiveModuleKey('interns');
+    setActiveSubmoduleKey('interns-overview');
+    setActiveInternId(null);
+    pushRoute(
+      normalizeRoute({
+        moduleKey: 'interns',
+        submoduleKey: 'interns-overview',
+        projectId: null,
+        view: null,
+        internId: null,
+      }),
+    );
   }
 
   function handleToggleMaintenanceProject(projectId: number) {
@@ -986,7 +1047,11 @@ function App() {
           ) : isProjectsAdmin ? (
             <ProjectsPage />
           ) : isInternsOverview ? (
-            <InternsOverviewPage />
+            activeInternId !== null ? (
+              <InternDetailPage internId={activeInternId} onBack={handleExitInternDetailPage} />
+            ) : (
+              <InternsOverviewPage onNavigateInternDetail={intern => handleOpenInternDetailPage(intern.id)} />
+            )
           ) : isInternsPerformance ? (
             <InternPerformancePage />
           ) : isInternsAdmin ? (
