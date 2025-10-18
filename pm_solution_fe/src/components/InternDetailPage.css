@@ -158,6 +158,33 @@
   font-size: 0.95rem;
 }
 
+.internDetail__sectionHeader--history {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.internDetail__sectionHeaderContent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.internDetail__historySummary {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.internDetail__historySummary li {
+  margin: 0;
+}
+
 .internDetail__metaGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -282,7 +309,7 @@
   align-self: flex-start;
 }
 
-.internDetail__historyBadgeCount {
+.internDetail__historySummaryCount {
   font-size: 0.7rem;
   font-weight: 600;
   padding: 0.05rem 0.5rem;
@@ -336,5 +363,15 @@
 
   .internDetail__historyMeta {
     align-items: flex-start;
+  }
+
+  .internDetail__sectionHeader--history {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .internDetail__historySummary {
+    justify-content: flex-start;
   }
 }

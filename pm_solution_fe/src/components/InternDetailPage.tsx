@@ -58,12 +58,19 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const statusCounts = useMemo(() => {
-    return history.reduce<Record<string, number>>((acc, entry) => {
-      const key = entry.statusLabel;
-      acc[key] = (acc[key] ?? 0) + 1;
+  const statusSummary = useMemo(() => {
+    return history.reduce<
+      { label: string; count: number; severity: number }[]
+    >((acc, entry) => {
+      const existing = acc.find(item => item.label === entry.statusLabel);
+      if (existing) {
+        existing.count += 1;
+        existing.severity = Math.max(existing.severity, entry.statusSeverity);
+      } else {
+        acc.push({ label: entry.statusLabel, count: 1, severity: entry.statusSeverity });
+      }
       return acc;
-    }, {});
+    }, []);
   }, [history]);
 
   useEffect(() => {
@@ -209,9 +216,25 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
               className="internDetail__section internDetail__section--history internDetail__card"
               aria-label="Historie statusů stážisty"
             >
-              <div className="internDetail__sectionHeader">
-                <h3>Historie statusů</h3>
-                <p>Poskytuje kontext k tomu, kdy a proč se měnila dostupnost stážisty.</p>
+              <div className="internDetail__sectionHeader internDetail__sectionHeader--history">
+                <div className="internDetail__sectionHeaderContent">
+                  <h3>Historie statusů</h3>
+                  <p>Poskytuje kontext k tomu, kdy a proč se měnila dostupnost stážisty.</p>
+                </div>
+                {statusSummary.length > 0 ? (
+                  <ul className="internDetail__historySummary" aria-label="Souhrn statusů">
+                    {statusSummary.map(item => (
+                      <li key={item.label}>
+                        <span
+                          className={`internDetail__badge internDetail__historyBadge ${resolveStatusModifier(item.severity)}`}
+                        >
+                          {item.label}
+                          <span className="internDetail__historySummaryCount">{item.count}×</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
               {historyLoading ? (
                 <p className="internDetail__status">Načítám historii statusů…</p>
@@ -229,9 +252,6 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
                         className={`internDetail__badge internDetail__historyBadge ${resolveStatusModifier(entry.statusSeverity)}`}
                       >
                         {entry.statusLabel}
-                        <span className="internDetail__historyBadgeCount">
-                          celkem {statusCounts[entry.statusLabel]}×
-                        </span>
                       </span>
                       <div className="internDetail__historyMeta">
                         <span className="internDetail__historyCode">{entry.statusCode}</span>
