@@ -114,7 +114,6 @@
   color: #b91c1c;
 }
 
-.internDetail__statusCode,
 .internDetail__historyCode {
   font-size: 0.85rem;
   font-weight: 600;
@@ -123,10 +122,18 @@
   text-transform: uppercase;
 }
 
+.internDetail__sections {
+  display: flex;
+  gap: 24px;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
 .internDetail__section {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1 1 0;
 }
 
 .internDetail__section h3 {
@@ -180,8 +187,7 @@
   font-weight: 600;
 }
 
-.internDetail__status,
-.internDetail__statusCode {
+.internDetail__status {
   white-space: nowrap;
 }
 
@@ -233,16 +239,32 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
+  max-height: 320px;
+  padding-right: 4px;
+  flex: 1 1 auto;
 }
 
 .internDetail__historyItem {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #e5e7eb;
   flex-wrap: wrap;
+}
+
+.internDetail__historyCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  font-weight: 600;
+  color: #374151;
+  flex-shrink: 0;
 }
 
 .internDetail__historyList li:last-child {
@@ -263,10 +285,17 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+  margin-left: auto;
 }
 
 .internDetail__historyBadge {
   align-self: flex-start;
+}
+
+.internDetail__section--history {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .internDetail__historyRange {
@@ -290,6 +319,10 @@
 }
 
 @media (max-width: 768px) {
+  .internDetail__sections {
+    flex-direction: column;
+  }
+
   .internDetail__header {
     flex-direction: column;
     align-items: flex-start;

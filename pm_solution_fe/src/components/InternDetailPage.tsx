@@ -142,92 +142,97 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
               >
                 {detail.statusLabel}
               </span>
-              <span className="internDetail__statusCode">{detail.statusCode}</span>
             </div>
           </header>
 
-          <section className="internDetail__section internDetail__card" aria-label="Základní informace">
-            <h3>Profil stážisty</h3>
-            <dl className="internDetail__metaGrid">
-              <div>
-                <dt>Úroveň</dt>
-                <dd>{detail.levelLabel}</dd>
-              </div>
-              <div>
-                <dt>Skupiny</dt>
-                <dd>{groups}</dd>
-              </div>
-              <div>
-                <dt>Celkem vykázané hodiny</dt>
-                <dd className="internDetail__metaStrong">{formatHours(detail.totalHours)}</dd>
-              </div>
-            </dl>
-          </section>
+          <div className="internDetail__sections">
+            <section className="internDetail__section internDetail__card" aria-label="Základní informace">
+              <h3>Profil stážisty</h3>
+              <dl className="internDetail__metaGrid">
+                <div>
+                  <dt>Úroveň</dt>
+                  <dd>{detail.levelLabel}</dd>
+                </div>
+                <div>
+                  <dt>Skupiny</dt>
+                  <dd>{groups}</dd>
+                </div>
+                <div>
+                  <dt>Celkem vykázané hodiny</dt>
+                  <dd className="internDetail__metaStrong">{formatHours(detail.totalHours)}</dd>
+                </div>
+              </dl>
+            </section>
 
-          <section className="internDetail__section internDetail__card" aria-label="Přiřazení na projekty">
-            <div className="internDetail__sectionHeader">
-              <h3>Přiřazení na projekty</h3>
-              <p>Souhrn plánované alokace stážisty napříč projekty.</p>
-            </div>
-            {detail.projects.length === 0 ? (
-              <p className="internDetail__status">Stážista zatím není přiřazen k žádnému projektu.</p>
-            ) : (
-              <div className="internDetail__tableWrapper">
-                <table className="internDetail__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Projekt</th>
-                      <th scope="col" className="internDetail__columnNumeric">Plánovaná alokace</th>
-                      <th scope="col" className="internDetail__columnBoolean">Započítat do nákladů</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.projects.map(project => (
-                      <tr key={project.projectId}>
-                        <th scope="row">{project.projectName}</th>
-                        <td className="internDetail__columnNumeric">{formatHours(project.workloadHours)}</td>
-                        <td className="internDetail__columnBoolean">
-                          {project.includeInReportedCost ? 'Ano' : 'Ne'}
-                        </td>
+            <section className="internDetail__section internDetail__card" aria-label="Přiřazení na projekty">
+              <div className="internDetail__sectionHeader">
+                <h3>Přiřazení na projekty</h3>
+                <p>Souhrn plánované alokace stážisty napříč projekty.</p>
+              </div>
+              {detail.projects.length === 0 ? (
+                <p className="internDetail__status">Stážista zatím není přiřazen k žádnému projektu.</p>
+              ) : (
+                <div className="internDetail__tableWrapper">
+                  <table className="internDetail__table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Projekt</th>
+                        <th scope="col" className="internDetail__columnNumeric">Plánovaná alokace</th>
+                        <th scope="col" className="internDetail__columnBoolean">Započítat do nákladů</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+                    </thead>
+                    <tbody>
+                      {detail.projects.map(project => (
+                        <tr key={project.projectId}>
+                          <th scope="row">{project.projectName}</th>
+                          <td className="internDetail__columnNumeric">{formatHours(project.workloadHours)}</td>
+                          <td className="internDetail__columnBoolean">
+                            {project.includeInReportedCost ? 'Ano' : 'Ne'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
 
-          <section className="internDetail__section internDetail__card" aria-label="Historie statusů stážisty">
-            <div className="internDetail__sectionHeader">
-              <h3>Historie statusů</h3>
-              <p>Poskytuje kontext k tomu, kdy a proč se měnila dostupnost stážisty.</p>
-            </div>
-            {historyLoading ? (
-              <p className="internDetail__status">Načítám historii statusů…</p>
-            ) : historyError ? (
-              <div className="internDetail__historyError" role="alert">
-                <p>{historyError}</p>
+            <section
+              className="internDetail__section internDetail__section--history internDetail__card"
+              aria-label="Historie statusů stážisty"
+            >
+              <div className="internDetail__sectionHeader">
+                <h3>Historie statusů</h3>
+                <p>Poskytuje kontext k tomu, kdy a proč se měnila dostupnost stážisty.</p>
               </div>
-            ) : history.length === 0 ? (
-              <p className="internDetail__status">Pro stážistu zatím není evidována historie statusů.</p>
-            ) : (
-              <ul className="internDetail__historyList">
-                {history.map(entry => (
-                  <li key={entry.id} className="internDetail__historyItem">
-                    <span
-                      className={`internDetail__badge internDetail__historyBadge ${resolveStatusModifier(entry.statusSeverity)}`}
-                    >
-                      {entry.statusLabel}
-                    </span>
-                    <div className="internDetail__historyMeta">
-                      <span className="internDetail__historyCode">{entry.statusCode}</span>
-                      <span className="internDetail__historyRange">{formatHistoryRange(entry)}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+              {historyLoading ? (
+                <p className="internDetail__status">Načítám historii statusů…</p>
+              ) : historyError ? (
+                <div className="internDetail__historyError" role="alert">
+                  <p>{historyError}</p>
+                </div>
+              ) : history.length === 0 ? (
+                <p className="internDetail__status">Pro stážistu zatím není evidována historie statusů.</p>
+              ) : (
+                <ul className="internDetail__historyList">
+                  {history.map((entry, index) => (
+                    <li key={entry.id} className="internDetail__historyItem">
+                      <span className="internDetail__historyCount">{index + 1}</span>
+                      <span
+                        className={`internDetail__badge internDetail__historyBadge ${resolveStatusModifier(entry.statusSeverity)}`}
+                      >
+                        {entry.statusLabel}
+                      </span>
+                      <div className="internDetail__historyMeta">
+                        <span className="internDetail__historyCode">{entry.statusCode}</span>
+                        <span className="internDetail__historyRange">{formatHistoryRange(entry)}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
         </>
       ) : null}
     </section>
