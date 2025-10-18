@@ -14,6 +14,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,6 +41,7 @@ type SeriesDescriptor = {
   projectName: string;
   bucketLabel: string;
   isTop: boolean;
+  totalKey: string;
 };
 
 const PROJECT_COLORS = [
@@ -196,6 +198,7 @@ export default function InternPerformancePage() {
     if (!performance) return [];
     const descriptors: SeriesDescriptor[] = [];
     performance.buckets.forEach((bucket, bucketIndex) => {
+      const totalKey = `period${bucketIndex}__total`;
       projectDescriptors.forEach((project, projectIndex) => {
         descriptors.push({
           key: `${bucket.index}-${project.key}`,
@@ -205,6 +208,7 @@ export default function InternPerformancePage() {
           projectName: project.name,
           bucketLabel: bucket.label,
           isTop: projectIndex === projectDescriptors.length - 1,
+          totalKey,
         });
       });
     });
@@ -223,6 +227,8 @@ export default function InternPerformancePage() {
         hoursByProject.set(buildProjectKey(project.projectId), project.hours);
       });
       performance.buckets.forEach((_, bucketIndex) => {
+        const totalKey = `period${bucketIndex}__total`;
+        entry[totalKey] = intern.hours[bucketIndex] ?? 0;
         projectDescriptors.forEach(project => {
           const source = hoursByProject.get(project.key) ?? (project.key === buildProjectKey(null) ? intern.hours : undefined);
           const value = source && source[bucketIndex] != null ? source[bucketIndex] : 0;
@@ -567,7 +573,22 @@ export default function InternPerformancePage() {
                     stackId={series.stackId}
                     fill={series.fill}
                     radius={series.isTop ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                  />
+                  >
+                    {series.isTop ? (
+                      <LabelList
+                        dataKey={series.totalKey}
+                        position="top"
+                        offset={12}
+                        formatter={(value: number | string) => {
+                          const numeric = typeof value === 'number' ? value : Number(value);
+                          if (!Number.isFinite(numeric) || numeric <= 0) {
+                            return '';
+                          }
+                          return formatHours(numeric);
+                        }}
+                      />
+                    ) : null}
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
