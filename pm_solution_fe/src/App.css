@@ -60,6 +60,10 @@
   width: 80%;
   max-width: none;
 }
+.app-content__inner--intern-detail {
+  width: 100%;
+  max-width: none;
+}
 .app-content__inner--interns-performance {
   width: 100%;
   max-width: none;
