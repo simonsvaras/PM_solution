@@ -228,12 +228,19 @@ export default function InternPerformancePage() {
       });
       performance.buckets.forEach((_, bucketIndex) => {
         const totalKey = `period${bucketIndex}__total`;
-        entry[totalKey] = intern.hours[bucketIndex] ?? 0;
+        let bucketTotal = 0;
         projectDescriptors.forEach(project => {
           const source = hoursByProject.get(project.key) ?? (project.key === buildProjectKey(null) ? intern.hours : undefined);
           const value = source && source[bucketIndex] != null ? source[bucketIndex] : 0;
           entry[`period${bucketIndex}__project${project.key}`] = value;
+          bucketTotal += value;
         });
+        if (bucketTotal === 0) {
+          const fallback = intern.hours[bucketIndex];
+          entry[totalKey] = fallback ?? 0;
+        } else {
+          entry[totalKey] = bucketTotal;
+        }
       });
       return entry;
     });
@@ -335,7 +342,7 @@ export default function InternPerformancePage() {
   }, [internSearch]);
 
   function formatHours(value: number): string {
-    return `${numberFormatter.format(value)} h`;
+    return numberFormatter.format(value);
   }
 
   return (
