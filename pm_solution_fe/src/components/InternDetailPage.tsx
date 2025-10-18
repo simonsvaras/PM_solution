@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './InternDetailPage.css';
 import {
   getInternOverviewDetail,
@@ -57,6 +57,14 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
   const [history, setHistory] = useState<InternStatusHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const statusCounts = useMemo(() => {
+    return history.reduce<Record<string, number>>((acc, entry) => {
+      const key = entry.statusLabel;
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [history]);
 
   useEffect(() => {
     let ignore = false;
@@ -215,13 +223,15 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
                 <p className="internDetail__status">Pro stážistu zatím není evidována historie statusů.</p>
               ) : (
                 <ul className="internDetail__historyList">
-                  {history.map((entry, index) => (
+                  {history.map(entry => (
                     <li key={entry.id} className="internDetail__historyItem">
-                      <span className="internDetail__historyCount">{index + 1}</span>
                       <span
                         className={`internDetail__badge internDetail__historyBadge ${resolveStatusModifier(entry.statusSeverity)}`}
                       >
                         {entry.statusLabel}
+                        <span className="internDetail__historyBadgeCount">
+                          celkem {statusCounts[entry.statusLabel]}×
+                        </span>
                       </span>
                       <div className="internDetail__historyMeta">
                         <span className="internDetail__historyCode">{entry.statusCode}</span>

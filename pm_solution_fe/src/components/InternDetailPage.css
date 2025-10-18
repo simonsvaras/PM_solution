@@ -94,6 +94,9 @@
 .internDetail__historyBadge {
   padding: 0.25rem 0.75rem;
   font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .internDetail__statusBadge--ok,
@@ -254,19 +257,6 @@
   flex-wrap: wrap;
 }
 
-.internDetail__historyCount {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  font-weight: 600;
-  color: #374151;
-  flex-shrink: 0;
-}
-
 .internDetail__historyList li:last-child {
   border-bottom: none;
 }
@@ -290,6 +280,17 @@
 
 .internDetail__historyBadge {
   align-self: flex-start;
+}
+
+.internDetail__historyBadgeCount {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.65);
+  color: inherit;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .internDetail__section--history {
