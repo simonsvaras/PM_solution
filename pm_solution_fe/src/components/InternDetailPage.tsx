@@ -322,111 +322,6 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
               </dl>
             </section>
 
-            <section
-              className="internDetail__section internDetail__card internDetail__chartSection"
-              aria-label="Vývoj vykázaných hodin"
-            >
-              <div className="internDetail__sectionHeader">
-                <div>
-                  <h3>Vývoj vykázaných hodin</h3>
-                  <p>Rozložení odpracovaných hodin v čase podle projektů.</p>
-                </div>
-                <div className="internDetail__chartControls" aria-label="Nastavení grafu">
-                  <div className="internDetail__chartToggle" role="group" aria-label="Typ období">
-                    <button
-                      type="button"
-                      className={`internDetail__chartToggleButton${chartPeriod === 'week' ? ' is-active' : ''}`}
-                      onClick={() => handlePeriodChange('week')}
-                    >
-                      Týdny
-                    </button>
-                    <button
-                      type="button"
-                      className={`internDetail__chartToggleButton${chartPeriod === 'month' ? ' is-active' : ''}`}
-                      onClick={() => handlePeriodChange('month')}
-                    >
-                      Měsíce
-                    </button>
-                  </div>
-                  <label className="internDetail__chartPeriods">
-                    <span>Počet období</span>
-                    <input
-                      type="number"
-                      min={2}
-                      max={5}
-                      value={chartPeriods}
-                      onChange={event => handlePeriodsChange(event.target.value)}
-                    />
-                  </label>
-                </div>
-              </div>
-              {performanceLoading ? (
-                <p className="internDetail__status">Načítám data…</p>
-              ) : performanceError ? (
-                <div className="internDetail__error" role="alert">
-                  <h4>Data pro graf se nepodařilo načíst.</h4>
-                  <p>{performanceError}</p>
-                </div>
-              ) : !performance || chartData.length === 0 ? (
-                <p className="internDetail__status">Žádná data pro zobrazení.</p>
-              ) : hasAnyHours ? (
-                <>
-                  <div className="internDetail__chartWrapper">
-                    <ResponsiveContainer width="100%" height={320}>
-                      <BarChart data={chartData} margin={{ top: 16, right: 16, left: 8, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="bucket" interval={0} />
-                        <YAxis tickFormatter={value => numberFormatter.format(value as number)} />
-                        <Tooltip
-                          formatter={(value, _name, payload) => {
-                            const numeric = typeof value === 'number' ? value : Number(value);
-                            const project = chartProjects.find(item => `project${item.key}` === payload?.dataKey);
-                            const label = project?.label ?? resolveProjectName(null);
-                            return [formatHours(Number.isNaN(numeric) ? 0 : numeric), label];
-                          }}
-                          labelFormatter={label => label as string}
-                        />
-                        {chartProjects.map((project, index) => (
-                          <Bar
-                            key={project.key}
-                            dataKey={`project${project.key}`}
-                            name={project.label}
-                            stackId="hours"
-                            fill={project.color}
-                            radius={index === chartProjects.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
-                          >
-                            {index === chartProjects.length - 1 ? (
-                              <LabelList
-                                dataKey="total"
-                                position="top"
-                                formatter={(value: number | string) => {
-                                  const numeric = typeof value === 'number' ? value : Number(value);
-                                  if (!Number.isFinite(numeric) || numeric <= 0) return '';
-                                  return formatHours(numeric);
-                                }}
-                              />
-                            ) : null}
-                          </Bar>
-                        ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ul className="internDetail__chartLegend">
-                    {chartProjects.map(project => (
-                      <li key={project.key}>
-                        <span className="internDetail__chartLegendSwatch" style={{ backgroundColor: project.color }} />
-                        <span>{project.label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="internDetail__status">
-                  Stážista nemá v posledních {chartPeriods} {periodLabel} vykázané žádné hodiny.
-                </p>
-              )}
-            </section>
-
             <section className="internDetail__section internDetail__card" aria-label="Přiřazení na projekty">
               <div className="internDetail__sectionHeader">
                 <h3>Přiřazení na projekty</h3>
@@ -511,6 +406,111 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
               )}
             </section>
           </div>
+
+          <section
+            className="internDetail__card internDetail__chartSection internDetail__chartSection--wide"
+            aria-label="Vývoj vykázaných hodin"
+          >
+            <div className="internDetail__sectionHeader">
+              <div>
+                <h3>Vývoj vykázaných hodin</h3>
+                <p>Rozložení odpracovaných hodin v čase podle projektů.</p>
+              </div>
+              <div className="internDetail__chartControls" aria-label="Nastavení grafu">
+                <div className="internDetail__chartToggle" role="group" aria-label="Typ období">
+                  <button
+                    type="button"
+                    className={`internDetail__chartToggleButton${chartPeriod === 'week' ? ' is-active' : ''}`}
+                    onClick={() => handlePeriodChange('week')}
+                  >
+                    Týdny
+                  </button>
+                  <button
+                    type="button"
+                    className={`internDetail__chartToggleButton${chartPeriod === 'month' ? ' is-active' : ''}`}
+                    onClick={() => handlePeriodChange('month')}
+                  >
+                    Měsíce
+                  </button>
+                </div>
+                <label className="internDetail__chartPeriods">
+                  <span>Počet období</span>
+                  <input
+                    type="number"
+                    min={2}
+                    max={5}
+                    value={chartPeriods}
+                    onChange={event => handlePeriodsChange(event.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+            {performanceLoading ? (
+              <p className="internDetail__status">Načítám data…</p>
+            ) : performanceError ? (
+              <div className="internDetail__error" role="alert">
+                <h4>Data pro graf se nepodařilo načíst.</h4>
+                <p>{performanceError}</p>
+              </div>
+            ) : !performance || chartData.length === 0 ? (
+              <p className="internDetail__status">Žádná data pro zobrazení.</p>
+            ) : hasAnyHours ? (
+              <>
+                <div className="internDetail__chartWrapper">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={chartData} margin={{ top: 16, right: 16, left: 8, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <XAxis dataKey="bucket" interval={0} />
+                      <YAxis tickFormatter={value => numberFormatter.format(value as number)} />
+                      <Tooltip
+                        formatter={(value, _name, payload) => {
+                          const numeric = typeof value === 'number' ? value : Number(value);
+                          const project = chartProjects.find(item => `project${item.key}` === payload?.dataKey);
+                          const label = project?.label ?? resolveProjectName(null);
+                          return [formatHours(Number.isNaN(numeric) ? 0 : numeric), label];
+                        }}
+                        labelFormatter={label => label as string}
+                      />
+                      {chartProjects.map((project, index) => (
+                        <Bar
+                          key={project.key}
+                          dataKey={`project${project.key}`}
+                          name={project.label}
+                          stackId="hours"
+                          fill={project.color}
+                          radius={index === chartProjects.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                        >
+                          {index === chartProjects.length - 1 ? (
+                            <LabelList
+                              dataKey="total"
+                              position="top"
+                              formatter={(value: number | string) => {
+                                const numeric = typeof value === 'number' ? value : Number(value);
+                                if (!Number.isFinite(numeric) || numeric <= 0) return '';
+                                return formatHours(numeric);
+                              }}
+                            />
+                          ) : null}
+                        </Bar>
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="internDetail__chartLegend">
+                  {chartProjects.map(project => (
+                    <li key={project.key}>
+                      <span className="internDetail__chartLegendSwatch" style={{ backgroundColor: project.color }} />
+                      <span>{project.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="internDetail__status">
+                Stážista nemá v posledních {chartPeriods} {periodLabel} vykázané žádné hodiny.
+              </p>
+            )}
+          </section>
         </>
       ) : null}
     </section>

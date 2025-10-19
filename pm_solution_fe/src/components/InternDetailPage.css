@@ -159,7 +159,15 @@
 }
 
 .internDetail__chartSection {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  width: 100%;
+  flex: none;
+}
+
+.internDetail__chartSection--wide {
+  align-self: stretch;
 }
 
 .internDetail__chartControls {
