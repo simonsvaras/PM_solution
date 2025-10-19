@@ -4,11 +4,14 @@ import {
   getInternOverviewDetail,
   getInternPerformance,
   getInternStatusHistory,
+  getProjectReportInternDetail,
   type ErrorResponse,
   type InternDetail,
   type InternPerformanceResponse,
   type InternStatusHistoryEntry,
+  type ProjectReportInternDetailIssue,
 } from '../api';
+import Badge from './Badge';
 import {
   Bar,
   BarChart,
@@ -57,6 +60,77 @@ function formatHistoryRange(entry: InternStatusHistoryEntry): string {
   return `${from} – ${to}`;
 }
 
+function formatHoursFromSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return '0 h';
+  }
+  const hours = seconds / 3600;
+  return `${hours.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h`;
+}
+
+function formatIssueDueDate(value: string | null): string {
+  if (!value) {
+    return 'Bez termínu';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Bez termínu';
+  }
+  return date.toLocaleDateString('cs-CZ');
+}
+
+function formatIssueAge(ageDays: number | null, createdAt: string | null): string {
+  if (typeof ageDays === 'number' && Number.isFinite(ageDays)) {
+    const safeAge = Math.max(0, Math.floor(ageDays));
+    return safeAge.toLocaleString('cs-CZ');
+  }
+
+  if (!createdAt) {
+    return '—';
+  }
+
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) {
+    return '—';
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+  const dayMs = 1000 * 60 * 60 * 24;
+  if (diffMs <= 0) {
+    return '0';
+  }
+  const diffDays = Math.floor(diffMs / dayMs);
+  return diffDays.toLocaleString('cs-CZ');
+}
+
+function getLabelValue(labels: readonly string[] | null | undefined, labelKey: string): string | null {
+  if (!labels || labels.length === 0) {
+    return null;
+  }
+  const normalizedKey = labelKey.trim().toLowerCase();
+  for (const label of labels) {
+    if (!label) {
+      continue;
+    }
+    const [rawKey, ...rawValueParts] = label.split(':');
+    if (!rawKey || rawValueParts.length === 0) {
+      continue;
+    }
+    if (rawKey.trim().toLowerCase() === normalizedKey) {
+      const value = rawValueParts.join(':').trim();
+      if (value.length > 0) {
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
+function getPriorityLabel(labels: readonly string[] | null | undefined): string | null {
+  return getLabelValue(labels, 'priorita') ?? getLabelValue(labels, 'priority');
+}
+
 type InternDetailPageProps = {
   internId: number;
   onBack: () => void;
@@ -66,6 +140,14 @@ type ChartDatum = {
   bucket: string;
   total: number;
   [key: `project${string}`]: number;
+};
+
+type ProjectIssuesState = {
+  projectId: number;
+  projectName: string;
+  issues: ProjectReportInternDetailIssue[];
+  loading: boolean;
+  error: string | null;
 };
 
 const PROJECT_COLORS = [
@@ -95,6 +177,8 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
   const [performance, setPerformance] = useState<InternPerformanceResponse | null>(null);
   const [performanceLoading, setPerformanceLoading] = useState(false);
   const [performanceError, setPerformanceError] = useState<string | null>(null);
+  const [projectIssues, setProjectIssues] = useState<ProjectIssuesState[]>([]);
+  const [projectIssuesLoading, setProjectIssuesLoading] = useState(false);
   const numberFormatter = useMemo(
     () => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, minimumFractionDigits: 0 }),
     [],
@@ -196,6 +280,104 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
       ignore = true;
     };
   }, [internId, chartPeriod, chartPeriods]);
+
+  useEffect(() => {
+    if (!detail) {
+      setProjectIssues([]);
+      setProjectIssuesLoading(false);
+      return;
+    }
+
+    const uniqueProjects = detail.projects.reduce<{
+      projectId: number;
+      projectName: string;
+    }[]>((acc, project) => {
+      if (acc.some(item => item.projectId === project.projectId)) {
+        return acc;
+      }
+      acc.push({ projectId: project.projectId, projectName: project.projectName });
+      return acc;
+    }, []);
+
+    if (uniqueProjects.length === 0) {
+      setProjectIssues([]);
+      setProjectIssuesLoading(false);
+      return;
+    }
+
+    let ignore = false;
+    setProjectIssuesLoading(true);
+    setProjectIssues(
+      uniqueProjects.map(project => ({
+        projectId: project.projectId,
+        projectName: resolveProjectName(project.projectName),
+        issues: [],
+        loading: true,
+        error: null,
+      })),
+    );
+
+    const internUsername = detail.username;
+
+    async function loadIssues() {
+      const results = await Promise.all(
+        uniqueProjects.map(async project => {
+          try {
+            const response = await getProjectReportInternDetail(project.projectId, internUsername);
+            return {
+              projectId: project.projectId,
+              issues: response.issues,
+              error: null as string | null,
+            };
+          } catch (err) {
+            return {
+              projectId: project.projectId,
+              issues: [],
+              error: extractErrorMessage(err),
+            };
+          }
+        }),
+      );
+
+      if (ignore) {
+        return;
+      }
+
+      setProjectIssues(
+        uniqueProjects.map(project => {
+          const result = results.find(item => item.projectId === project.projectId);
+          return {
+            projectId: project.projectId,
+            projectName: resolveProjectName(project.projectName),
+            issues: result?.issues ?? [],
+            loading: false,
+            error: result?.error ?? null,
+          };
+        }),
+      );
+      setProjectIssuesLoading(false);
+    }
+
+    loadIssues().catch(err => {
+      if (ignore) {
+        return;
+      }
+      setProjectIssues(
+        uniqueProjects.map(project => ({
+          projectId: project.projectId,
+          projectName: resolveProjectName(project.projectName),
+          issues: [],
+          loading: false,
+          error: extractErrorMessage(err),
+        })),
+      );
+      setProjectIssuesLoading(false);
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [detail]);
 
   const groups = detail?.groups.map(group => group.label).join(', ') || 'Bez skupiny';
 
@@ -509,6 +691,116 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
               <p className="internDetail__status">
                 Stážista nemá v posledních {chartPeriods} {periodLabel} vykázané žádné hodiny.
               </p>
+            )}
+          </section>
+
+          <section
+            className="internDetail__card internDetail__issuesSection"
+            aria-label="Přiřazená issues podle projektů"
+          >
+            <div className="internDetail__sectionHeader">
+              <div>
+                <h3>Otevřená issues podle projektů</h3>
+                <p>Seznam aktuálně přiřazených issues rozdělených podle jednotlivých projektů.</p>
+              </div>
+            </div>
+
+            {detail.projects.length === 0 ? (
+              <p className="internDetail__status">Stážista zatím není přiřazen k žádnému projektu.</p>
+            ) : projectIssuesLoading && projectIssues.length === 0 ? (
+              <p className="internDetail__status">Načítám otevřená issues…</p>
+            ) : projectIssues.length === 0 ? (
+              <p className="internDetail__status">Žádná data pro zobrazení.</p>
+            ) : (
+              <div className="internDetail__issuesList">
+                {projectIssues.map(project => (
+                  <article key={project.projectId} className="internDetail__issuesProject">
+                    <header className="internDetail__issuesProjectHeader">
+                      <h4>{project.projectName}</h4>
+                      <span className="internDetail__issuesCount">
+                        {project.loading
+                          ? 'Načítám…'
+                          : `${numberFormatter.format(project.issues.length)} otevřených issues`}
+                      </span>
+                    </header>
+
+                    {project.loading ? (
+                      <p className="internDetail__status">Načítám issues pro tento projekt…</p>
+                    ) : project.error ? (
+                      <div className="internDetail__issuesError" role="alert">
+                        <p>Nepodařilo se načíst issues projektu.</p>
+                        <p>{project.error}</p>
+                      </div>
+                    ) : project.issues.length === 0 ? (
+                      <p className="internDetail__status">
+                        Tento projekt aktuálně nemá žádná otevřená issues přiřazená stážistovi.
+                      </p>
+                    ) : (
+                      <div className="internDetail__issuesTableWrapper">
+                        <table className="internDetail__issuesTable">
+                          <thead>
+                            <tr>
+                              <th scope="col">Issue</th>
+                              <th scope="col">Priorita</th>
+                              <th scope="col" className="internDetail__issuesColumnHours">Celkem vykázáno</th>
+                              <th scope="col">Termín</th>
+                              <th scope="col" className="internDetail__issuesColumnNumeric">Stáří (dny)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {project.issues.map(issue => {
+                              const meta: string[] = [];
+                              if (issue.issueIid != null) {
+                                meta.push(`#${issue.issueIid}`);
+                              }
+                              if (issue.repositoryName) {
+                                meta.push(issue.repositoryName);
+                              }
+                              const issueContent = (
+                                <div className="internDetail__issuesIssueInfo">
+                                  <span className="internDetail__issuesIssueTitle">{issue.issueTitle}</span>
+                                  {meta.length > 0 ? (
+                                    <span className="internDetail__issuesIssueMeta">{meta.join(' • ')}</span>
+                                  ) : null}
+                                </div>
+                              );
+                              const key = `${issue.repositoryId}:${issue.issueId ?? issue.issueIid ?? issue.issueTitle}`;
+                              return (
+                                <tr key={key}>
+                                  <th scope="row">
+                                    {issue.issueWebUrl ? (
+                                      <a
+                                        href={issue.issueWebUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="internDetail__issuesIssueLink"
+                                      >
+                                        {issueContent}
+                                      </a>
+                                    ) : (
+                                      issueContent
+                                    )}
+                                  </th>
+                                  <td className="internDetail__issuesCellBadge">
+                                    <Badge kind="priority" value={getPriorityLabel(issue.labels)} />
+                                  </td>
+                                  <td className="internDetail__issuesColumnHours">
+                                    {formatHoursFromSeconds(issue.totalTimeSpentSeconds)}
+                                  </td>
+                                  <td>{formatIssueDueDate(issue.dueDate)}</td>
+                                  <td className="internDetail__issuesColumnNumeric">
+                                    {formatIssueAge(issue.ageDays, issue.createdAt)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
             )}
           </section>
         </>
