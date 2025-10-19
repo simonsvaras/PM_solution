@@ -2,11 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import './InternDetailPage.css';
 import {
   getInternOverviewDetail,
+  getInternPerformance,
   getInternStatusHistory,
   type ErrorResponse,
   type InternDetail,
+  type InternPerformanceResponse,
   type InternStatusHistoryEntry,
 } from '../api';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 function formatHours(hours: number | null): string {
   if (hours === null || Number.isNaN(hours)) {
@@ -50,6 +62,27 @@ type InternDetailPageProps = {
   onBack: () => void;
 };
 
+type ChartDatum = {
+  bucket: string;
+  total: number;
+  [key: `project${string}`]: number;
+};
+
+const PROJECT_COLORS = [
+  '#2563eb',
+  '#ea580c',
+  '#16a34a',
+  '#7c3aed',
+  '#ef4444',
+  '#0ea5e9',
+  '#f59e0b',
+  '#14b8a6',
+  '#d946ef',
+  '#65a30d',
+  '#f97316',
+  '#8b5cf6',
+];
+
 export default function InternDetailPage({ internId, onBack }: InternDetailPageProps) {
   const [detail, setDetail] = useState<InternDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,6 +90,15 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
   const [history, setHistory] = useState<InternStatusHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
+  const [chartPeriods, setChartPeriods] = useState(4);
+  const [performance, setPerformance] = useState<InternPerformanceResponse | null>(null);
+  const [performanceLoading, setPerformanceLoading] = useState(false);
+  const [performanceError, setPerformanceError] = useState<string | null>(null);
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, minimumFractionDigits: 0 }),
+    [],
+  );
 
   const statusSummary = useMemo(() => {
     return history.reduce<
@@ -125,7 +167,108 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
     };
   }, [internId]);
 
+  useEffect(() => {
+    let ignore = false;
+    setPerformanceLoading(true);
+    setPerformanceError(null);
+    setPerformance(null);
+    getInternPerformance({
+      period: chartPeriod,
+      periods: chartPeriods,
+      internIds: [internId],
+    })
+      .then(response => {
+        if (!ignore) {
+          setPerformance(response);
+        }
+      })
+      .catch(err => {
+        if (!ignore) {
+          setPerformanceError(extractErrorMessage(err));
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setPerformanceLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [internId, chartPeriod, chartPeriods]);
+
   const groups = detail?.groups.map(group => group.label).join(', ') || 'Bez skupiny';
+
+  const chartProjects = useMemo(() => {
+    if (!performance || performance.interns.length === 0) return [];
+    const [intern] = performance.interns;
+    const descriptors: { key: string; label: string; color: string }[] = [];
+    const used = new Map<string, number>();
+    intern.projects.forEach(project => {
+      const key = buildProjectKey(project.projectId);
+      if (used.has(key)) return;
+      used.set(key, descriptors.length);
+      descriptors.push({
+        key,
+        label: resolveProjectName(project.projectName),
+        color: PROJECT_COLORS[descriptors.length % PROJECT_COLORS.length],
+      });
+    });
+    if (descriptors.length === 0) {
+      descriptors.push({
+        key: buildProjectKey(null),
+        label: resolveProjectName(null),
+        color: PROJECT_COLORS[0],
+      });
+    }
+    return descriptors;
+  }, [performance]);
+
+  const chartData = useMemo<ChartDatum[]>(() => {
+    if (!performance || performance.interns.length === 0) return [];
+    const [intern] = performance.interns;
+    const hoursByProject = new Map<string, number[]>();
+    intern.projects.forEach(project => {
+      hoursByProject.set(buildProjectKey(project.projectId), project.hours);
+    });
+    const fallbackKey = buildProjectKey(null);
+    return performance.buckets.map((bucket, bucketIndex) => {
+      const entry: ChartDatum = {
+        bucket: bucket.label,
+        total: 0,
+      };
+      let total = 0;
+      chartProjects.forEach(project => {
+        const source = hoursByProject.get(project.key) ?? (project.key === fallbackKey ? intern.hours : undefined);
+        const value = source && source[bucketIndex] != null ? source[bucketIndex] : 0;
+        entry[`project${project.key}`] = value;
+        total += value;
+      });
+      if (total === 0) {
+        total = intern.hours[bucketIndex] ?? 0;
+      }
+      entry.total = total;
+      return entry;
+    });
+  }, [performance, chartProjects]);
+
+  const hasAnyHours = useMemo(() => {
+    if (!performance || performance.interns.length === 0) return false;
+    return performance.interns[0].hours.some(value => value > 0);
+  }, [performance]);
+
+  const periodLabel = chartPeriod === 'week' ? 'týdny' : 'měsíce';
+
+  function handlePeriodChange(value: 'week' | 'month') {
+    setChartPeriod(value);
+  }
+
+  function handlePeriodsChange(value: string) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.min(Math.max(Math.round(parsed), 2), 5);
+    setChartPeriods(clamped);
+  }
 
   return (
     <section className="internDetail" aria-label="Detail stážisty">
@@ -177,6 +320,111 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
                   <dd className="internDetail__metaStrong">{formatHours(detail.totalHours)}</dd>
                 </div>
               </dl>
+            </section>
+
+            <section
+              className="internDetail__section internDetail__card internDetail__chartSection"
+              aria-label="Vývoj vykázaných hodin"
+            >
+              <div className="internDetail__sectionHeader">
+                <div>
+                  <h3>Vývoj vykázaných hodin</h3>
+                  <p>Rozložení odpracovaných hodin v čase podle projektů.</p>
+                </div>
+                <div className="internDetail__chartControls" aria-label="Nastavení grafu">
+                  <div className="internDetail__chartToggle" role="group" aria-label="Typ období">
+                    <button
+                      type="button"
+                      className={`internDetail__chartToggleButton${chartPeriod === 'week' ? ' is-active' : ''}`}
+                      onClick={() => handlePeriodChange('week')}
+                    >
+                      Týdny
+                    </button>
+                    <button
+                      type="button"
+                      className={`internDetail__chartToggleButton${chartPeriod === 'month' ? ' is-active' : ''}`}
+                      onClick={() => handlePeriodChange('month')}
+                    >
+                      Měsíce
+                    </button>
+                  </div>
+                  <label className="internDetail__chartPeriods">
+                    <span>Počet období</span>
+                    <input
+                      type="number"
+                      min={2}
+                      max={5}
+                      value={chartPeriods}
+                      onChange={event => handlePeriodsChange(event.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+              {performanceLoading ? (
+                <p className="internDetail__status">Načítám data…</p>
+              ) : performanceError ? (
+                <div className="internDetail__error" role="alert">
+                  <h4>Data pro graf se nepodařilo načíst.</h4>
+                  <p>{performanceError}</p>
+                </div>
+              ) : !performance || chartData.length === 0 ? (
+                <p className="internDetail__status">Žádná data pro zobrazení.</p>
+              ) : hasAnyHours ? (
+                <>
+                  <div className="internDetail__chartWrapper">
+                    <ResponsiveContainer width="100%" height={320}>
+                      <BarChart data={chartData} margin={{ top: 16, right: 16, left: 8, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis dataKey="bucket" interval={0} />
+                        <YAxis tickFormatter={value => numberFormatter.format(value as number)} />
+                        <Tooltip
+                          formatter={(value, _name, payload) => {
+                            const numeric = typeof value === 'number' ? value : Number(value);
+                            const project = chartProjects.find(item => `project${item.key}` === payload?.dataKey);
+                            const label = project?.label ?? resolveProjectName(null);
+                            return [formatHours(Number.isNaN(numeric) ? 0 : numeric), label];
+                          }}
+                          labelFormatter={label => label as string}
+                        />
+                        {chartProjects.map((project, index) => (
+                          <Bar
+                            key={project.key}
+                            dataKey={`project${project.key}`}
+                            name={project.label}
+                            stackId="hours"
+                            fill={project.color}
+                            radius={index === chartProjects.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                          >
+                            {index === chartProjects.length - 1 ? (
+                              <LabelList
+                                dataKey="total"
+                                position="top"
+                                formatter={(value: number | string) => {
+                                  const numeric = typeof value === 'number' ? value : Number(value);
+                                  if (!Number.isFinite(numeric) || numeric <= 0) return '';
+                                  return formatHours(numeric);
+                                }}
+                              />
+                            ) : null}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="internDetail__chartLegend">
+                    {chartProjects.map(project => (
+                      <li key={project.key}>
+                        <span className="internDetail__chartLegendSwatch" style={{ backgroundColor: project.color }} />
+                        <span>{project.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="internDetail__status">
+                  Stážista nemá v posledních {chartPeriods} {periodLabel} vykázané žádné hodiny.
+                </p>
+              )}
             </section>
 
             <section className="internDetail__section internDetail__card" aria-label="Přiřazení na projekty">
@@ -267,4 +515,13 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
       ) : null}
     </section>
   );
+}
+
+function buildProjectKey(projectId: number | null): string {
+  return projectId == null ? 'none' : String(projectId);
+}
+
+function resolveProjectName(projectName: string | null | undefined): string {
+  const trimmed = projectName?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : 'Nezařazený projekt';
 }
