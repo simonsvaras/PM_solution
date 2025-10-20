@@ -170,6 +170,7 @@
 }
 
 /* Technický komentář: Statusový box kombinuje badge, formulář a historii, proto používáme grid-like layout s mezerami. */
+.internsOverview__statusPreview,
 .internsOverview__statusSection {
   display: flex;
   flex-direction: column;
@@ -180,11 +181,29 @@
   background: #f9fafb;
 }
 
+.internsOverview__statusPreview h3,
 .internsOverview__statusSection h3 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
   color: #111827;
+}
+
+.internsOverview__statusTriggerButton {
+  align-self: flex-start;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.internsOverview__statusTriggerButton:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
 }
 
 .internsOverview__statusHistory h4 {
