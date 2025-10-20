@@ -79,6 +79,7 @@ export default function InternsOverviewPage({ onNavigateInternDetail }: InternsO
   const [statusHistory, setStatusHistory] = useState<InternStatusHistoryEntry[]>([]);
   const [statusHistoryLoading, setStatusHistoryLoading] = useState(false);
   const [statusHistoryError, setStatusHistoryError] = useState<string | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
 
   const groupOptions = useMemo(() => {
     const groups = new Map<number, { id: number; label: string }>();
@@ -175,6 +176,7 @@ export default function InternsOverviewPage({ onNavigateInternDetail }: InternsO
     setStatusSubmitSuccess(null);
     setStatusHistory([]);
     setStatusHistoryError(null);
+    setStatusModalOpen(false);
     getInternOverviewDetail(intern.id)
       .then(data => setDetail(data))
       .catch(err => setDetailError(extractErrorMessage(err)))
@@ -194,6 +196,17 @@ export default function InternsOverviewPage({ onNavigateInternDetail }: InternsO
     setStatusHistory([]);
     setStatusHistoryError(null);
     setStatusHistoryLoading(false);
+    setStatusModalOpen(false);
+  }
+
+  function openStatusModal() {
+    if (!selected) return;
+    setStatusModalOpen(true);
+    fetchStatusHistory(selected.id);
+  }
+
+  function closeStatusModal() {
+    setStatusModalOpen(false);
   }
 
   async function handleStatusSubmit(event: FormEvent<HTMLFormElement>) {
@@ -399,7 +412,7 @@ export default function InternsOverviewPage({ onNavigateInternDetail }: InternsO
                 <dd>{formatHours(detail.totalHours)}</dd>
               </div>
             </dl>
-            <section className="internsOverview__statusSection" aria-label="Správa statusu stážisty">
+            <section className="internsOverview__statusPreview" aria-label="Aktuální status stážisty">
               <h3>Stav stážisty</h3>
               <div className="internsOverview__statusCurrent">
                 <span className={`internsOverview__statusBadge ${resolveStatusModifier(detail.statusSeverity)}`}>
@@ -407,73 +420,14 @@ export default function InternsOverviewPage({ onNavigateInternDetail }: InternsO
                 </span>
                 <span className="internsOverview__statusCode">{detail.statusCode}</span>
               </div>
-              {statusOptionsLoading ? (
-                <p className="internsOverview__statusLoading">Načítám seznam statusů…</p>
-              ) : statusOptionsError ? (
-                <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusOptionsError}</p>
-              ) : null}
-              <form className="internsOverview__statusForm" onSubmit={handleStatusSubmit}>
-                <label className="internsOverview__statusField">
-                  <span>Nový status</span>
-                  <select
-                    value={statusForm.statusCode}
-                    onChange={event => setStatusForm(prev => ({ ...prev, statusCode: event.target.value }))}
-                    disabled={statusSubmitting || statusOptionsLoading || Boolean(statusOptionsError)}
-                  >
-                    <option value="">Vyberte stav…</option>
-                    {statusOptions.map(option => (
-                      <option key={option.code} value={option.code}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="internsOverview__statusField">
-                  <span>Platné od (prázdné = dnešní datum)</span>
-                  <input
-                    type="date"
-                    value={statusForm.validFrom}
-                    onChange={event => setStatusForm(prev => ({ ...prev, validFrom: event.target.value }))}
-                    disabled={statusSubmitting}
-                  />
-                </label>
-                {statusSubmitError && (
-                  <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusSubmitError}</p>
-                )}
-                {statusSubmitSuccess && (
-                  <p className="internsOverview__statusMessage internsOverview__statusMessage--success">{statusSubmitSuccess}</p>
-                )}
-                <button
-                  type="submit"
-                  className="internsOverview__statusSubmit"
-                  disabled={statusSubmitting || !statusForm.statusCode || Boolean(statusOptionsError)}
-                >
-                  {statusSubmitting ? 'Ukládám…' : 'Aktualizovat status'}
-                </button>
-              </form>
-              <div className="internsOverview__statusHistory" aria-live="polite">
-                <h4>Historie stavů</h4>
-                {statusHistoryLoading ? (
-                  <p className="internsOverview__statusLoading">Načítám historii…</p>
-                ) : statusHistoryError ? (
-                  <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusHistoryError}</p>
-                ) : statusHistory.length === 0 ? (
-                  <p className="internsOverview__statusEmpty">Zatím nejsou evidované žádné změny.</p>
-                ) : (
-                  <ul>
-                    {statusHistory.map(entry => (
-                      <li key={entry.id}>
-                        <span
-                          className={`internsOverview__statusBadge ${resolveStatusModifier(entry.statusSeverity)}`}
-                        >
-                          {entry.statusLabel}
-                        </span>
-                        <span className="internsOverview__statusRange">{formatHistoryRange(entry)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <button
+                type="button"
+                className="internsOverview__statusTriggerButton"
+                onClick={openStatusModal}
+                disabled={detailLoading}
+              >
+                Aktualizovat status
+              </button>
             </section>
             <section aria-label="Přidělené projekty">
               <h3>Projekty a úvazky</h3>
@@ -501,6 +455,90 @@ export default function InternsOverviewPage({ onNavigateInternDetail }: InternsO
               )}
             </section>
           </div>
+        )}
+      </Modal>
+      <Modal
+        isOpen={statusModalOpen && Boolean(detail) && Boolean(selected)}
+        title={selected ? `Aktualizovat status – ${selected.firstName} ${selected.lastName}` : 'Aktualizovat status'}
+        onClose={closeStatusModal}
+      >
+        {detail ? (
+          <section className="internsOverview__statusSection" aria-label="Správa statusu stážisty">
+            <h3>Stav stážisty</h3>
+            <div className="internsOverview__statusCurrent">
+              <span className={`internsOverview__statusBadge ${resolveStatusModifier(detail.statusSeverity)}`}>
+                {detail.statusLabel}
+              </span>
+              <span className="internsOverview__statusCode">{detail.statusCode}</span>
+            </div>
+            {statusOptionsLoading ? (
+              <p className="internsOverview__statusLoading">Načítám seznam statusů…</p>
+            ) : statusOptionsError ? (
+              <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusOptionsError}</p>
+            ) : null}
+            <form className="internsOverview__statusForm" onSubmit={handleStatusSubmit}>
+              <label className="internsOverview__statusField">
+                <span>Nový status</span>
+                <select
+                  value={statusForm.statusCode}
+                  onChange={event => setStatusForm(prev => ({ ...prev, statusCode: event.target.value }))}
+                  disabled={statusSubmitting || statusOptionsLoading || Boolean(statusOptionsError)}
+                >
+                  <option value="">Vyberte stav…</option>
+                  {statusOptions.map(option => (
+                    <option key={option.code} value={option.code}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="internsOverview__statusField">
+                <span>Platné od (prázdné = dnešní datum)</span>
+                <input
+                  type="date"
+                  value={statusForm.validFrom}
+                  onChange={event => setStatusForm(prev => ({ ...prev, validFrom: event.target.value }))}
+                  disabled={statusSubmitting}
+                />
+              </label>
+              {statusSubmitError && (
+                <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusSubmitError}</p>
+              )}
+              {statusSubmitSuccess && (
+                <p className="internsOverview__statusMessage internsOverview__statusMessage--success">{statusSubmitSuccess}</p>
+              )}
+              <button
+                type="submit"
+                className="internsOverview__statusSubmit"
+                disabled={statusSubmitting || !statusForm.statusCode || Boolean(statusOptionsError)}
+              >
+                {statusSubmitting ? 'Ukládám…' : 'Aktualizovat status'}
+              </button>
+            </form>
+            <div className="internsOverview__statusHistory" aria-live="polite">
+              <h4>Historie stavů</h4>
+              {statusHistoryLoading ? (
+                <p className="internsOverview__statusLoading">Načítám historii…</p>
+              ) : statusHistoryError ? (
+                <p className="internsOverview__statusMessage internsOverview__statusMessage--error">{statusHistoryError}</p>
+              ) : statusHistory.length === 0 ? (
+                <p className="internsOverview__statusEmpty">Zatím nejsou evidované žádné změny.</p>
+              ) : (
+                <ul>
+                  {statusHistory.map(entry => (
+                    <li key={entry.id}>
+                      <span className={`internsOverview__statusBadge ${resolveStatusModifier(entry.statusSeverity)}`}>
+                        {entry.statusLabel}
+                      </span>
+                      <span className="internsOverview__statusRange">{formatHistoryRange(entry)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        ) : (
+          <p>Načítám detail stážisty…</p>
         )}
       </Modal>
     </section>
