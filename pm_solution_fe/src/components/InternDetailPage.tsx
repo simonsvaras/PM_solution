@@ -150,6 +150,8 @@ type ProjectIssuesState = {
   error: string | null;
 };
 
+const UNASSIGNED_PROJECT_COLOR = '#6b7280';
+
 const PROJECT_COLORS = [
   '#2563eb',
   '#ea580c',
@@ -390,17 +392,20 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
       const key = buildProjectKey(project.projectId);
       if (used.has(key)) return;
       used.set(key, descriptors.length);
+      const color = project.projectId == null
+        ? UNASSIGNED_PROJECT_COLOR
+        : PROJECT_COLORS[descriptors.length % PROJECT_COLORS.length];
       descriptors.push({
         key,
         label: resolveProjectName(project.projectName),
-        color: PROJECT_COLORS[descriptors.length % PROJECT_COLORS.length],
+        color,
       });
     });
     if (descriptors.length === 0) {
       descriptors.push({
         key: buildProjectKey(null),
         label: resolveProjectName(null),
-        color: PROJECT_COLORS[0],
+        color: UNASSIGNED_PROJECT_COLOR,
       });
     }
     return descriptors;
@@ -815,5 +820,5 @@ function buildProjectKey(projectId: number | null): string {
 
 function resolveProjectName(projectName: string | null | undefined): string {
   const trimmed = projectName?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : 'Nezařazený projekt';
+  return trimmed && trimmed.length > 0 ? trimmed : 'Bez projektu';
 }

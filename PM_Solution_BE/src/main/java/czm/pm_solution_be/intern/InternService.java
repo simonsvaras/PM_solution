@@ -268,7 +268,7 @@ public class InternService {
         }
 
         List<InternPerformanceIntern> internRows = accumulatorMap.values().stream()
-                .map(InternPerformanceAccumulator::toResponse)
+                .map(accumulator -> accumulator.toResponse(UNASSIGNED_PROJECT_NAME))
                 .toList();
 
         return new InternPerformanceResponse(buckets, internRows);
@@ -859,6 +859,8 @@ public class InternService {
         }
     }
 
+    private static final String UNASSIGNED_PROJECT_NAME = "Bez projektu";
+
     private static class InternPerformanceAccumulator {
         private final long internId;
         private final String username;
@@ -891,7 +893,8 @@ public class InternService {
             accumulator.addHours(index, normalized);
         }
 
-        InternPerformanceIntern toResponse() {
+        InternPerformanceIntern toResponse(String unassignedProjectName) {
+            addUnassignedProjectIfNeeded(unassignedProjectName);
             List<BigDecimal> values = new ArrayList<>(hours.length);
             for (BigDecimal hour : hours) {
                 values.add(hour);
@@ -900,6 +903,32 @@ public class InternService {
                     .map(InternPerformanceProjectAccumulator::toResponse)
                     .toList();
             return new InternPerformanceIntern(internId, username, firstName, lastName, values, projectValues);
+        }
+
+        private void addUnassignedProjectIfNeeded(String unassignedProjectName) {
+            InternPerformanceProjectAccumulator unassigned = null;
+            for (int index = 0; index < hours.length; index++) {
+                BigDecimal total = hours[index] != null ? hours[index] : BigDecimal.ZERO;
+                if (total.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                BigDecimal assigned = BigDecimal.ZERO;
+                for (InternPerformanceProjectAccumulator project : projects.values()) {
+                    if (project.projectId == null) {
+                        continue;
+                    }
+                    assigned = assigned.add(project.getHoursAt(index));
+                }
+                BigDecimal remaining = total.subtract(assigned);
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                if (unassigned == null) {
+                    unassigned = projects.computeIfAbsent(null,
+                            id -> new InternPerformanceProjectAccumulator(null, unassignedProjectName, hours.length));
+                }
+                unassigned.addHours(index, remaining);
+            }
         }
     }
 
@@ -919,6 +948,10 @@ public class InternService {
 
         void addHours(int index, BigDecimal value) {
             this.hours[index] = this.hours[index].add(value != null ? value : BigDecimal.ZERO);
+        }
+
+        BigDecimal getHoursAt(int index) {
+            return this.hours[index];
         }
 
         InternPerformanceProject toResponse() {
