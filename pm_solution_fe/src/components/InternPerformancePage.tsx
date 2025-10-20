@@ -279,7 +279,7 @@ export default function InternPerformancePage() {
   function handlePeriodsChange(value: string) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
-    const clamped = Math.min(Math.max(Math.round(parsed), 2), 5);
+    const clamped = Math.min(Math.max(Math.round(parsed), 2), 12);
     setPeriods(clamped);
   }
 
@@ -399,7 +399,7 @@ export default function InternPerformancePage() {
                   id="performance-periods"
                   type="number"
                   min={2}
-                  max={5}
+                  max={12}
                   value={periods}
                   onChange={event => handlePeriodsChange(event.target.value)}
                   disabled={controlsDisabled}
