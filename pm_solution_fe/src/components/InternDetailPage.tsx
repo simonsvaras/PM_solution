@@ -453,7 +453,7 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
   function handlePeriodsChange(value: string) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
-    const clamped = Math.min(Math.max(Math.round(parsed), 2), 5);
+    const clamped = Math.min(Math.max(Math.round(parsed), 2), 12);
     setChartPeriods(clamped);
   }
 
@@ -625,7 +625,7 @@ export default function InternDetailPage({ internId, onBack }: InternDetailPageP
                   <input
                     type="number"
                     min={2}
-                    max={5}
+                    max={12}
                     value={chartPeriods}
                     onChange={event => handlePeriodsChange(event.target.value)}
                   />
