@@ -1,6 +1,6 @@
 import './Badge.css';
 
-type BadgeKind = 'priority' | 'team';
+type BadgeKind = 'priority' | 'team' | 'status';
 
 type BadgeProps = {
   kind: BadgeKind;
@@ -19,6 +19,15 @@ const TEAM_CLASS_MAP: Record<string, string> = {
   frontend: 'badge--team-frontend',
 };
 
+const STATUS_CLASS_MAP: Record<string, string> = {
+  done: 'badge--status-done',
+  todo: 'badge--status-todo',
+  totest: 'badge--status-totest',
+  backlog: 'badge--status-backlog',
+  torewiev: 'badge--status-torewiev',
+  inprogress: 'badge--status-inprogress',
+};
+
 export default function Badge({ kind, value }: BadgeProps) {
   if (!value) {
     return <span className="badge badge--empty">—</span>;
@@ -34,8 +43,10 @@ export default function Badge({ kind, value }: BadgeProps) {
 
   if (kind === 'priority') {
     className += ` ${PRIORITY_CLASS_MAP[normalized] ?? 'badge--default'}`;
-  } else {
+  } else if (kind === 'team') {
     className += ` ${TEAM_CLASS_MAP[normalized] ?? 'badge--default'}`;
+  } else {
+    className += ` ${STATUS_CLASS_MAP[normalized] ?? 'badge--default'}`;
   }
 
   return <span className={className}>{trimmed}</span>;

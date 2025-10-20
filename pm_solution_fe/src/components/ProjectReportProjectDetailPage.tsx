@@ -157,6 +157,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
    */
   const [issuePriorityFilter, setIssuePriorityFilter] = useState<string>('all');
   const [issueTeamFilter, setIssueTeamFilter] = useState<string>('all');
+  const [issueStatusFilter, setIssueStatusFilter] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{
     key: 'time' | 'cost';
     direction: 'asc' | 'desc';
@@ -241,6 +242,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     setIssueStateFilter('all');
     setIssuePriorityFilter('all');
     setIssueTeamFilter('all');
+    setIssueStatusFilter('all');
     setSortConfig(null);
   }, [detail?.summary.milestoneId]);
 
@@ -316,6 +318,13 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     return buildLabelOptions(detail.issues, 'team');
   }, [detail]);
 
+  const statusOptions = useMemo(() => {
+    if (!detail) {
+      return [] as { value: string; label: string }[];
+    }
+    return buildLabelOptions(detail.issues, 'status');
+  }, [detail]);
+
   const filteredIssues = useMemo(() => {
     if (!detail) {
       return [] as ProjectMilestoneDetail['issues'];
@@ -360,6 +369,13 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
         }
       }
 
+      if (issueStatusFilter !== 'all') {
+        const statusValue = getLabelValue(issue.labels, 'status');
+        if (!statusValue || statusValue.toLowerCase() !== issueStatusFilter) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -388,6 +404,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     issueStateFilter,
     issuePriorityFilter,
     issueTeamFilter,
+    issueStatusFilter,
     sortConfig,
   ]);
 
@@ -645,15 +662,40 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                           checked={issueTeamFilter === option.value}
                           onChange={() => setIssueTeamFilter(option.value)}
                         />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </fieldset>
-                </div>
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <fieldset className="projectReportProjectDetail__filterControl projectReportProjectDetail__labelsFilter">
+                  <legend>Status</legend>
+                  <label>
+                    <input
+                      type="radio"
+                      name="issue-status"
+                      value="all"
+                      checked={issueStatusFilter === 'all'}
+                      onChange={() => setIssueStatusFilter('all')}
+                    />
+                    <span>Všechny</span>
+                  </label>
+                  {statusOptions.map(option => (
+                    <label key={option.value}>
+                      <input
+                        type="radio"
+                        name="issue-status"
+                        value={option.value}
+                        checked={issueStatusFilter === option.value}
+                        onChange={() => setIssueStatusFilter(option.value)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
 
-                {filteredIssues.length === 0 ? (
-                  <p className="projectReportProjectDetail__status">
-                    Žádné issues neodpovídají zadaným filtrům.
+              {filteredIssues.length === 0 ? (
+                <p className="projectReportProjectDetail__status">
+                  Žádné issues neodpovídají zadaným filtrům.
                   </p>
                 ) : (
                   <div className="projectReportProjectDetail__tableWrapper">
@@ -664,6 +706,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                           <th scope="col">Assignee</th>
                           <th scope="col">Priorita</th>
                           <th scope="col">Tým</th>
+                          <th scope="col">Status</th>
                           <th scope="col">Stav</th>
                           <th scope="col">Termín</th>
                           <th scope="col" className="projectReportProjectDetail__columnNumeric">
@@ -739,6 +782,9 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                               </td>
                               <td className="projectReportProjectDetail__cellBadge">
                                 <Badge kind="team" value={getLabelValue(issue.labels, 'team')} />
+                              </td>
+                              <td className="projectReportProjectDetail__cellBadge">
+                                <Badge kind="status" value={getLabelValue(issue.labels, 'status')} />
                               </td>
                               <td>{formatIssueState(issue.state)}</td>
                               <td>{formatDate(issue.dueDate)}</td>

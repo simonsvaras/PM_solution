@@ -80,6 +80,10 @@ function getPriorityLabel(labels: readonly string[] | null | undefined): string 
   return getLabelValue(labels, 'priorita') ?? getLabelValue(labels, 'priority');
 }
 
+function getStatusLabel(labels: readonly string[] | null | undefined): string | null {
+  return getLabelValue(labels, 'status');
+}
+
 function formatInternLabel(intern: ProjectReportDetailIntern): string {
   const name = `${intern.firstName ?? ''} ${intern.lastName ?? ''}`.trim();
   if (name && intern.username) {
@@ -309,6 +313,7 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
                   <tr>
                     <th scope="col">Issue</th>
                     <th scope="col">Priorita</th>
+                    <th scope="col">Status</th>
                     <th scope="col" className="projectReportInternDetail__columnHours">Celkem vykázáno</th>
                     <th scope="col">Termín</th>
                     <th scope="col" className="projectReportInternDetail__columnNumeric">Stáří (dny)</th>
@@ -349,6 +354,9 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
                         </th>
                         <td className="projectReportInternDetail__cellBadge">
                           <Badge kind="priority" value={getPriorityLabel(issue.labels)} />
+                        </td>
+                        <td className="projectReportInternDetail__cellBadge">
+                          <Badge kind="status" value={getStatusLabel(issue.labels)} />
                         </td>
                         <td className="projectReportInternDetail__columnHours">
                           {formatHoursFromSeconds(issue.totalTimeSpentSeconds)}
