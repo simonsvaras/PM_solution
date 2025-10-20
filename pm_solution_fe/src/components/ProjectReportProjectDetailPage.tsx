@@ -520,6 +520,9 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                       labelParts.push(usernameLabel);
                     }
                     const displayLabel = labelParts.join(' ');
+                    const isTopContributor =
+                      maxContributionSeconds > 0 &&
+                      contribution.totalTimeSpentSeconds === maxContributionSeconds;
                     return (
                       <div
                         key={contribution.internId ?? contribution.internUsername}
@@ -530,6 +533,15 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                           style={{ height: `${percentage}%` }}
                           aria-hidden="true"
                         >
+                          {isTopContributor ? (
+                            <span
+                              className="projectReportProjectDetail__chartCrown"
+                              role="img"
+                              aria-label="Nejvíce odpracovaných hodin"
+                            >
+                              👑
+                            </span>
+                          ) : null}
                           <span className="projectReportProjectDetail__chartValue">
                             {formatShortHours(contribution.totalTimeSpentSeconds)}
                           </span>
