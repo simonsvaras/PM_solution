@@ -215,8 +215,8 @@ public class InternService {
                                                  List<Long> groupIds) {
         PerformancePeriod period = PerformancePeriod.fromParameter(periodParam);
         int periods = periodsParam != null ? periodsParam : 2;
-        if (periods < 2 || periods > 5) {
-            throw ApiException.validation("Počet období musí být v rozmezí 2 až 5.", "performance_periods_invalid");
+        if (periods < 2 || periods > 12) {
+            throw ApiException.validation("Počet období musí být v rozmezí 2 až 12.", "performance_periods_invalid");
         }
 
         List<Long> sanitizedInternIds = sanitizeInternIds(internIds);
