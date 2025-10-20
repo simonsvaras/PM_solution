@@ -91,6 +91,14 @@ function formatShortHours(seconds: number): string {
   return `${hours.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} h`;
 }
 
+function normalizeSeconds(value: number | string | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  const parsed = typeof value === 'string' ? Number(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 /**
  * Reads the value part of a GitLab label in a tolerant way (ignores whitespace around the colon).
  */
@@ -252,7 +260,8 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
 
   const maxContributionSeconds = useMemo(() => {
     return internContributions.reduce((max, contribution) => {
-      return Math.max(max, contribution.totalTimeSpentSeconds);
+      const totalSeconds = normalizeSeconds(contribution.totalTimeSpentSeconds);
+      return Math.max(max, totalSeconds);
     }, 0);
   }, [internContributions]);
 
@@ -502,8 +511,9 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
               ) : (
                 <div className="projectReportProjectDetail__chartBars">
                   {internContributions.map(contribution => {
+                    const totalSeconds = normalizeSeconds(contribution.totalTimeSpentSeconds);
                     const percentage = maxContributionSeconds > 0
-                      ? (contribution.totalTimeSpentSeconds / maxContributionSeconds) * 100
+                      ? (totalSeconds / maxContributionSeconds) * 100
                       : 0;
                     const labelParts: string[] = [];
                     if (contribution.internFirstName || contribution.internLastName) {
@@ -522,7 +532,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                     const displayLabel = labelParts.join(' ');
                     const isTopContributor =
                       maxContributionSeconds > 0 &&
-                      contribution.totalTimeSpentSeconds === maxContributionSeconds;
+                      Math.abs(totalSeconds - maxContributionSeconds) < 1e-6;
                     return (
                       <div
                         key={contribution.internId ?? contribution.internUsername}
@@ -543,7 +553,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
                             </span>
                           ) : null}
                           <span className="projectReportProjectDetail__chartValue">
-                            {formatShortHours(contribution.totalTimeSpentSeconds)}
+                            {formatShortHours(totalSeconds)}
                           </span>
                         </div>
                         <span className="projectReportProjectDetail__chartLabel">{displayLabel}</span>
