@@ -515,6 +515,165 @@ export type ProjectReportDetailResponse = {
   issues: ProjectReportDetailIssue[];
 };
 
+export type WeeklyPlannerTaskDTO = {
+  id: number;
+  dayOfWeek: number | null;
+  note: string | null;
+  plannedHours: number | string | null;
+  internId: number | null;
+  internName: string | null;
+  issueId: number | null;
+  issueTitle: string | null;
+  issueState: string | null;
+  deadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+  carriedOverFromWeekStart?: string | null;
+  carriedOverFromWeekId?: number | null;
+};
+
+export type WeeklyPlannerTask = {
+  id: number;
+  dayOfWeek: number | null;
+  note: string | null;
+  plannedHours: number | null;
+  internId: number | null;
+  internName: string | null;
+  issueId: number | null;
+  issueTitle: string | null;
+  issueState: string | null;
+  deadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+  carriedOverFromWeekStart: string | null;
+  carriedOverFromWeekId: number | null;
+};
+
+export type WeeklyPlannerWeekDTO = {
+  id: number;
+  projectId: number;
+  weekStart: string;
+  weekEnd: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string | null;
+  isClosed?: boolean;
+  tasks: WeeklyPlannerTaskDTO[];
+};
+
+export type WeeklyPlannerWeek = {
+  id: number;
+  projectId: number;
+  weekStart: string;
+  weekEnd: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  isClosed: boolean;
+  tasks: WeeklyPlannerTask[];
+};
+
+export type WeeklyPlannerMetadataDTO = {
+  projectId: number;
+  weekStartDay: number;
+  today: string;
+  currentWeekStart: string | null;
+  currentWeekEnd: string | null;
+  currentWeekId: number | null;
+  roles?: string[];
+};
+
+export type WeeklyPlannerMetadata = {
+  projectId: number;
+  weekStartDay: number;
+  today: string;
+  currentWeekStart: string | null;
+  currentWeekEnd: string | null;
+  currentWeekId: number | null;
+  roles: string[];
+};
+
+export type WeeklyPlannerWeekCollectionDTO = {
+  weeks: WeeklyPlannerWeekDTO[];
+  metadata: WeeklyPlannerMetadataDTO;
+};
+
+export type WeeklyPlannerWeekCollection = {
+  weeks: WeeklyPlannerWeek[];
+  metadata: WeeklyPlannerMetadata;
+};
+
+export type WeeklyPlannerWeekWithMetadataDTO = {
+  week: WeeklyPlannerWeekDTO;
+  metadata: WeeklyPlannerMetadataDTO;
+};
+
+export type WeeklyPlannerWeekWithMetadata = {
+  week: WeeklyPlannerWeek;
+  metadata: WeeklyPlannerMetadata;
+};
+
+export type WeeklySummaryPermissionsDTO = {
+  canCloseWeek?: boolean;
+  canCarryOver?: boolean;
+};
+
+export type WeeklySummaryMetricsDTO = {
+  totalTasks?: number | string | null;
+  completedTasks?: number | string | null;
+  completedPercentage?: number | string | null;
+  carriedOverTasks?: number | string | null;
+  carriedOverPercentage?: number | string | null;
+  newTasks?: number | string | null;
+  inProgressTasks?: number | string | null;
+};
+
+export type WeeklySummaryDTO = {
+  projectWeekId: number;
+  taskCount: number | string;
+  totalHours: number | string;
+  weekStart?: string | null;
+  weekEnd?: string | null;
+  state?: string | null;
+  isClosed?: boolean;
+  completedAt?: string | null;
+  metrics?: WeeklySummaryMetricsDTO | null;
+  permissions?: WeeklySummaryPermissionsDTO | null;
+};
+
+export type WeeklySummaryMetrics = {
+  totalTasks: number | null;
+  completedTasks: number | null;
+  completedPercentage: number | null;
+  carriedOverTasks: number | null;
+  carriedOverPercentage: number | null;
+  newTasks: number | null;
+  inProgressTasks: number | null;
+};
+
+export type WeeklySummaryPermissions = {
+  canCloseWeek: boolean;
+  canCarryOver: boolean;
+};
+
+export type WeeklySummary = {
+  projectWeekId: number;
+  taskCount: number;
+  totalHours: number | null;
+  weekStart: string | null;
+  weekEnd: string | null;
+  state: string | null;
+  isClosed: boolean;
+  completedAt: string | null;
+  metrics: WeeklySummaryMetrics;
+  permissions: WeeklySummaryPermissions;
+};
+
+export type CarryOverTasksPayload = {
+  targetWeekStart: string;
+  taskIds?: number[];
+};
+
 export type ProjectReportInternDetailIssue = {
   repositoryId: number;
   repositoryName: string;
@@ -638,6 +797,106 @@ function mapInternDetail(dto: InternDetailDTO): InternDetail {
   return {
     ...overview,
     projects: (dto.projects ?? []).map(mapInternProjectAllocation),
+  };
+}
+
+function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
+  const plannedHoursRaw = parseNumber(dto.plannedHours);
+  return {
+    id: dto.id,
+    dayOfWeek: dto.dayOfWeek ?? null,
+    note: dto.note ?? null,
+    plannedHours: Number.isNaN(plannedHoursRaw) ? null : plannedHoursRaw,
+    internId: dto.internId ?? null,
+    internName: dto.internName ?? null,
+    issueId: dto.issueId ?? null,
+    issueTitle: dto.issueTitle ?? null,
+    issueState: dto.issueState ?? null,
+    deadline: dto.deadline ?? null,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    carriedOverFromWeekStart: dto.carriedOverFromWeekStart ?? null,
+    carriedOverFromWeekId: dto.carriedOverFromWeekId ?? null,
+  };
+}
+
+function mapWeeklyPlannerWeek(dto: WeeklyPlannerWeekDTO): WeeklyPlannerWeek {
+  const closedAt = dto.closedAt ?? null;
+  const explicitClosed = dto.isClosed === true || dto.isClosed === false ? dto.isClosed : null;
+  return {
+    id: dto.id,
+    projectId: dto.projectId,
+    weekStart: dto.weekStart,
+    weekEnd: dto.weekEnd,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    closedAt,
+    isClosed: explicitClosed ?? (closedAt !== null),
+    tasks: (dto.tasks ?? []).map(mapWeeklyPlannerTask),
+  };
+}
+
+function mapWeeklyPlannerMetadata(dto: WeeklyPlannerMetadataDTO): WeeklyPlannerMetadata {
+  return {
+    projectId: dto.projectId,
+    weekStartDay: dto.weekStartDay,
+    today: dto.today,
+    currentWeekStart: dto.currentWeekStart ?? null,
+    currentWeekEnd: dto.currentWeekEnd ?? null,
+    currentWeekId: dto.currentWeekId ?? null,
+    roles: Array.isArray(dto.roles) ? dto.roles : [],
+  };
+}
+
+function mapWeeklySummaryMetrics(dto: WeeklySummaryMetricsDTO | null | undefined): WeeklySummaryMetrics {
+  function normalise(value: number | string | null | undefined): number | null {
+    const parsed = parseNumber(value ?? null);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return {
+    totalTasks: normalise(dto?.totalTasks),
+    completedTasks: normalise(dto?.completedTasks),
+    completedPercentage: normalise(dto?.completedPercentage),
+    carriedOverTasks: normalise(dto?.carriedOverTasks),
+    carriedOverPercentage: normalise(dto?.carriedOverPercentage),
+    newTasks: normalise(dto?.newTasks),
+    inProgressTasks: normalise(dto?.inProgressTasks),
+  };
+}
+
+function mapWeeklySummary(dto: WeeklySummaryDTO): WeeklySummary {
+  const taskCountRaw = parseNumber(dto.taskCount);
+  const totalHoursRaw = parseNumber(dto.totalHours);
+  const normalizedState = dto.state ? dto.state.trim().toUpperCase() : null;
+  const isClosed = dto.isClosed ?? (normalizedState === 'CLOSED');
+  return {
+    projectWeekId: dto.projectWeekId,
+    taskCount: Number.isNaN(taskCountRaw) ? 0 : taskCountRaw,
+    totalHours: Number.isNaN(totalHoursRaw) ? null : totalHoursRaw,
+    weekStart: dto.weekStart ?? null,
+    weekEnd: dto.weekEnd ?? null,
+    state: normalizedState,
+    isClosed: Boolean(isClosed),
+    completedAt: dto.completedAt ?? null,
+    metrics: mapWeeklySummaryMetrics(dto.metrics),
+    permissions: {
+      canCloseWeek: dto.permissions?.canCloseWeek ?? false,
+      canCarryOver: dto.permissions?.canCarryOver ?? false,
+    },
+  };
+}
+
+function mapWeeklyPlannerWeekCollection(dto: WeeklyPlannerWeekCollectionDTO): WeeklyPlannerWeekCollection {
+  return {
+    weeks: (dto.weeks ?? []).map(mapWeeklyPlannerWeek),
+    metadata: mapWeeklyPlannerMetadata(dto.metadata),
+  };
+}
+
+function mapWeeklyPlannerWeekWithMetadata(dto: WeeklyPlannerWeekWithMetadataDTO): WeeklyPlannerWeekWithMetadata {
+  return {
+    week: mapWeeklyPlannerWeek(dto.week),
+    metadata: mapWeeklyPlannerMetadata(dto.metadata),
   };
 }
 
@@ -896,6 +1155,77 @@ export async function updateProjectInterns(projectId: number, interns: ProjectIn
     body: JSON.stringify({ interns }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function listProjectWeeklyPlannerWeeks(
+  projectId: number,
+  params?: { limit?: number; offset?: number },
+): Promise<WeeklyPlannerWeekCollection> {
+  const searchParams = new URLSearchParams();
+  if (typeof params?.limit === 'number' && Number.isFinite(params.limit)) {
+    searchParams.set('limit', String(params.limit));
+  }
+  if (typeof params?.offset === 'number' && Number.isFinite(params.offset)) {
+    searchParams.set('offset', String(params.offset));
+  }
+  const query = searchParams.toString();
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks${query ? `?${query}` : ''}`,
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerWeekCollectionDTO>(res);
+  return mapWeeklyPlannerWeekCollection(data);
+}
+
+export async function getProjectWeeklyPlannerWeek(
+  projectId: number,
+  projectWeekId: number,
+): Promise<WeeklyPlannerWeekWithMetadata> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerWeekWithMetadataDTO>(res);
+  return mapWeeklyPlannerWeekWithMetadata(data);
+}
+
+export async function getProjectWeekSummary(
+  projectId: number,
+  projectWeekId: number,
+): Promise<WeeklySummary> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/summary`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklySummaryDTO>(res);
+  return mapWeeklySummary(data);
+}
+
+export async function closeProjectWeek(
+  projectId: number,
+  projectWeekId: number,
+): Promise<WeeklyPlannerWeekWithMetadata> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/close`, {
+    method: "POST",
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerWeekWithMetadataDTO>(res);
+  return mapWeeklyPlannerWeekWithMetadata(data);
+}
+
+export async function carryOverWeeklyTasks(
+  projectId: number,
+  projectWeekId: number,
+  payload: CarryOverTasksPayload,
+): Promise<WeeklyPlannerTask[]> {
+  const body: CarryOverTasksPayload = {
+    targetWeekStart: payload.targetWeekStart,
+    taskIds: payload.taskIds && payload.taskIds.length > 0 ? payload.taskIds : undefined,
+  };
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/carry-over`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerTaskDTO[]>(res);
+  return (data ?? []).map(mapWeeklyPlannerTask);
 }
 
 export async function getProjectActiveMilestones(projectId: number): Promise<ProjectMilestoneSummary[]> {

@@ -3,30 +3,339 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.5rem;
+  background: var(--color-page-background, #f5f6f8);
+  min-height: 100%;
 }
 
 .projectWeeklyPlanner__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.projectWeeklyPlanner__headingGroup {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.projectWeeklyPlanner__subtitle {
+.projectWeeklyPlanner__eyebrow {
   margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary, #6f6f6f);
+}
+
+.projectWeeklyPlanner__headingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.projectWeeklyPlanner__title {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.projectWeeklyPlanner__statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.projectWeeklyPlanner__statusBadge--open {
+  background: rgba(46, 204, 113, 0.15);
+  color: #117a37;
+}
+
+.projectWeeklyPlanner__statusBadge--closed {
+  background: rgba(244, 67, 54, 0.1);
+  color: #c62828;
+}
+
+.projectWeeklyPlanner__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+  min-width: 260px;
+}
+
+.projectWeeklyPlanner__weekSelect {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
   color: var(--color-text-secondary, #4a4a4a);
 }
 
-.projectWeeklyPlanner__placeholder {
-  padding: 1.5rem;
-  border: 1px dashed var(--color-border, #c8c8c8);
-  border-radius: 0.75rem;
-  background: var(--color-surface, #fafafa);
-  line-height: 1.6;
+.projectWeeklyPlanner__weekSelect select {
+  appearance: none;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-border, #d7d7d7);
+  background: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  box-shadow: 0 2px 12px rgba(26, 26, 26, 0.05);
 }
 
-.projectWeeklyPlanner__placeholder code {
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.25rem;
-  background: var(--color-code-bg, rgba(0, 0, 0, 0.08));
-  font-family: inherit;
+.projectWeeklyPlanner__weekSelect select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.projectWeeklyPlanner__secondaryActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.projectWeeklyPlanner__secondaryActions button {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px dashed var(--color-border, #d7d7d7);
+  background: #fafafa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary, #6f6f6f);
+  cursor: not-allowed;
+}
+
+.projectWeeklyPlanner__closeButton {
+  padding: 0.75rem 1rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #4b6bfb, #6574ff);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(75, 107, 251, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projectWeeklyPlanner__closeButton:disabled {
+  background: linear-gradient(135deg, rgba(75, 107, 251, 0.4), rgba(101, 116, 255, 0.4));
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.projectWeeklyPlanner__closeButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(75, 107, 251, 0.45);
+}
+
+.projectWeeklyPlanner__status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.projectWeeklyPlanner__status--error {
+  color: var(--color-danger, #b42318);
+}
+
+.projectWeeklyPlanner__empty {
+  padding: 2rem;
+  border-radius: 1rem;
+  border: 1px dashed var(--color-border, #d7d7d7);
+  background: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.projectWeeklyPlanner__tasks {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.projectWeeklyPlanner__taskCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(26, 26, 26, 0.05);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projectWeeklyPlanner__taskCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(26, 26, 26, 0.12);
+}
+
+.projectWeeklyPlanner__taskHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.projectWeeklyPlanner__taskDay {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary, #6f6f6f);
+  text-transform: uppercase;
+}
+
+.projectWeeklyPlanner__taskBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 152, 0, 0.15);
+  color: #a05a00;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.projectWeeklyPlanner__taskTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.projectWeeklyPlanner__taskMeta {
+  margin: 0;
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.projectWeeklyPlanner__taskNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.projectWeeklyPlanner__modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.projectWeeklyPlanner__modalButton {
+  padding: 0.65rem 1.2rem;
+  border-radius: 0.65rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.projectWeeklyPlanner__modalButton--secondary {
+  background: #f5f6f8;
+  color: var(--color-text-primary, #1a1a1a);
+  border: 1px solid var(--color-border, #d7d7d7);
+}
+
+.projectWeeklyPlanner__modalButton--secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.projectWeeklyPlanner__modalButton--primary {
+  background: linear-gradient(135deg, #4b6bfb, #6574ff);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(75, 107, 251, 0.35);
+}
+
+.projectWeeklyPlanner__modalButton--primary:disabled {
+  background: linear-gradient(135deg, rgba(75, 107, 251, 0.45), rgba(101, 116, 255, 0.45));
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.projectWeeklyPlanner__modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  font-size: 0.95rem;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.projectWeeklyPlanner__modalError {
+  margin: 0;
+  color: var(--color-danger, #b42318);
+  font-weight: 600;
+}
+
+.projectWeeklyPlanner__modalScrollableBody {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.projectWeeklyPlanner__carryOverList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.projectWeeklyPlanner__carryOverItem {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.projectWeeklyPlanner__carryOverItem input {
+  margin-top: 0.4rem;
+}
+
+.projectWeeklyPlanner__carryOverItem strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.projectWeeklyPlanner__carryOverItem small {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+@media (max-width: 960px) {
+  .projectWeeklyPlanner__controls {
+    width: 100%;
+  }
+
+  .projectWeeklyPlanner__secondaryActions {
+    flex-direction: row;
+  }
+}
+
+@media (max-width: 640px) {
+  .projectWeeklyPlanner {
+    padding: 1.25rem;
+  }
+
+  .projectWeeklyPlanner__title {
+    font-size: 1.5rem;
+  }
+
+  .projectWeeklyPlanner__tasks {
+    grid-template-columns: 1fr;
+  }
 }
