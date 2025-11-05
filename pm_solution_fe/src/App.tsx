@@ -9,6 +9,7 @@ import ProjectReportInternDetailPage from './components/ProjectReportInternDetai
 import ProjectReportProjectDetailPage from './components/ProjectReportProjectDetailPage';
 import ProjectReportLongTermPage from './components/ProjectReportLongTermPage';
 import ProjectCapacityReportPage from './components/ProjectCapacityReportPage';
+import ProjectWeeklyPlannerPage from './components/ProjectWeeklyPlannerPage';
 import InternsPage from './components/InternsPage';
 import InternsOverviewPage from './components/InternsOverviewPage';
 import InternDetailPage from './components/InternDetailPage';
@@ -88,7 +89,8 @@ type ReportDetailView =
   | 'detail-long-term'
   | 'detail-intern'
   | 'detail-project'
-  | 'detail-capacity';
+  | 'detail-capacity'
+  | 'detail-planning';
 
 type DetailSectionView = Exclude<ReportDetailView, 'summary'>;
 
@@ -99,7 +101,8 @@ function isReportDetailView(value: string | null): value is ReportDetailView {
     value === 'detail-long-term' ||
     value === 'detail-intern' ||
     value === 'detail-project' ||
-    value === 'detail-capacity'
+    value === 'detail-capacity' ||
+    value === 'detail-planning'
   );
 }
 
@@ -109,6 +112,7 @@ type ParsedRoute = {
   projectId?: number | null;
   view?: ReportDetailView | null;
   internId?: number | null;
+  tab?: string | null;
 };
 
 type NormalizedRoute = {
@@ -117,21 +121,53 @@ type NormalizedRoute = {
   projectId: number | null;
   view: ReportDetailView | null;
   internId: number | null;
+  tab: string | null;
 };
 
-function parseRoute(search: string): ParsedRoute {
+function parseRoute(pathname: string, search: string): ParsedRoute {
   const params = new URLSearchParams(search);
   const moduleKey = params.get('module');
   const submoduleKey = params.get('submodule');
   const projectIdParam = params.get('projectId');
   const viewParam = params.get('view');
+  const tabParam = params.get('tab');
   const parsedId = projectIdParam !== null ? Number.parseInt(projectIdParam, 10) : null;
   const projectId = Number.isNaN(parsedId) ? null : parsedId;
   const internIdParam = params.get('internId');
   const parsedInternId = internIdParam !== null ? Number.parseInt(internIdParam, 10) : null;
   const internId = Number.isNaN(parsedInternId) ? null : parsedInternId;
   const view = isReportDetailView(viewParam) ? viewParam : null;
-  return { moduleKey, submoduleKey, projectId, view, internId };
+  let normalizedModuleKey = moduleKey;
+  let normalizedSubmoduleKey = submoduleKey;
+  let normalizedProjectIdParam = projectIdParam;
+  const trimmedPath = pathname.replace(/^\/+|\/+$/g, '');
+  if (trimmedPath.length > 0) {
+    const segments = trimmedPath.split('/').filter(Boolean);
+    if (segments[0] === 'projects-overview') {
+      normalizedModuleKey = 'projects';
+      normalizedSubmoduleKey = 'projects-overview';
+      if (segments.length > 1 && !normalizedProjectIdParam) {
+        normalizedProjectIdParam = segments[1];
+      } else if (segments.length > 1) {
+        normalizedProjectIdParam = segments[1];
+      }
+    }
+  }
+  const tab = tabParam ?? null;
+  const normalizedProjectId =
+    normalizedProjectIdParam !== null && normalizedProjectIdParam !== undefined
+      ? Number.parseInt(normalizedProjectIdParam, 10)
+      : null;
+  const finalProjectId =
+    normalizedProjectId !== null && !Number.isNaN(normalizedProjectId) ? normalizedProjectId : projectId;
+  return {
+    moduleKey: normalizedModuleKey,
+    submoduleKey: normalizedSubmoduleKey,
+    projectId: finalProjectId,
+    view,
+    internId,
+    tab,
+  };
 }
 
 function normalizeRoute(route: ParsedRoute): NormalizedRoute {
@@ -157,14 +193,25 @@ function normalizeRoute(route: ParsedRoute): NormalizedRoute {
   const projectId = isProjectsOverview && typeof route.projectId === 'number' && !Number.isNaN(route.projectId)
     ? route.projectId
     : null;
+  const requestedTab = typeof route.tab === 'string' ? route.tab : null;
   let view: ReportDetailView | null = null;
+  let tab: string | null = null;
   if (isProjectsOverview) {
     if (projectId === null) {
       view = null;
+      tab = null;
+    } else if (requestedTab === 'planning') {
+      view = 'detail-planning';
+      tab = 'planning';
+    } else if (route.view === 'detail-planning') {
+      view = 'detail-planning';
+      tab = 'planning';
     } else if (route.view && route.view !== 'summary') {
       view = route.view;
+      tab = null;
     } else {
       view = 'summary';
+      tab = null;
     }
   }
 
@@ -179,6 +226,7 @@ function normalizeRoute(route: ParsedRoute): NormalizedRoute {
     projectId,
     view,
     internId,
+    tab,
   };
 }
 
@@ -186,14 +234,32 @@ function pushRoute(route: NormalizedRoute, replace = false) {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   const params = url.searchParams;
-  params.set('module', route.moduleKey);
-  params.set('submodule', route.submoduleKey);
-  if (route.projectId !== null) params.set('projectId', String(route.projectId));
-  else params.delete('projectId');
+  const isProjectsOverviewRoute =
+    route.moduleKey === 'projects' && route.submoduleKey === 'projects-overview';
+
+  if (isProjectsOverviewRoute) {
+    url.pathname = route.projectId !== null ? `/projects-overview/${route.projectId}` : '/projects-overview';
+    params.delete('module');
+    params.delete('submodule');
+    params.delete('projectId');
+  } else {
+    url.pathname = '/';
+    params.set('module', route.moduleKey);
+    params.set('submodule', route.submoduleKey);
+    if (route.projectId !== null) params.set('projectId', String(route.projectId));
+    else params.delete('projectId');
+  }
+
   if (route.internId !== null) params.set('internId', String(route.internId));
   else params.delete('internId');
-  if (route.view) params.set('view', route.view);
-  else params.delete('view');
+
+  if (route.view && route.view !== 'summary') params.set('view', route.view);
+  else if (!isProjectsOverviewRoute) params.delete('view');
+  else if (route.view === 'summary') params.delete('view');
+
+  if (route.tab) params.set('tab', route.tab);
+  else params.delete('tab');
+
   url.search = params.toString();
   const nextUrl = `${url.pathname}${url.search}${url.hash}`;
   const state = { ...route };
@@ -209,8 +275,15 @@ function App() {
   const [initialRoute] = useState<NormalizedRoute>(() =>
     normalizeRoute(
       typeof window !== 'undefined'
-        ? parseRoute(window.location.search)
-        : { moduleKey: modules[0].key, submoduleKey: modules[0].submodules[0].key, projectId: null, view: null },
+        ? parseRoute(window.location.pathname, window.location.search)
+        : {
+            moduleKey: modules[0].key,
+            submoduleKey: modules[0].submodules[0].key,
+            projectId: null,
+            view: null,
+            internId: null,
+            tab: null,
+          },
     ),
   );
   const [deltaOnly, setDeltaOnly] = useState(true);
@@ -346,7 +419,7 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     function handlePopstate() {
-      const nextRoute = normalizeRoute(parseRoute(window.location.search));
+      const nextRoute = normalizeRoute(parseRoute(window.location.pathname, window.location.search));
       setActiveModuleKey(nextRoute.moduleKey);
       setActiveSubmoduleKey(nextRoute.submoduleKey);
       setReportView(nextRoute.view);
@@ -462,6 +535,8 @@ function App() {
       headerTitle = 'Detail stážisty';
     } else if (reportView === 'detail-project') {
       headerTitle = 'Detail projektu';
+    } else if (reportView === 'detail-planning') {
+      headerTitle = 'Planning';
     }
   } else if (isInternDetailRoute) {
     headerTitle = 'Detail stážisty';
@@ -479,6 +554,8 @@ function App() {
       headerDescription = 'Stránka detailu stážisty je ve vývoji.';
     } else if (reportView === 'detail-capacity') {
       headerDescription = 'Zaznamenejte aktuální stav kapacit projektu a sdílejte kontext s dodavatelským týmem.';
+    } else if (reportView === 'detail-planning') {
+      headerDescription = 'Naplánujte týdenní zaměření projektu a sdílejte priority s týmem.';
     }
   } else if (isInternDetailRoute) {
     headerDescription = 'Zobrazte kompletní přehled o vytížení a historii stážisty.';
@@ -523,6 +600,7 @@ function App() {
     { view: 'detail-intern', label: 'Detail stážisty' },
     { view: 'detail-project', label: 'Detail projektu' },
     { view: 'detail-long-term', label: 'Dlouhodobý report' },
+    { view: 'detail-planning', label: 'Planning' },
   ];
 
   const detailNavigation = isProjectReportDetail ? (
@@ -1030,6 +1108,8 @@ function App() {
                 <ProjectReportInternDetailPage project={selectedReportProject} />
               ) : reportView === 'detail-capacity' ? (
                 <ProjectCapacityReportPage project={selectedReportProject} onShowToast={showToast} />
+              ) : reportView === 'detail-planning' ? (
+                <ProjectWeeklyPlannerPage project={selectedReportProject} />
               ) : (
                 <ProjectReportProjectDetailPage project={selectedReportProject} />
               )

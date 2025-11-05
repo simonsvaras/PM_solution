@@ -1,0 +1,32 @@
+.projectWeeklyPlanner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.projectWeeklyPlanner__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.projectWeeklyPlanner__subtitle {
+  margin: 0;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.projectWeeklyPlanner__placeholder {
+  padding: 1.5rem;
+  border: 1px dashed var(--color-border, #c8c8c8);
+  border-radius: 0.75rem;
+  background: var(--color-surface, #fafafa);
+  line-height: 1.6;
+}
+
+.projectWeeklyPlanner__placeholder code {
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  background: var(--color-code-bg, rgba(0, 0, 0, 0.08));
+  font-family: inherit;
+}

@@ -16,7 +16,7 @@ export default function ProjectInfoCard({ project, onSelect }: ProjectInfoCardPr
   );
 
   const budgetLabel = project.budget != null ? currencyFormatter.format(project.budget) : 'Neuvedeno';
-  const reportsOverviewLink = `?module=projects&submodule=projects-overview&projectId=${project.id}`;
+  const reportsOverviewLink = `/projects-overview/${project.id}`;
 
   function handleDetailClick(event: MouseEvent<HTMLAnchorElement>) {
     if (!onSelect) {
