@@ -613,6 +613,14 @@ export type WeeklyPlannerWeekWithMetadata = {
   metadata: WeeklyPlannerMetadata;
 };
 
+export type WeeklyPlannerSettingsDTO = {
+  weekStartDay: number;
+};
+
+export type WeeklyPlannerSettings = {
+  weekStartDay: number;
+};
+
 export type WeeklySummaryPermissionsDTO = {
   canCloseWeek?: boolean;
   canCarryOver?: boolean;
@@ -845,6 +853,12 @@ function mapWeeklyPlannerMetadata(dto: WeeklyPlannerMetadataDTO): WeeklyPlannerM
     currentWeekEnd: dto.currentWeekEnd ?? null,
     currentWeekId: dto.currentWeekId ?? null,
     roles: Array.isArray(dto.roles) ? dto.roles : [],
+  };
+}
+
+function mapWeeklyPlannerSettings(dto: WeeklyPlannerSettingsDTO): WeeklyPlannerSettings {
+  return {
+    weekStartDay: dto.weekStartDay,
   };
 }
 
@@ -1155,6 +1169,27 @@ export async function updateProjectInterns(projectId: number, interns: ProjectIn
     body: JSON.stringify({ interns }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function getWeeklyPlannerSettings(projectId: number): Promise<WeeklyPlannerSettings> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/settings`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerSettingsDTO>(res);
+  return mapWeeklyPlannerSettings(data);
+}
+
+export async function updateWeeklyPlannerSettings(
+  projectId: number,
+  settings: WeeklyPlannerSettings,
+): Promise<WeeklyPlannerSettings> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/settings`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerSettingsDTO>(res);
+  return mapWeeklyPlannerSettings(data);
 }
 
 export async function listProjectWeeklyPlannerWeeks(
