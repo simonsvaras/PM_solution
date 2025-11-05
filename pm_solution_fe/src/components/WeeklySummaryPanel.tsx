@@ -73,40 +73,46 @@ export default function WeeklySummaryPanel({ summary, isLoading, error, onRetry 
     );
   }
 
-  const totalTasks = summary?.metrics.totalTasks ?? summary?.taskCount ?? null;
+  const metricsData = summary?.metrics ?? null;
+  const totalTasks = metricsData?.totalTasks ?? summary?.taskCount ?? null;
   const totalHours = summary ? formatHours(summary.totalHours) : '—';
+
+  const completedTasks = metricsData?.completedTasks ?? null;
+  const completedTotal = metricsData?.totalTasks ?? null;
+  const carriedOverTasks = metricsData?.carriedOverTasks ?? null;
+  const newTasks = metricsData?.newTasks ?? null;
+  const inProgressTasks = metricsData?.inProgressTasks ?? null;
+  const completedPercentage = metricsData?.completedPercentage ?? null;
+  const carriedOverPercentage = metricsData?.carriedOverPercentage ?? null;
 
   const metrics = [
     {
       key: 'completed',
       label: 'Splněno',
-      value: formatPercentage(summary?.metrics.completedPercentage ?? null),
+      value: formatPercentage(completedPercentage),
       hint:
-        summary?.metrics.completedTasks !== null && summary?.metrics.totalTasks !== null
-          ? `${formatCount(summary.metrics.completedTasks)} z ${formatCount(summary.metrics.totalTasks)}`
-          : summary?.metrics.completedTasks !== null
-          ? `${formatCount(summary.metrics.completedTasks)} úkolů`
+        completedTasks !== null && completedTotal !== null
+          ? `${formatCount(completedTasks)} z ${formatCount(completedTotal)}`
+          : completedTasks !== null
+          ? `${formatCount(completedTasks)} úkolů`
           : '—',
     },
     {
       key: 'carried',
       label: 'Přenesené',
-      value: formatPercentage(summary?.metrics.carriedOverPercentage ?? null),
-      hint:
-        summary?.metrics.carriedOverTasks !== null
-          ? `${formatCount(summary.metrics.carriedOverTasks)} úkolů`
-          : '—',
+      value: formatPercentage(carriedOverPercentage),
+      hint: carriedOverTasks !== null ? `${formatCount(carriedOverTasks)} úkolů` : '—',
     },
     {
       key: 'new',
       label: 'Nově přidané',
-      value: formatCount(summary?.metrics.newTasks ?? null),
+      value: formatCount(newTasks),
       hint: 'V tomto týdnu',
     },
     {
       key: 'open',
       label: 'Rozpracované',
-      value: formatCount(summary?.metrics.inProgressTasks ?? null),
+      value: formatCount(inProgressTasks),
       hint: 'Zůstává otevřených',
     },
   ];

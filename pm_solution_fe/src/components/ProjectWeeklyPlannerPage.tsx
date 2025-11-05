@@ -8,12 +8,15 @@ import {
   type ProjectOverviewDTO,
   type WeeklyPlannerTask,
   type WeeklyPlannerWeek,
+  type WeeklyPlannerSettings,
   type WeeklySummary,
   closeProjectWeek,
   carryOverWeeklyTasks,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
+  getWeeklyPlannerSettings,
   listProjectWeeklyPlannerWeeks,
+  updateWeeklyPlannerSettings,
 } from '../api';
 
 type ProjectWeeklyPlannerPageProps = {
@@ -31,11 +34,13 @@ const dayNames = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobo
 const dateFormatter = new Intl.DateTimeFormat('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
 const hoursFormatter = new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 
-function getDayLabel(dayOfWeek: number | null): string {
+function getDayLabel(dayOfWeek: number | null, weekStartDay = 1): string {
   if (!dayOfWeek || dayOfWeek < 1 || dayOfWeek > dayNames.length) {
     return 'Bez dne';
   }
-  return dayNames[dayOfWeek - 1];
+  const offset = ((weekStartDay - 1) % dayNames.length + dayNames.length) % dayNames.length;
+  const index = (offset + (dayOfWeek - 1)) % dayNames.length;
+  return dayNames[index];
 }
 
 function formatDateRange(start: string | null, end: string | null): string {
@@ -92,6 +97,25 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   const [carryOverError, setCarryOverError] = useState<ErrorResponse | null>(null);
   const [carriedAudit, setCarriedAudit] = useState<Record<number, string>>({});
   const [roles, setRoles] = useState<string[]>([]);
+  const [weekStartDay, setWeekStartDay] = useState<number>(1);
+  const [weekSettings, setWeekSettings] = useState<WeeklyPlannerSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<ErrorResponse | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
+
+  const loadSettings = useCallback(() => {
+    setSettingsLoading(true);
+    setSettingsError(null);
+    getWeeklyPlannerSettings(project.id)
+      .then(settingsResponse => {
+        setWeekSettings(settingsResponse);
+        setWeekStartDay(settingsResponse.weekStartDay);
+        setSettingsSaveError(null);
+      })
+      .catch(err => setSettingsError(err as ErrorResponse))
+      .finally(() => setSettingsLoading(false));
+  }, [project.id]);
 
   const loadWeeks = useCallback(() => {
     setWeeksLoading(true);
@@ -100,6 +124,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       .then(collection => {
         setWeeks(collection.weeks);
         setRoles(collection.metadata.roles);
+        setWeekStartDay(collection.metadata.weekStartDay);
+        setWeekSettings(prev =>
+          prev ? { ...prev, weekStartDay: collection.metadata.weekStartDay } : { weekStartDay: collection.metadata.weekStartDay },
+        );
         setSelectedWeekId(prev => {
           if (prev !== null) return prev;
           if (collection.metadata.currentWeekId !== null) {
@@ -113,6 +141,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   }, [project.id]);
 
   useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  useEffect(() => {
     loadWeeks();
   }, [loadWeeks]);
 
@@ -124,6 +156,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         .then(data => {
           setSelectedWeek(data.week);
           setRoles(data.metadata.roles);
+          setWeekStartDay(data.metadata.weekStartDay);
+          setWeekSettings(prev =>
+            prev ? { ...prev, weekStartDay: data.metadata.weekStartDay } : { weekStartDay: data.metadata.weekStartDay },
+          );
           setWeeks(prev => {
             const exists = prev.findIndex(week => week.id === data.week.id);
             if (exists >= 0) {
@@ -159,6 +195,13 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
     }
     fetchWeek(selectedWeekId);
   }, [selectedWeekId, fetchWeek]);
+
+  const weekStartOptions = useMemo(
+    () => dayNames.map((name, index) => ({ value: index + 1, label: `${index + 1} – ${name}` })),
+    [],
+  );
+
+  const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
   const hasPmRole = useMemo(
@@ -243,7 +286,12 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
 
   function handleWeekChange(event: ChangeEvent<HTMLSelectElement>) {
     const value = Number.parseInt(event.target.value, 10);
-    setSelectedWeekId(Number.isNaN(value) ? null : value);
+    if (Number.isNaN(value)) {
+      setSelectedWeekId(null);
+      return;
+    }
+    setSelectedWeekId(value);
+    loadWeeks();
   }
 
   function handleOpenCloseModal() {
@@ -260,6 +308,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         setClosingWeek(false);
         setCloseModalOpen(false);
         setRoles(response.metadata.roles);
+        setWeekStartDay(response.metadata.weekStartDay);
+        setWeekSettings(prev =>
+          prev ? { ...prev, weekStartDay: response.metadata.weekStartDay } : { weekStartDay: response.metadata.weekStartDay },
+        );
         const targetWeekStart = response.metadata.currentWeekStart ?? response.week.weekStart;
         const targetWeekId = response.metadata.currentWeekId ?? null;
         const incompleteTasks = response.week.tasks.filter(task => !isIssueClosed(task));
@@ -285,6 +337,35 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       .catch(err => {
         setCloseError(err as ErrorResponse);
         setClosingWeek(false);
+      });
+  }
+
+  function handleWeekStartDayChange(event: ChangeEvent<HTMLSelectElement>) {
+    const value = Number.parseInt(event.target.value, 10);
+    if (Number.isNaN(value) || value < 1 || value > dayNames.length) {
+      return;
+    }
+    const currentValue = weekSettings?.weekStartDay ?? weekStartDay;
+    if (value === currentValue) {
+      return;
+    }
+    setSettingsSaveError(null);
+    setSettingsSaving(true);
+    updateWeeklyPlannerSettings(project.id, { weekStartDay: value })
+      .then(updatedSettings => {
+        setSettingsSaving(false);
+        setWeekSettings(updatedSettings);
+        setWeekStartDay(updatedSettings.weekStartDay);
+        setSettingsError(null);
+        setSettingsSaveError(null);
+        loadWeeks();
+        if (selectedWeekId !== null) {
+          fetchWeek(selectedWeekId);
+        }
+      })
+      .catch(err => {
+        setSettingsSaving(false);
+        setSettingsSaveError(err as ErrorResponse);
       });
   }
 
@@ -392,6 +473,56 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         </div>
       </header>
 
+      <section className="projectWeeklyPlanner__settings" aria-labelledby="project-week-settings-title">
+        <div className="projectWeeklyPlanner__settingsHeader">
+          <div>
+            <h3 id="project-week-settings-title" className="projectWeeklyPlanner__settingsTitle">
+              Nastavení týdne
+            </h3>
+            <p className="projectWeeklyPlanner__settingsHint">Určete, který den je považován za začátek týdne.</p>
+          </div>
+          {(settingsSaving || settingsLoading) && (
+            <span className="projectWeeklyPlanner__settingsStatus" aria-live="polite">
+              {settingsSaving ? 'Ukládám…' : 'Načítám…'}
+            </span>
+          )}
+        </div>
+        <div className="projectWeeklyPlanner__settingsControls">
+          <label className="projectWeeklyPlanner__settingsField">
+            <span>První den týdne</span>
+            <select
+              value={String(currentWeekStartDay)}
+              onChange={handleWeekStartDayChange}
+              disabled={settingsLoading || settingsSaving}
+            >
+              {weekStartOptions.map(option => (
+                <option key={option.value} value={String(option.value)}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {settingsError && (
+            <p className="projectWeeklyPlanner__settingsError" role="alert">
+              Nastavení se nepodařilo načíst. {settingsError.error.message}{' '}
+              <button
+                type="button"
+                className="projectWeeklyPlanner__settingsRetry"
+                onClick={loadSettings}
+                disabled={settingsLoading}
+              >
+                Zkusit znovu
+              </button>
+            </p>
+          )}
+          {settingsSaveError && !settingsError && (
+            <p className="projectWeeklyPlanner__settingsError" role="alert">
+              Nastavení se nepodařilo uložit. {settingsSaveError.error.message}
+            </p>
+          )}
+        </div>
+      </section>
+
       <WeeklySummaryPanel
         summary={summary}
         isLoading={summaryLoading}
@@ -428,7 +559,7 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
             return (
               <article key={task.id} className="projectWeeklyPlanner__taskCard" role="listitem">
                 <div className="projectWeeklyPlanner__taskHeader">
-                  <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek)}</span>
+                  <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, currentWeekStartDay)}</span>
                   {carriedFrom && (
                     <span className="projectWeeklyPlanner__taskBadge">Carried over from week {formatDate(carriedFrom)}</span>
                   )}
@@ -506,7 +637,7 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
                     <span>
                       <strong>{task.issueTitle ?? task.note ?? 'Bez názvu'}</strong>
                       <small>
-                        {getDayLabel(task.dayOfWeek)} • {task.internName ?? 'Nepřiřazeno'} • {formatPlannedHours(task.plannedHours)}
+                        {getDayLabel(task.dayOfWeek, currentWeekStartDay)} • {task.internName ?? 'Nepřiřazeno'} • {formatPlannedHours(task.plannedHours)}
                       </small>
                     </span>
                   </label>
