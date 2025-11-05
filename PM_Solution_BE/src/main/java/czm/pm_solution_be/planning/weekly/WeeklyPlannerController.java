@@ -1,0 +1,223 @@
+package czm.pm_solution_be.planning.weekly;
+
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.TaskDetail;
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.TaskInput;
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeekConfiguration;
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeekDetail;
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeeklySummary;
+import czm.pm_solution_be.web.ApiException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/projects/{projectId}/weekly-planner")
+public class WeeklyPlannerController {
+
+    private final WeeklyPlannerService service;
+
+    public WeeklyPlannerController(WeeklyPlannerService service) {
+        this.service = service;
+    }
+
+    @PutMapping("/configuration/week-start")
+    public WeekConfigurationResponse configureWeekStart(@PathVariable long projectId,
+                                                        @RequestBody WeekStartConfigurationRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        WeekConfiguration configuration = service.configureWeekStart(projectId, request.weekStartDay());
+        return new WeekConfigurationResponse(configuration.projectId(), configuration.weekStartDay());
+    }
+
+    @PostMapping("/weeks/generate")
+    public ResponseEntity<List<WeekDetailResponse>> generateWeeks(@PathVariable long projectId,
+                                                                  @RequestBody WeekGenerationRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        List<WeekDetail> weeks = service.generateWeeks(projectId, request.from(), request.to());
+        return ResponseEntity.status(HttpStatus.CREATED).body(weeks.stream().map(this::toWeekResponse).toList());
+    }
+
+    @GetMapping("/weeks")
+    public List<WeekDetailResponse> listWeeks(@PathVariable long projectId,
+                                              @RequestParam(defaultValue = "20") int limit,
+                                              @RequestParam(defaultValue = "0") int offset) {
+        List<WeekDetail> weeks = service.listWeeks(projectId, limit, offset);
+        return weeks.stream().map(this::toWeekResponse).toList();
+    }
+
+    @GetMapping("/weeks/{projectWeekId}")
+    public WeekDetailResponse getWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        return toWeekResponse(service.getWeek(projectId, projectWeekId));
+    }
+
+    @PostMapping("/weeks/{projectWeekId}/tasks")
+    public ResponseEntity<TaskDetailResponse> createTask(@PathVariable long projectId,
+                                                         @PathVariable long projectWeekId,
+                                                         @RequestBody WeeklyTaskRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        TaskDetail created = service.createTask(projectId, projectWeekId, toTaskInput(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toTaskResponse(created));
+    }
+
+    @PutMapping("/weeks/{projectWeekId}/tasks/{taskId}")
+    public TaskDetailResponse updateTask(@PathVariable long projectId,
+                                         @PathVariable long projectWeekId,
+                                         @PathVariable long taskId,
+                                         @RequestBody WeeklyTaskRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        TaskDetail updated = service.updateTask(projectId, projectWeekId, taskId, toTaskInput(request));
+        return toTaskResponse(updated);
+    }
+
+    @PostMapping("/weeks/{projectWeekId}/tasks/{taskId}/status")
+    public TaskDetailResponse changeStatus(@PathVariable long projectId,
+                                           @PathVariable long projectWeekId,
+                                           @PathVariable long taskId,
+                                           @RequestBody ChangeStatusRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        TaskDetail updated = service.changeStatus(projectId, projectWeekId, taskId, request.status());
+        return toTaskResponse(updated);
+    }
+
+    @PostMapping("/weeks/{projectWeekId}/carry-over")
+    public List<TaskDetailResponse> carryOverTasks(@PathVariable long projectId,
+                                                   @PathVariable long projectWeekId,
+                                                   @RequestBody CarryOverRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        List<TaskDetail> carried = service.carryOverTasks(projectId, projectWeekId, request.targetWeekStart(), request.taskIds());
+        return carried.stream().map(this::toTaskResponse).toList();
+    }
+
+    @PostMapping("/weeks/{projectWeekId}/close")
+    public WeekDetailResponse closeWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        WeekDetail detail = service.closeWeek(projectId, projectWeekId);
+        return toWeekResponse(detail);
+    }
+
+    @GetMapping("/weeks/{projectWeekId}/summary")
+    public WeeklySummaryResponse getSummary(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        WeeklySummary summary = service.getSummary(projectId, projectWeekId);
+        List<DailySummaryResponse> perDay = summary.perDay().stream()
+                .map(day -> new DailySummaryResponse(day.dayOfWeek(), day.taskCount(), day.totalHours()))
+                .toList();
+        List<InternSummaryResponse> perIntern = summary.perIntern().stream()
+                .map(intern -> new InternSummaryResponse(intern.internId(), intern.internName(), intern.taskCount(), intern.totalHours()))
+                .toList();
+        return new WeeklySummaryResponse(summary.projectWeekId(), summary.taskCount(), summary.totalHours(), perDay, perIntern);
+    }
+
+    private WeekDetailResponse toWeekResponse(WeekDetail detail) {
+        List<TaskDetailResponse> tasks = detail.tasks().stream()
+                .map(this::toTaskResponse)
+                .toList();
+        return new WeekDetailResponse(detail.id(), detail.projectId(), detail.weekStart(), detail.weekEnd(), detail.createdAt(), detail.updatedAt(), tasks);
+    }
+
+    private TaskDetailResponse toTaskResponse(TaskDetail detail) {
+        return new TaskDetailResponse(
+                detail.id(),
+                detail.dayOfWeek(),
+                detail.note(),
+                detail.plannedHours(),
+                detail.internId(),
+                detail.internName(),
+                detail.issueId(),
+                detail.issueTitle(),
+                detail.issueState(),
+                detail.deadline(),
+                detail.createdAt(),
+                detail.updatedAt());
+    }
+
+    private TaskInput toTaskInput(WeeklyTaskRequest request) {
+        return new TaskInput(
+                request.issueId(),
+                request.internId(),
+                request.dayOfWeek(),
+                request.note(),
+                request.plannedHours(),
+                request.deadline());
+    }
+
+    public record WeekStartConfigurationRequest(Integer weekStartDay) {
+    }
+
+    public record WeekGenerationRequest(LocalDate from, LocalDate to) {
+    }
+
+    public record WeeklyTaskRequest(Long issueId,
+                                    Long internId,
+                                    Integer dayOfWeek,
+                                    String note,
+                                    BigDecimal plannedHours,
+                                    LocalDate deadline) {
+    }
+
+    public record ChangeStatusRequest(String status) {
+    }
+
+    public record CarryOverRequest(LocalDate targetWeekStart, List<Long> taskIds) {
+    }
+
+    public record WeekConfigurationResponse(long projectId, int weekStartDay) {
+    }
+
+    public record WeekDetailResponse(long id,
+                                     long projectId,
+                                     LocalDate weekStart,
+                                     LocalDate weekEnd,
+                                     OffsetDateTime createdAt,
+                                     OffsetDateTime updatedAt,
+                                     List<TaskDetailResponse> tasks) {
+    }
+
+    public record TaskDetailResponse(long id,
+                                     Integer dayOfWeek,
+                                     String note,
+                                     BigDecimal plannedHours,
+                                     Long internId,
+                                     String internName,
+                                     Long issueId,
+                                     String issueTitle,
+                                     String issueState,
+                                     LocalDate deadline,
+                                     OffsetDateTime createdAt,
+                                     OffsetDateTime updatedAt) {
+    }
+
+    public record WeeklySummaryResponse(long projectWeekId,
+                                        long taskCount,
+                                        BigDecimal totalHours,
+                                        List<DailySummaryResponse> perDay,
+                                        List<InternSummaryResponse> perIntern) {
+    }
+
+    public record DailySummaryResponse(int dayOfWeek, long taskCount, BigDecimal totalHours) {
+    }
+
+    public record InternSummaryResponse(Long internId, String internName, long taskCount, BigDecimal totalHours) {
+    }
+}
