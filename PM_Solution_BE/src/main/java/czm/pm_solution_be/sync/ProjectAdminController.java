@@ -23,7 +23,8 @@ public class ProjectAdminController {
                              LocalDate budgetTo,
                              boolean isExternal,
                              BigDecimal hourlyRateCzk,
-                             BigDecimal reportedCost) {}
+                             BigDecimal reportedCost,
+                             int weekStartDay) {}
     public record CreateRequest(Long namespaceId,
                                 String namespaceName,
                                 String name,
@@ -31,7 +32,8 @@ public class ProjectAdminController {
                                 LocalDate budgetFrom,
                                 LocalDate budgetTo,
                                 Boolean isExternal,
-                                BigDecimal hourlyRateCzk) {}
+                                BigDecimal hourlyRateCzk,
+                                Integer weekStartDay) {}
     public record UpdateRequest(String name,
                                  Integer budget,
                                  LocalDate budgetFrom,
@@ -39,7 +41,8 @@ public class ProjectAdminController {
                                  Long namespaceId,
                                  String namespaceName,
                                  Boolean isExternal,
-                                 BigDecimal hourlyRateCzk) {}
+                                 BigDecimal hourlyRateCzk,
+                                 Integer weekStartDay) {}
 
     @PostMapping
     public ResponseEntity<ProjectDto> create(@RequestBody CreateRequest req) {
@@ -48,11 +51,12 @@ public class ProjectAdminController {
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
         validateHourlyRate(req.hourlyRateCzk());
+        int weekStartDay = resolveWeekStartDay(req.weekStartDay());
         boolean isExternal = Boolean.TRUE.equals(req.isExternal());
         enforceExternalHourlyRateRule(isExternal, req.hourlyRateCzk());
         BigDecimal hourlyRate = isExternal ? req.hourlyRateCzk() : null;
-        SyncDao.UpsertResult<Long> res = dao.upsertProject(req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), isExternal, hourlyRate);
-        ProjectDto body = findProjectOrFallback(res.id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), isExternal, hourlyRate);
+        SyncDao.UpsertResult<Long> res = dao.upsertProject(req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), isExternal, hourlyRate, weekStartDay);
+        ProjectDto body = findProjectOrFallback(res.id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), isExternal, hourlyRate, weekStartDay);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -68,13 +72,14 @@ public class ProjectAdminController {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
         boolean isExternal = req.isExternal() != null ? req.isExternal() : existing.isExternal();
+        int weekStartDay = req.weekStartDay() != null ? resolveWeekStartDay(req.weekStartDay()) : existing.weekStartDay();
         enforceExternalHourlyRateRule(isExternal, req.hourlyRateCzk());
         BigDecimal hourlyRate = isExternal ? req.hourlyRateCzk() : null;
-        dao.updateProject(id, req.name, req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName(), isExternal, hourlyRate);
+        dao.updateProject(id, req.name, req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName(), isExternal, hourlyRate, weekStartDay);
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.isExternal(), p.hourlyRateCzk(), p.reportedCost()))
+                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.isExternal(), p.hourlyRateCzk(), p.reportedCost(), p.weekStartDay()))
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
     }
 
@@ -85,7 +90,8 @@ public class ProjectAdminController {
                                       Long namespaceId,
                                       String namespaceName,
                                       Boolean isExternal,
-                                      BigDecimal hourlyRateCzk) {}
+                                      BigDecimal hourlyRateCzk,
+                                      Integer weekStartDay) {}
 
     @PostMapping("/by-name")
     public ResponseEntity<ProjectDto> createByName(@RequestBody CreateByNameRequest req) {
@@ -94,11 +100,12 @@ public class ProjectAdminController {
         }
         validateBudgetPayload(req.budget(), req.budgetFrom(), req.budgetTo());
         validateHourlyRate(req.hourlyRateCzk());
+        int weekStartDay = resolveWeekStartDay(req.weekStartDay());
         boolean isExternal = Boolean.TRUE.equals(req.isExternal());
         enforceExternalHourlyRateRule(isExternal, req.hourlyRateCzk());
         BigDecimal hourlyRate = isExternal ? req.hourlyRateCzk() : null;
-        Long id = dao.createProjectByName(req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName(), isExternal, hourlyRate);
-        ProjectDto body = findProjectOrFallback(id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), isExternal, hourlyRate);
+        Long id = dao.createProjectByName(req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), req.namespaceId(), req.namespaceName(), isExternal, hourlyRate, weekStartDay);
+        ProjectDto body = findProjectOrFallback(id, req.namespaceId(), req.namespaceName(), req.name(), req.budget(), req.budgetFrom(), req.budgetTo(), isExternal, hourlyRate, weekStartDay);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -129,6 +136,14 @@ public class ProjectAdminController {
         }
     }
 
+    private int resolveWeekStartDay(Integer weekStartDay) {
+        int resolved = weekStartDay == null ? 1 : weekStartDay;
+        if (resolved < 1 || resolved > 7) {
+            throw new IllegalArgumentException("week_start_day musí být v intervalu 1 až 7");
+        }
+        return resolved;
+    }
+
     private ProjectDto findProjectOrFallback(Long id,
                                              Long namespaceId,
                                              String namespaceName,
@@ -137,14 +152,15 @@ public class ProjectAdminController {
                                              LocalDate budgetFrom,
                                              LocalDate budgetTo,
                                              boolean isExternal,
-                                             BigDecimal hourlyRateCzk) {
+                                             BigDecimal hourlyRateCzk,
+                                             int weekStartDay) {
         if (id == null) {
             throw new IllegalStateException("ID projektu nebylo vráceno databází");
         }
         return dao.listProjects().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
-                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.isExternal(), p.hourlyRateCzk(), p.reportedCost()))
-                .orElse(new ProjectDto(id, namespaceId, namespaceName, name, budget, budgetFrom, budgetTo, isExternal, hourlyRateCzk, BigDecimal.ZERO));
+                .map(p -> new ProjectDto(p.id(), p.namespaceId(), p.namespaceName(), p.name(), p.budget(), p.budgetFrom(), p.budgetTo(), p.isExternal(), p.hourlyRateCzk(), p.reportedCost(), p.weekStartDay()))
+                .orElse(new ProjectDto(id, namespaceId, namespaceName, name, budget, budgetFrom, budgetTo, isExternal, hourlyRateCzk, BigDecimal.ZERO, weekStartDay));
     }
 }

@@ -1,9 +1,12 @@
 package czm.pm_solution_be.planning.weekly;
 
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.PlannerMetadata;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.TaskDetail;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.TaskInput;
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeekCollection;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeekConfiguration;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeekDetail;
+import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeekWithMetadata;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeeklySummary;
 import czm.pm_solution_be.web.ApiException;
 import org.springframework.http.HttpStatus;
@@ -43,26 +46,27 @@ public class WeeklyPlannerController {
     }
 
     @PostMapping("/weeks/generate")
-    public ResponseEntity<List<WeekDetailResponse>> generateWeeks(@PathVariable long projectId,
-                                                                  @RequestBody WeekGenerationRequest request) {
+    public ResponseEntity<WeekCollectionResponse> generateWeeks(@PathVariable long projectId,
+                                                                @RequestBody WeekGenerationRequest request) {
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
-        List<WeekDetail> weeks = service.generateWeeks(projectId, request.from(), request.to());
-        return ResponseEntity.status(HttpStatus.CREATED).body(weeks.stream().map(this::toWeekResponse).toList());
+        WeekCollection weeks = service.generateWeeks(projectId, request.from(), request.to());
+        return ResponseEntity.status(HttpStatus.CREATED).body(toWeekCollectionResponse(weeks));
     }
 
     @GetMapping("/weeks")
-    public List<WeekDetailResponse> listWeeks(@PathVariable long projectId,
-                                              @RequestParam(defaultValue = "20") int limit,
-                                              @RequestParam(defaultValue = "0") int offset) {
-        List<WeekDetail> weeks = service.listWeeks(projectId, limit, offset);
-        return weeks.stream().map(this::toWeekResponse).toList();
+    public WeekCollectionResponse listWeeks(@PathVariable long projectId,
+                                            @RequestParam(defaultValue = "20") int limit,
+                                            @RequestParam(defaultValue = "0") int offset) {
+        WeekCollection weeks = service.listWeeks(projectId, limit, offset);
+        return toWeekCollectionResponse(weeks);
     }
 
     @GetMapping("/weeks/{projectWeekId}")
-    public WeekDetailResponse getWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
-        return toWeekResponse(service.getWeek(projectId, projectWeekId));
+    public WeekWithMetadataResponse getWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        WeekWithMetadata detail = service.getWeek(projectId, projectWeekId);
+        return new WeekWithMetadataResponse(toWeekResponse(detail.week()), toMetadataResponse(detail.metadata()));
     }
 
     @PostMapping("/weeks/{projectWeekId}/tasks")
@@ -112,9 +116,9 @@ public class WeeklyPlannerController {
     }
 
     @PostMapping("/weeks/{projectWeekId}/close")
-    public WeekDetailResponse closeWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
-        WeekDetail detail = service.closeWeek(projectId, projectWeekId);
-        return toWeekResponse(detail);
+    public WeekWithMetadataResponse closeWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        WeekWithMetadata detail = service.closeWeek(projectId, projectWeekId);
+        return new WeekWithMetadataResponse(toWeekResponse(detail.week()), toMetadataResponse(detail.metadata()));
     }
 
     @GetMapping("/weeks/{projectWeekId}/summary")
@@ -129,11 +133,28 @@ public class WeeklyPlannerController {
         return new WeeklySummaryResponse(summary.projectWeekId(), summary.taskCount(), summary.totalHours(), perDay, perIntern);
     }
 
+    private WeekCollectionResponse toWeekCollectionResponse(WeekCollection weeks) {
+        List<WeekDetailResponse> responses = weeks.weeks().stream()
+                .map(this::toWeekResponse)
+                .toList();
+        return new WeekCollectionResponse(responses, toMetadataResponse(weeks.metadata()));
+    }
+
     private WeekDetailResponse toWeekResponse(WeekDetail detail) {
         List<TaskDetailResponse> tasks = detail.tasks().stream()
                 .map(this::toTaskResponse)
                 .toList();
         return new WeekDetailResponse(detail.id(), detail.projectId(), detail.weekStart(), detail.weekEnd(), detail.createdAt(), detail.updatedAt(), tasks);
+    }
+
+    private PlannerMetadataResponse toMetadataResponse(PlannerMetadata metadata) {
+        return new PlannerMetadataResponse(
+                metadata.projectId(),
+                metadata.weekStartDay(),
+                metadata.today(),
+                metadata.currentWeekStart(),
+                metadata.currentWeekEnd(),
+                metadata.currentWeekId());
     }
 
     private TaskDetailResponse toTaskResponse(TaskDetail detail) {
@@ -183,6 +204,22 @@ public class WeeklyPlannerController {
     }
 
     public record WeekConfigurationResponse(long projectId, int weekStartDay) {
+    }
+
+    public record WeekCollectionResponse(List<WeekDetailResponse> weeks,
+                                         PlannerMetadataResponse metadata) {
+    }
+
+    public record WeekWithMetadataResponse(WeekDetailResponse week,
+                                           PlannerMetadataResponse metadata) {
+    }
+
+    public record PlannerMetadataResponse(long projectId,
+                                          int weekStartDay,
+                                          LocalDate today,
+                                          LocalDate currentWeekStart,
+                                          LocalDate currentWeekEnd,
+                                          Long currentWeekId) {
     }
 
     public record WeekDetailResponse(long id,

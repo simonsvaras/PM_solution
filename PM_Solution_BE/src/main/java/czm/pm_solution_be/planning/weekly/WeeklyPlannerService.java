@@ -16,6 +16,7 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
@@ -56,7 +57,7 @@ public class WeeklyPlannerService {
         return new WeekConfiguration(projectId, weekStartDay);
     }
 
-    public List<WeekDetail> generateWeeks(long projectId, LocalDate from, LocalDate to) {
+    public WeekCollection generateWeeks(long projectId, LocalDate from, LocalDate to) {
         ProjectConfigurationRow project = requireProject(projectId);
         if (from == null) {
             throw ApiException.validation("Datum 'od' je povinné.", "from_required");
@@ -90,11 +91,12 @@ public class WeeklyPlannerService {
             result.add(mapWeek(row));
             current = current.plusWeeks(1);
         }
-        return List.copyOf(result);
+        PlannerMetadata metadata = createMetadata(projectId, project);
+        return new WeekCollection(metadata, List.copyOf(result));
     }
 
-    public List<WeekDetail> listWeeks(long projectId, int limit, int offset) {
-        requireProject(projectId);
+    public WeekCollection listWeeks(long projectId, int limit, int offset) {
+        ProjectConfigurationRow project = requireProject(projectId);
         if (limit <= 0 || limit > 200) {
             throw ApiException.validation("Limit musí být v intervalu 1 až 200.", "pagination_limit_invalid");
         }
@@ -102,18 +104,22 @@ public class WeeklyPlannerService {
             throw ApiException.validation("Offset nesmí být záporný.", "pagination_offset_invalid");
         }
         List<ProjectWeekRow> rows = repository.listProjectWeeks(projectId, limit, offset);
-        return rows.stream()
+        PlannerMetadata metadata = createMetadata(projectId, project);
+        List<WeekDetail> weeks = rows.stream()
                 .map(this::mapWeek)
                 .toList();
+        return new WeekCollection(metadata, weeks);
     }
 
-    public WeekDetail getWeek(long projectId, long projectWeekId) {
+    public WeekWithMetadata getWeek(long projectId, long projectWeekId) {
+        ProjectConfigurationRow project = requireProject(projectId);
         ProjectWeekRow row = repository.findProjectWeekById(projectWeekId)
                 .orElseThrow(() -> ApiException.notFound("Požadovaný týden neexistuje.", "project_week"));
         if (row.projectId() != projectId) {
             throw ApiException.notFound("Požadovaný týden neexistuje.", "project_week");
         }
-        return mapWeek(row);
+        PlannerMetadata metadata = createMetadata(projectId, project);
+        return new WeekWithMetadata(metadata, mapWeek(row));
     }
 
     public TaskDetail createTask(long projectId, long projectWeekId, TaskInput input) {
@@ -223,7 +229,8 @@ public class WeeklyPlannerService {
                 .toList();
     }
 
-    public WeekDetail closeWeek(long projectId, long projectWeekId) {
+    public WeekWithMetadata closeWeek(long projectId, long projectWeekId) {
+        ProjectConfigurationRow project = requireProject(projectId);
         ProjectWeekRow week = requireWeek(projectId, projectWeekId);
         LocalDate weekEnd = computeWeekEnd(week.weekStartDate());
         txTemplate.executeWithoutResult(status -> {
@@ -236,7 +243,8 @@ public class WeeklyPlannerService {
         });
         ProjectWeekRow refreshed = repository.findProjectWeekById(projectWeekId)
                 .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst týden po uzavření.", "week_reload_failed"));
-        return mapWeek(refreshed);
+        PlannerMetadata metadata = createMetadata(projectId, project);
+        return new WeekWithMetadata(metadata, mapWeek(refreshed));
     }
 
     public WeeklySummary getSummary(long projectId, long projectWeekId) {
@@ -339,6 +347,16 @@ public class WeeklyPlannerService {
                 tasks);
     }
 
+    private PlannerMetadata createMetadata(long projectId, ProjectConfigurationRow project) {
+        LocalDate today = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate();
+        LocalDate currentWeekStart = alignToWeekStart(today, project.weekStartDay());
+        LocalDate currentWeekEnd = computeWeekEnd(currentWeekStart);
+        Long currentWeekId = repository.findProjectWeek(projectId, currentWeekStart)
+                .map(ProjectWeekRow::id)
+                .orElse(null);
+        return new PlannerMetadata(projectId, project.weekStartDay(), today, currentWeekStart, currentWeekEnd, currentWeekId);
+    }
+
     private TaskDetail mapTask(WeeklyTaskRow row) {
         return new TaskDetail(
                 row.id(),
@@ -387,6 +405,20 @@ public class WeeklyPlannerService {
     }
 
     public record WeekConfiguration(long projectId, int weekStartDay) {
+    }
+
+    public record WeekCollection(PlannerMetadata metadata, List<WeekDetail> weeks) {
+    }
+
+    public record WeekWithMetadata(PlannerMetadata metadata, WeekDetail week) {
+    }
+
+    public record PlannerMetadata(long projectId,
+                                   int weekStartDay,
+                                   LocalDate today,
+                                   LocalDate currentWeekStart,
+                                   LocalDate currentWeekEnd,
+                                   Long currentWeekId) {
     }
 
     public record WeekDetail(long id,

@@ -23,7 +23,8 @@ public class ProjectQueryController {
                              java.time.LocalDate budgetTo,
                              boolean isExternal,
                              BigDecimal hourlyRateCzk,
-                             BigDecimal reportedCost) {}
+                             BigDecimal reportedCost,
+                             int weekStartDay) {}
 
     public record ProjectOverviewDto(Long id,
                                      String name,
@@ -39,7 +40,7 @@ public class ProjectQueryController {
     @GetMapping
     public List<ProjectDto> list() {
         return dao.listProjects().stream()
-                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.isExternal(), r.hourlyRateCzk(), r.reportedCost()))
+                .map(r -> new ProjectDto(r.id(), r.namespaceId(), r.namespaceName(), r.name(), r.budget(), r.budgetFrom(), r.budgetTo(), r.isExternal(), r.hourlyRateCzk(), r.reportedCost(), r.weekStartDay()))
                 .toList();
     }
 
