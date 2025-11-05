@@ -11,14 +11,7 @@ SET row_security = off;
 
 -- Add project.week_start_day with default Monday (ISO weekday 1)
 ALTER TABLE "public"."project"
-    ADD COLUMN IF NOT EXISTS "week_start_day" smallint DEFAULT 1;
-
-UPDATE "public"."project"
-SET "week_start_day" = 1
-WHERE "week_start_day" IS NULL;
-
-ALTER TABLE "public"."project"
-    ALTER COLUMN "week_start_day" SET NOT NULL;
+    ADD COLUMN "week_start_day" smallint NOT NULL DEFAULT 1;
 
 ALTER TABLE "public"."project"
     ADD CONSTRAINT IF NOT EXISTS "project_week_start_day_check" CHECK (("week_start_day" >= 1 AND "week_start_day" <= 7));
