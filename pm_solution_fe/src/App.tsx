@@ -1109,7 +1109,7 @@ function App() {
               ) : reportView === 'detail-capacity' ? (
                 <ProjectCapacityReportPage project={selectedReportProject} onShowToast={showToast} />
               ) : reportView === 'detail-planning' ? (
-                <ProjectWeeklyPlannerPage project={selectedReportProject} />
+                <ProjectWeeklyPlannerPage project={selectedReportProject} onShowToast={showToast} />
               ) : (
                 <ProjectReportProjectDetailPage project={selectedReportProject} />
               )

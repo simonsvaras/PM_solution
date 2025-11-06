@@ -1,8 +1,17 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
 import Modal from './Modal';
 import WeeklyTaskFormModal, { type WeeklyTaskFormInitialTask, type WeeklyTaskFormMode, type WeeklyTaskFormValues } from './WeeklyTaskFormModal';
 import WeeklySummaryPanel from './WeeklySummaryPanel';
+import WeeklyTaskList, {
+  getWeeklyTasksQueryKey,
+  prependWeeklyTask,
+  replaceWeeklyTask,
+  setWeeklyTasksQueryData,
+  type WeeklyTasksQueryData,
+} from './WeeklyTaskList';
+import { dayNames, formatDate, formatDateRange, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
 import {
   type CarryOverTasksPayload,
   type ErrorResponse,
@@ -11,17 +20,23 @@ import {
   type WeeklyPlannerWeek,
   type WeeklyPlannerSettings,
   type WeeklySummary,
-  closeProjectWeek,
+  type WeeklyTaskPayload,
   carryOverWeeklyTasks,
+  closeProjectWeek,
+  createWeeklyTask,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
   getWeeklyPlannerSettings,
   listProjectWeeklyPlannerWeeks,
   updateWeeklyPlannerSettings,
+  updateWeeklyTask,
 } from '../api';
+
+type ToastKind = 'success' | 'warning' | 'error';
 
 type ProjectWeeklyPlannerPageProps = {
   project: ProjectOverviewDTO;
+  onShowToast?: (type: ToastKind, text: string) => void;
 };
 
 type CarryOverContext = {
@@ -31,53 +46,73 @@ type CarryOverContext = {
 };
 
 const WEEK_FETCH_LIMIT = 20;
-const dayNames = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle'];
-const dateFormatter = new Intl.DateTimeFormat('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
-const hoursFormatter = new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 
-function getDayLabel(dayOfWeek: number | null, weekStartDay = 1): string {
-  if (!dayOfWeek || dayOfWeek < 1 || dayOfWeek > dayNames.length) {
-    return 'Bez dne';
-  }
-  const offset = ((weekStartDay - 1) % dayNames.length + dayNames.length) % dayNames.length;
-  const index = (offset + (dayOfWeek - 1)) % dayNames.length;
-  return dayNames[index];
+type TaskMutationContext = {
+  queryKey: ReturnType<typeof getWeeklyTasksQueryKey>;
+  previous: WeeklyTasksQueryData | undefined;
+  weekId: number;
+  optimisticId?: number;
+};
+
+type CreateTaskVariables = { weekId: number; values: WeeklyTaskFormValues };
+type UpdateTaskVariables = { weekId: number; taskId: number; values: WeeklyTaskFormValues };
+
+let optimisticTaskIdCounter = -1;
+
+function nextOptimisticTaskId(): number {
+  optimisticTaskIdCounter -= 1;
+  return optimisticTaskIdCounter;
 }
 
-function formatDateRange(start: string | null, end: string | null): string {
-  if (!start || !end) {
-    return '—';
-  }
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return '—';
-  }
-  return `${dateFormatter.format(startDate)} – ${dateFormatter.format(endDate)}`;
+function mapFormValuesToPayload(values: WeeklyTaskFormValues): WeeklyTaskPayload {
+  const trimmedTitle = values.title.trim();
+  const trimmedDescription = values.description.trim();
+  return {
+    title: trimmedTitle,
+    description: trimmedDescription.length > 0 ? trimmedDescription : null,
+    status: values.status,
+    deadline: values.deadline ?? null,
+    issueId: values.issueId ?? null,
+    internId: values.assignedInternId ?? null,
+    note: trimmedDescription.length > 0 ? trimmedDescription : trimmedTitle,
+    plannedHours: null,
+    dayOfWeek: null,
+  };
 }
 
-function formatDate(start: string | null): string {
-  if (!start) return '—';
-  const value = new Date(start);
-  if (Number.isNaN(value.getTime())) {
-    return '—';
-  }
-  return dateFormatter.format(value);
-}
-
-function formatPlannedHours(hours: number | null): string {
-  if (hours === null || Number.isNaN(hours)) {
-    return 'Neplánováno';
-  }
-  return `${hoursFormatter.format(hours)} h`;
+function createOptimisticTaskFromForm(
+  values: WeeklyTaskFormValues,
+  overrides?: Partial<WeeklyPlannerTask>,
+): WeeklyPlannerTask {
+  const now = new Date().toISOString();
+  const status = values.status === 'CLOSED' ? 'CLOSED' : 'OPENED';
+  const optimisticId = overrides?.id ?? nextOptimisticTaskId();
+  const trimmedTitle = values.title.trim();
+  const trimmedDescription = values.description.trim();
+  return {
+    id: optimisticId,
+    dayOfWeek: overrides?.dayOfWeek ?? null,
+    note: overrides?.note ?? (trimmedDescription.length > 0 ? trimmedDescription : trimmedTitle),
+    plannedHours: overrides?.plannedHours ?? null,
+    internId: values.assignedInternId ?? overrides?.internId ?? null,
+    internName: overrides?.internName ?? null,
+    issueId: values.issueId ?? overrides?.issueId ?? null,
+    issueTitle: overrides?.issueTitle ?? trimmedTitle,
+    issueState: status === 'CLOSED' ? 'closed' : 'opened',
+    status,
+    deadline: values.deadline ?? overrides?.deadline ?? null,
+    createdAt: overrides?.createdAt ?? now,
+    updatedAt: overrides?.updatedAt ?? now,
+    carriedOverFromWeekStart: overrides?.carriedOverFromWeekStart ?? null,
+    carriedOverFromWeekId: overrides?.carriedOverFromWeekId ?? null,
+  };
 }
 
 function isIssueClosed(task: WeeklyPlannerTask): boolean {
-  const state = task.issueState ?? '';
-  return state.trim().toLowerCase() === 'closed';
+  return task.status === 'CLOSED';
 }
 
-export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlannerPageProps) {
+export default function ProjectWeeklyPlannerPage({ project, onShowToast }: ProjectWeeklyPlannerPageProps) {
   const [weeksLoading, setWeeksLoading] = useState(false);
   const [weeksError, setWeeksError] = useState<ErrorResponse | null>(null);
   const [weeks, setWeeks] = useState<WeeklyPlannerWeek[]>([]);
@@ -108,6 +143,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
   const [taskFormMode, setTaskFormMode] = useState<WeeklyTaskFormMode>('create');
   const [taskFormInitial, setTaskFormInitial] = useState<WeeklyTaskFormInitialTask | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [taskMutationError, setTaskMutationError] = useState<ErrorResponse | null>(null);
+
+  const queryClient = useQueryClient();
 
   const loadSettings = useCallback(() => {
     setSettingsLoading(true);
@@ -128,6 +167,9 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
     listProjectWeeklyPlannerWeeks(project.id, { limit: WEEK_FETCH_LIMIT, offset: 0 })
       .then(collection => {
         setWeeks(collection.weeks);
+        collection.weeks.forEach(week => {
+          setWeeklyTasksQueryData(queryClient, project.id, week.id, week.tasks);
+        });
         setRoles(collection.metadata.roles);
         setWeekStartDay(collection.metadata.weekStartDay);
         setWeekSettings(prev =>
@@ -143,7 +185,7 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       })
       .catch(err => setWeeksError(err as ErrorResponse))
       .finally(() => setWeeksLoading(false));
-  }, [project.id]);
+  }, [project.id, queryClient]);
 
   useEffect(() => {
     loadSettings();
@@ -159,6 +201,7 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       setWeekError(null);
       getProjectWeeklyPlannerWeek(project.id, weekId)
         .then(data => {
+          setWeeklyTasksQueryData(queryClient, project.id, data.week.id, data.week.tasks);
           setSelectedWeek(data.week);
           setRoles(data.metadata.roles);
           setWeekStartDay(data.metadata.weekStartDay);
@@ -189,7 +232,7 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         .catch(err => setSummaryError(err as ErrorResponse))
         .finally(() => setSummaryLoading(false));
     },
-    [project.id],
+    [project.id, queryClient],
   );
 
   useEffect(() => {
@@ -206,6 +249,87 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       setSelectedWeekIdForForm(selectedWeekId);
     }
   }, [isCreateModalOpen, selectedWeekId, selectedWeekIdForForm]);
+
+  useEffect(() => {
+    if (isCreateModalOpen && selectedWeekIdForForm !== selectedWeekId) {
+      closeCreateTaskModal();
+    }
+  }, [closeCreateTaskModal, isCreateModalOpen, selectedWeekId, selectedWeekIdForForm]);
+
+  function notify(type: ToastKind, text: string) {
+    onShowToast?.(type, text);
+  }
+
+  const createTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, CreateTaskVariables, TaskMutationContext>({
+    mutationFn: async ({ weekId, values }) => {
+      const payload = mapFormValuesToPayload(values);
+      return createWeeklyTask(project.id, weekId, payload);
+    },
+    onMutate: async ({ weekId, values }) => {
+      const queryKey = getWeeklyTasksQueryKey(project.id, weekId);
+      await queryClient.cancelQueries({ queryKey });
+      const optimisticTask = createOptimisticTaskFromForm(values);
+      const optimisticId = optimisticTask.id;
+      const previous = prependWeeklyTask(queryClient, project.id, weekId, optimisticTask);
+      setTaskMutationError(null);
+      return { queryKey, previous, weekId, optimisticId } satisfies TaskMutationContext;
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+      setTaskMutationError(error);
+    },
+    onSuccess: (task, _variables, context) => {
+      if (context) {
+        replaceWeeklyTask(queryClient, project.id, context.weekId, task, context.optimisticId);
+      }
+      setTaskMutationError(null);
+      closeCreateTaskModal();
+      notify('success', 'Úkol byl vytvořen.');
+    },
+    onSettled: (_result, _error, _variables, context) => {
+      if (context) {
+        queryClient.invalidateQueries({ queryKey: context.queryKey });
+      }
+    },
+  });
+
+  const updateTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, UpdateTaskVariables, TaskMutationContext>({
+    mutationFn: async ({ weekId, taskId, values }) => {
+      const payload = mapFormValuesToPayload(values);
+      return updateWeeklyTask(project.id, weekId, taskId, payload);
+    },
+    onMutate: async ({ weekId, taskId, values }) => {
+      const queryKey = getWeeklyTasksQueryKey(project.id, weekId);
+      await queryClient.cancelQueries({ queryKey });
+      const current = queryClient.getQueryData<WeeklyTasksQueryData>(queryKey);
+      const existing = current?.tasks.find(task => task.id === taskId);
+      const optimisticTask = createOptimisticTaskFromForm(values, existing ?? { id: taskId });
+      const previous = replaceWeeklyTask(queryClient, project.id, weekId, optimisticTask, taskId);
+      setTaskMutationError(null);
+      return { queryKey, previous, weekId, optimisticId: taskId } satisfies TaskMutationContext;
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+      setTaskMutationError(error);
+    },
+    onSuccess: (task, variables, context) => {
+      if (context) {
+        replaceWeeklyTask(queryClient, project.id, context.weekId, task, variables.taskId);
+      }
+      setTaskMutationError(null);
+      closeCreateTaskModal();
+      notify('success', 'Úkol byl upraven.');
+    },
+    onSettled: (_result, _error, _variables, context) => {
+      if (context) {
+        queryClient.invalidateQueries({ queryKey: context.queryKey });
+      }
+    },
+  });
 
   const weekStartOptions = useMemo(
     () => dayNames.map((name, index) => ({ value: index + 1, label: `${index + 1} – ${name}` })),
@@ -243,8 +367,6 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
 
   const closeButtonVisible = canCloseWeek && selectedWeekId !== null;
   const closeButtonDisabled = closingWeek || isClosed;
-  const tasks = selectedWeek?.tasks ?? [];
-
   const formWeek = useMemo(() => {
     if (selectedWeekIdForForm === null) {
       return null;
@@ -321,8 +443,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         return;
       }
       setTaskFormMode('create');
+      setEditingTaskId(null);
       setTaskFormInitial(null);
       setSelectedWeekIdForForm(weekId);
+      setTaskMutationError(null);
       setIsCreateModalOpen(true);
     },
     [],
@@ -332,13 +456,49 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
     setIsCreateModalOpen(false);
     setTaskFormInitial(null);
     setSelectedWeekIdForForm(null);
+    setEditingTaskId(null);
+    setTaskFormMode('create');
+    setTaskMutationError(null);
   }, []);
 
-  const handleTaskFormSubmit = useCallback(
-    async (_values: WeeklyTaskFormValues) => {
-      closeCreateTaskModal();
+  const handleEditTask = useCallback(
+    (task: WeeklyPlannerTask) => {
+      if (selectedWeekId === null) {
+        return;
+      }
+      setTaskFormMode('edit');
+      setEditingTaskId(task.id);
+      setSelectedWeekIdForForm(selectedWeekId);
+      setTaskFormInitial({
+        title: task.issueTitle ?? task.note ?? '',
+        description: task.note ?? '',
+        status: task.status,
+        deadline: task.deadline,
+        issueId: task.issueId ?? null,
+        assignedInternId: task.internId ?? null,
+      });
+      setTaskMutationError(null);
+      setIsCreateModalOpen(true);
     },
-    [closeCreateTaskModal],
+    [selectedWeekId],
+  );
+
+  const handleTaskFormSubmit = useCallback(
+    async (values: WeeklyTaskFormValues) => {
+      const activeWeekId = selectedWeekIdForForm ?? selectedWeekId;
+      if (activeWeekId === null) {
+        throw new Error('Vyberte týden pro uložení úkolu.');
+      }
+      if (taskFormMode === 'edit') {
+        if (editingTaskId === null) {
+          throw new Error('Úkol není k dispozici pro úpravu.');
+        }
+        await updateTaskMutation.mutateAsync({ weekId: activeWeekId, taskId: editingTaskId, values });
+        return;
+      }
+      await createTaskMutation.mutateAsync({ weekId: activeWeekId, values });
+    },
+    [createTaskMutation, editingTaskId, selectedWeekId, selectedWeekIdForForm, taskFormMode, updateTaskMutation],
   );
 
   useEffect(() => {
@@ -346,6 +506,10 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       closeCreateTaskModal();
     }
   }, [selectedWeekId, closeCreateTaskModal]);
+
+  useEffect(() => {
+    setTaskMutationError(null);
+  }, [selectedWeekId]);
 
   function handleOpenCloseModal() {
     setCloseError(null);
@@ -371,6 +535,7 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         setCarryOverSelection(incompleteTasks.map(task => task.id));
         setCarryOverContext({ sourceWeek: response.week, targetWeekStart, targetWeekId });
         setCarryOverModalOpen(true);
+        setWeeklyTasksQueryData(queryClient, project.id, response.week.id, response.week.tasks);
         setWeeks(prev => {
           const exists = prev.findIndex(week => week.id === response.week.id);
           if (exists >= 0) {
@@ -609,59 +774,29 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         }}
       />
 
-      {weekLoading && (
-        <p className="projectWeeklyPlanner__status" role="status">
-          Načítám detail týdne…
-        </p>
-      )}
-      {weekError && !weekLoading && (
-        <p className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error" role="alert">
-          Týden se nepodařilo načíst. {weekError.error.message}
-        </p>
-      )}
+      <div className="projectWeeklyPlanner__tasksHeader">
+        <h3 className="projectWeeklyPlanner__tasksTitle">Plán úkolů</h3>
+        <div className="projectWeeklyPlanner__tasksHeaderAction">{renderCreateTaskButton()}</div>
+      </div>
 
-      {!weekLoading && !weekError && (
-        <>
-          <div className="projectWeeklyPlanner__tasksHeader">
-            <h3 className="projectWeeklyPlanner__tasksTitle">Plán úkolů</h3>
-            <div className="projectWeeklyPlanner__tasksHeaderAction">
-              {renderCreateTaskButton()}
-            </div>
-          </div>
-
-          {tasks.length === 0 ? (
-            <div className="projectWeeklyPlanner__empty" role="status">
-              <p>V tomto týdnu zatím nejsou naplánovány žádné úkoly. Přidejte první, abyste mohli sdílet priority.</p>
-            </div>
-          ) : (
-            <div className="projectWeeklyPlanner__tasks" role="list">
-              {tasks.map(task => {
-                const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
-                const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
-                return (
-                  <article key={task.id} className="projectWeeklyPlanner__taskCard" role="listitem">
-                    <div className="projectWeeklyPlanner__taskHeader">
-                      <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, currentWeekStartDay)}</span>
-                      {carriedFrom && (
-                        <span className="projectWeeklyPlanner__taskBadge">Carried over from week {formatDate(carriedFrom)}</span>
-                      )}
-                    </div>
-                    <h3 className="projectWeeklyPlanner__taskTitle">{headline}</h3>
-                    <p className="projectWeeklyPlanner__taskMeta">
-                      <span>{task.internName ?? 'Nepřiřazeno'}</span>
-                      <span aria-hidden="true">•</span>
-                      <span>{formatPlannedHours(task.plannedHours)}</span>
-                    </p>
-                    {task.note && task.note !== task.issueTitle && (
-                      <p className="projectWeeklyPlanner__taskNote">{task.note}</p>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
+      <WeeklyTaskList
+        projectId={project.id}
+        weekId={selectedWeekId}
+        weekStartDay={currentWeekStartDay}
+        carriedAudit={carriedAudit}
+        initialTasks={selectedWeek?.tasks ?? []}
+        isClosed={isClosed}
+        isWeekLoading={weekLoading}
+        weekError={weekError}
+        onRetryWeek={() => {
+          if (selectedWeekId !== null) {
+            fetchWeek(selectedWeekId);
+          }
+        }}
+        onEditTask={handleEditTask}
+        mutationError={taskMutationError}
+        onDismissMutationError={() => setTaskMutationError(null)}
+      />
 
       {renderCreateTaskButton('projectWeeklyPlanner__floatingActionButton', { ariaLabel: 'New task' })}
 

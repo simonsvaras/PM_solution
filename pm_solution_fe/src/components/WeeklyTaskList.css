@@ -1,0 +1,68 @@
+.weeklyTaskList__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0 0 1.2rem;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.weeklyTaskList__summaryItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.weeklyTaskList__summaryItem strong {
+  color: var(--color-text-primary, #1a1a1a);
+  font-size: 1rem;
+}
+
+.weeklyTaskList__taskHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.weeklyTaskList__editButton {
+  border: none;
+  background: transparent;
+  color: #4b6bfb;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.weeklyTaskList__editButton:hover:not(:disabled) {
+  background: rgba(75, 107, 251, 0.1);
+}
+
+.weeklyTaskList__editButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.weeklyTaskList__statusMessage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.weeklyTaskList__dismissButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.weeklyTaskList__dismissButton:hover {
+  text-decoration: none;
+}

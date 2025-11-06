@@ -126,6 +126,21 @@ export default function WeeklyTaskFormModal({
     setIsSubmitting(false);
   }, [isOpen, initialTask, defaultDeadline]);
 
+  useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+    setTitle('');
+    setDescription('');
+    setStatus('OPENED');
+    setDeadline('');
+    setIssueId(null);
+    setAssignedInternId(null);
+    setFieldErrors({});
+    setSubmitError(null);
+    setIsSubmitting(false);
+  }, [isOpen, week?.id]);
+
   const issueOptions = issuesQuery.data ?? [];
   const internOptions = internsQuery.data ?? [];
 

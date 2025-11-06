@@ -549,6 +549,7 @@ export type WeeklyPlannerTaskDTO = {
   issueId: number | null;
   issueTitle: string | null;
   issueState: string | null;
+  status?: string | null;
   deadline: string | null;
   createdAt: string;
   updatedAt: string;
@@ -566,6 +567,7 @@ export type WeeklyPlannerTask = {
   issueId: number | null;
   issueTitle: string | null;
   issueState: string | null;
+  status: 'OPENED' | 'CLOSED';
   deadline: string | null;
   createdAt: string;
   updatedAt: string;
@@ -595,6 +597,18 @@ export type WeeklyPlannerWeek = {
   closedAt: string | null;
   isClosed: boolean;
   tasks: WeeklyPlannerTask[];
+};
+
+export type WeeklyTaskPayload = {
+  issueId?: number | null;
+  internId?: number | null;
+  dayOfWeek?: number | null;
+  note?: string | null;
+  plannedHours?: number | null;
+  deadline?: string | null;
+  title?: string | null;
+  description?: string | null;
+  status?: 'OPENED' | 'CLOSED';
 };
 
 export type WeeklyPlannerMetadataDTO = {
@@ -852,8 +866,14 @@ function mapInternDetail(dto: InternDetailDTO): InternDetail {
   };
 }
 
+function normaliseWeeklyTaskStatus(status: string | null | undefined): 'OPENED' | 'CLOSED' {
+  const normalized = typeof status === 'string' ? status.trim().toUpperCase() : '';
+  return normalized === 'CLOSED' ? 'CLOSED' : 'OPENED';
+}
+
 function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
   const plannedHoursRaw = parseNumber(dto.plannedHours);
+  const status = normaliseWeeklyTaskStatus(dto.status ?? dto.issueState ?? null);
   return {
     id: dto.id,
     dayOfWeek: dto.dayOfWeek ?? null,
@@ -864,6 +884,7 @@ function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
     issueId: dto.issueId ?? null,
     issueTitle: dto.issueTitle ?? null,
     issueState: dto.issueState ?? null,
+    status,
     deadline: dto.deadline ?? null,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
@@ -1025,6 +1046,15 @@ async function parseJson<T>(res: Response): Promise<T> {
   try { return JSON.parse(text) as T; } catch {
     throw { error: { code: "INVALID_JSON", message: "Neplatná odpověď serveru.", details: text, httpStatus: res.status } } as ErrorResponse;
   }
+}
+
+async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  const res = await fetch(input, init);
+  const data = await parseJson<T | ErrorResponse>(res);
+  if (!res.ok) {
+    throw data as ErrorResponse;
+  }
+  return data as T;
 }
 
 export async function getProjects(): Promise<ProjectDTO[]> {
@@ -1293,6 +1323,55 @@ export async function closeProjectWeek(
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<WeeklyPlannerWeekWithMetadataDTO>(res);
   return mapWeeklyPlannerWeekWithMetadata(data);
+}
+
+function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPayload {
+  return {
+    issueId: payload.issueId ?? null,
+    internId: payload.internId ?? null,
+    dayOfWeek: payload.dayOfWeek ?? null,
+    note: payload.note ?? null,
+    plannedHours: payload.plannedHours ?? null,
+    deadline: payload.deadline ?? null,
+    title: payload.title ?? null,
+    description: payload.description ?? null,
+    status: payload.status,
+  };
+}
+
+export async function createWeeklyTask(
+  projectId: number,
+  projectWeekId: number,
+  payload: WeeklyTaskPayload,
+): Promise<WeeklyPlannerTask> {
+  const body = normaliseWeeklyTaskPayload(payload);
+  const data = await fetchJson<WeeklyPlannerTaskDTO>(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return mapWeeklyPlannerTask(data);
+}
+
+export async function updateWeeklyTask(
+  projectId: number,
+  projectWeekId: number,
+  taskId: number,
+  payload: WeeklyTaskPayload,
+): Promise<WeeklyPlannerTask> {
+  const body = normaliseWeeklyTaskPayload(payload);
+  const data = await fetchJson<WeeklyPlannerTaskDTO>(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks/${taskId}`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return mapWeeklyPlannerTask(data);
 }
 
 export async function carryOverWeeklyTasks(
