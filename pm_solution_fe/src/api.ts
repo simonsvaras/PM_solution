@@ -600,15 +600,12 @@ export type WeeklyPlannerWeek = {
 };
 
 export type WeeklyTaskPayload = {
-  issueId?: number | null;
-  internId?: number | null;
-  dayOfWeek?: number | null;
-  note?: string | null;
-  plannedHours?: number | null;
-  deadline?: string | null;
-  title?: string | null;
-  description?: string | null;
-  status?: 'OPENED' | 'CLOSED';
+  issueId: number | null;
+  internId: number | null;
+  dayOfWeek: number;
+  note: string | null;
+  plannedHours: number | null;
+  deadline: string | null;
 };
 
 export type WeeklyPlannerMetadataDTO = {
@@ -1349,13 +1346,10 @@ function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPaylo
   return {
     issueId: payload.issueId ?? null,
     internId: payload.internId ?? null,
-    dayOfWeek: payload.dayOfWeek ?? null,
+    dayOfWeek: payload.dayOfWeek ?? 1,
     note: payload.note ?? null,
     plannedHours: payload.plannedHours ?? null,
     deadline: payload.deadline ?? null,
-    title: payload.title ?? null,
-    description: payload.description ?? null,
-    status: payload.status,
   };
 }
 

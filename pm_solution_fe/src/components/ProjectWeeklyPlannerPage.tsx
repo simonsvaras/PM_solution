@@ -57,8 +57,8 @@ type TaskMutationContext = {
   optimisticId?: number;
 };
 
-type CreateTaskVariables = { weekId: number; values: WeeklyTaskFormValues };
-type UpdateTaskVariables = { weekId: number; taskId: number; values: WeeklyTaskFormValues };
+type CreateTaskVariables = { weekId: number; dayOfWeek: number; values: WeeklyTaskFormValues };
+type UpdateTaskVariables = { weekId: number; taskId: number; dayOfWeek: number; values: WeeklyTaskFormValues };
 
 let optimisticTaskIdCounter = -1;
 
@@ -147,19 +147,33 @@ function findNextWeekStart(
   return candidateIso;
 }
 
-function mapFormValuesToPayload(values: WeeklyTaskFormValues): WeeklyTaskPayload {
+const WEEK_DAYS_COUNT = dayNames.length;
+
+function normaliseTaskDayOfWeek(value: number | null | undefined): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 1;
+  }
+  const rounded = Math.trunc(value);
+  if (rounded < 1) {
+    return 1;
+  }
+  if (rounded > WEEK_DAYS_COUNT) {
+    return WEEK_DAYS_COUNT;
+  }
+  return rounded;
+}
+
+function mapFormValuesToPayload(values: WeeklyTaskFormValues, options?: { dayOfWeek?: number | null }): WeeklyTaskPayload {
   const trimmedTitle = values.title.trim();
   const trimmedDescription = values.description.trim();
+  const dayOfWeek = normaliseTaskDayOfWeek(options?.dayOfWeek ?? null);
   return {
-    title: trimmedTitle,
-    description: trimmedDescription.length > 0 ? trimmedDescription : null,
-    status: values.status,
+    dayOfWeek,
     deadline: values.deadline ?? null,
     issueId: values.issueId ?? null,
     internId: values.assignedInternId ?? null,
     note: trimmedDescription.length > 0 ? trimmedDescription : trimmedTitle,
     plannedHours: null,
-    dayOfWeek: null,
   };
 }
 
@@ -229,6 +243,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [taskFormInitial, setTaskFormInitial] = useState<WeeklyTaskFormInitialTask | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [taskMutationError, setTaskMutationError] = useState<ErrorResponse | null>(null);
+  const [taskFormDayOfWeek, setTaskFormDayOfWeek] = useState<number>(1);
 
   const queryClient = useQueryClient();
 
@@ -242,6 +257,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       setTaskFormInitial(null);
       setSelectedWeekIdForForm(weekId);
       setTaskMutationError(null);
+      setTaskFormDayOfWeek(1);
       setIsCreateModalOpen(true);
     },
     [],
@@ -254,6 +270,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setEditingTaskId(null);
     setTaskFormMode('create');
     setTaskMutationError(null);
+    setTaskFormDayOfWeek(1);
   }, []);
 
   const loadSettings = useCallback(() => {
@@ -369,26 +386,30 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   }
 
   const createTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, CreateTaskVariables, TaskMutationContext>({
-    mutationFn: async ({ weekId, values }) => {
-      const payload = mapFormValuesToPayload(values);
+    mutationFn: async ({ weekId, values, dayOfWeek }: CreateTaskVariables) => {
+      const payload = mapFormValuesToPayload(values, { dayOfWeek });
       return createWeeklyTask(project.id, weekId, payload);
     },
-    onMutate: async ({ weekId, values }) => {
+    onMutate: async ({ weekId, values, dayOfWeek }: CreateTaskVariables) => {
       const queryKey = getWeeklyTasksQueryKey(project.id, weekId);
       await queryClient.cancelQueries({ queryKey });
-      const optimisticTask = createOptimisticTaskFromForm(values);
+      const optimisticTask = createOptimisticTaskFromForm(values, { dayOfWeek });
       const optimisticId = optimisticTask.id;
       const previous = prependWeeklyTask(queryClient, project.id, weekId, optimisticTask);
       setTaskMutationError(null);
       return { queryKey, previous, weekId, optimisticId } satisfies TaskMutationContext;
     },
-    onError: (error, _variables, context) => {
+    onError: (error: ErrorResponse, _variables: CreateTaskVariables | undefined, context: TaskMutationContext | undefined) => {
       if (context?.previous) {
         queryClient.setQueryData(context.queryKey, context.previous);
       }
       setTaskMutationError(error);
     },
-    onSuccess: (task, _variables, context) => {
+    onSuccess: (
+      task: WeeklyPlannerTask,
+      _variables: CreateTaskVariables | undefined,
+      context: TaskMutationContext | undefined,
+    ) => {
       if (context) {
         replaceWeeklyTask(queryClient, project.id, context.weekId, task, context.optimisticId);
       }
@@ -396,51 +417,62 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       closeCreateTaskModal();
       notify('success', 'Úkol byl vytvořen.');
     },
-    onSettled: (_result, _error, _variables, context) => {
+    onSettled: (
+      _result: WeeklyPlannerTask | undefined,
+      _error: ErrorResponse | null,
+      _variables: CreateTaskVariables | undefined,
+      context: TaskMutationContext | undefined,
+    ) => {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey });
       }
     },
   });
 
-  const generateWeekMutation = useMutation<
-    WeeklyPlannerWeekCollection,
-    ErrorResponse,
-    WeeklyPlannerWeekGenerationPayload
-  >({
-    mutationFn: payload => generateProjectWeeklyPlannerWeeks(project.id, payload),
+  const generateWeekMutation = useMutation<WeeklyPlannerWeekCollection, ErrorResponse, WeeklyPlannerWeekGenerationPayload>({
+    mutationFn: (payload: WeeklyPlannerWeekGenerationPayload) =>
+      generateProjectWeeklyPlannerWeeks(project.id, payload),
   });
 
   const updateTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, UpdateTaskVariables, TaskMutationContext>({
-    mutationFn: async ({ weekId, taskId, values }) => {
-      const payload = mapFormValuesToPayload(values);
+    mutationFn: async ({ weekId, taskId, values, dayOfWeek }: UpdateTaskVariables) => {
+      const payload = mapFormValuesToPayload(values, { dayOfWeek });
       return updateWeeklyTask(project.id, weekId, taskId, payload);
     },
-    onMutate: async ({ weekId, taskId, values }) => {
+    onMutate: async ({ weekId, taskId, values, dayOfWeek }: UpdateTaskVariables) => {
       const queryKey = getWeeklyTasksQueryKey(project.id, weekId);
       await queryClient.cancelQueries({ queryKey });
       const current = queryClient.getQueryData<WeeklyTasksQueryData>(queryKey);
       const existing = current?.tasks.find(task => task.id === taskId);
-      const optimisticTask = createOptimisticTaskFromForm(values, existing ?? { id: taskId });
+      const optimisticTask = createOptimisticTaskFromForm(values, existing ?? { id: taskId, dayOfWeek });
       const previous = replaceWeeklyTask(queryClient, project.id, weekId, optimisticTask, taskId);
       setTaskMutationError(null);
       return { queryKey, previous, weekId, optimisticId: taskId } satisfies TaskMutationContext;
     },
-    onError: (error, _variables, context) => {
+    onError: (error: ErrorResponse, _variables: UpdateTaskVariables | undefined, context: TaskMutationContext | undefined) => {
       if (context?.previous) {
         queryClient.setQueryData(context.queryKey, context.previous);
       }
       setTaskMutationError(error);
     },
-    onSuccess: (task, variables, context) => {
+    onSuccess: (
+      task: WeeklyPlannerTask,
+      variables: UpdateTaskVariables | undefined,
+      context: TaskMutationContext | undefined,
+    ) => {
       if (context) {
-        replaceWeeklyTask(queryClient, project.id, context.weekId, task, variables.taskId);
+        replaceWeeklyTask(queryClient, project.id, context.weekId, task, variables?.taskId ?? context.optimisticId);
       }
       setTaskMutationError(null);
       closeCreateTaskModal();
       notify('success', 'Úkol byl upraven.');
     },
-    onSettled: (_result, _error, _variables, context) => {
+    onSettled: (
+      _result: WeeklyPlannerTask | undefined,
+      _error: ErrorResponse | null,
+      _variables: UpdateTaskVariables | undefined,
+      context: TaskMutationContext | undefined,
+    ) => {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey });
       }
@@ -569,6 +601,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         issueId: task.issueId ?? null,
         assignedInternId: task.internId ?? null,
       });
+      setTaskFormDayOfWeek(normaliseTaskDayOfWeek(task.dayOfWeek));
       setTaskMutationError(null);
       setIsCreateModalOpen(true);
     },
@@ -581,16 +614,31 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       if (activeWeekId === null) {
         throw new Error('Vyberte týden pro uložení úkolu.');
       }
+      const normalisedDayOfWeek = normaliseTaskDayOfWeek(taskFormDayOfWeek);
+      setTaskFormDayOfWeek(normalisedDayOfWeek);
       if (taskFormMode === 'edit') {
         if (editingTaskId === null) {
           throw new Error('Úkol není k dispozici pro úpravu.');
         }
-        await updateTaskMutation.mutateAsync({ weekId: activeWeekId, taskId: editingTaskId, values });
+        await updateTaskMutation.mutateAsync({
+          weekId: activeWeekId,
+          taskId: editingTaskId,
+          values,
+          dayOfWeek: normalisedDayOfWeek,
+        });
         return;
       }
-      await createTaskMutation.mutateAsync({ weekId: activeWeekId, values });
+      await createTaskMutation.mutateAsync({ weekId: activeWeekId, values, dayOfWeek: normalisedDayOfWeek });
     },
-    [createTaskMutation, editingTaskId, selectedWeekId, selectedWeekIdForForm, taskFormMode, updateTaskMutation],
+    [
+      createTaskMutation,
+      editingTaskId,
+      selectedWeekId,
+      selectedWeekIdForForm,
+      taskFormDayOfWeek,
+      taskFormMode,
+      updateTaskMutation,
+    ],
   );
 
   useEffect(() => {

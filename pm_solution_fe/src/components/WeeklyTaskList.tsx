@@ -75,7 +75,7 @@ export function replaceWeeklyTask(
   const currentTasks = previous?.tasks ?? [];
   const targetId = typeof matchId === 'number' ? matchId : task.id;
   let replaced = false;
-  const mapped = currentTasks.map(existing => {
+  const mapped = currentTasks.map((existing: WeeklyPlannerTask) => {
     if (existing.id === targetId) {
       replaced = true;
       return task;
