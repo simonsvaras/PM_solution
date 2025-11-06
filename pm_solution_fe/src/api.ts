@@ -1273,6 +1273,25 @@ export async function updateWeeklyPlannerSettings(
   return mapWeeklyPlannerSettings(data);
 }
 
+export type GenerateWeeklyPlannerWeeksPayload = {
+  from: string;
+  to: string;
+};
+
+export async function generateProjectWeeklyPlannerWeeks(
+  projectId: number,
+  payload: GenerateWeeklyPlannerWeeksPayload,
+): Promise<WeeklyPlannerWeekCollection> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerWeekCollectionDTO>(res);
+  return mapWeeklyPlannerWeekCollection(data);
+}
+
 export async function listProjectWeeklyPlannerWeeks(
   projectId: number,
   params?: { limit?: number; offset?: number },

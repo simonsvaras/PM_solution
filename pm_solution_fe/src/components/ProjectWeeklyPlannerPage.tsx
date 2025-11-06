@@ -21,9 +21,12 @@ import {
   type WeeklyPlannerSettings,
   type WeeklySummary,
   type WeeklyTaskPayload,
+  type WeeklyPlannerWeekCollection,
+  type GenerateWeeklyPlannerWeeksPayload,
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
+  generateProjectWeeklyPlannerWeeks,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
   getWeeklyPlannerSettings,
@@ -62,6 +65,61 @@ let optimisticTaskIdCounter = -1;
 function nextOptimisticTaskId(): number {
   optimisticTaskIdCounter -= 1;
   return optimisticTaskIdCounter;
+}
+
+function parsePlannerDate(value: string | null): Date | null {
+  if (!value) {
+    return null;
+  }
+  const hasTimeComponent = /t/i.test(value);
+  const parsed = hasTimeComponent ? new Date(value) : new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function addDaysUtc(date: Date, amount: number): Date {
+  const clone = new Date(date.getTime());
+  clone.setUTCDate(clone.getUTCDate() + amount);
+  return clone;
+}
+
+function toIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function findWeekIdByDate(weeks: WeeklyPlannerWeek[], isoDate: string): number | null {
+  const target = parsePlannerDate(isoDate);
+  if (!target) {
+    return null;
+  }
+  const targetTime = target.getTime();
+  for (const week of weeks) {
+    const start = parsePlannerDate(week.weekStart);
+    const end = parsePlannerDate(week.weekEnd);
+    if (!start || !end) {
+      continue;
+    }
+    if (start.getTime() <= targetTime && targetTime <= end.getTime()) {
+      return week.id;
+    }
+  }
+  return null;
+}
+
+function getNextWeekTargetDate(weeks: WeeklyPlannerWeek[]): Date {
+  if (weeks.length === 0) {
+    return new Date();
+  }
+  const sorted = [...weeks].sort((a, b) => {
+    const aTime = parsePlannerDate(a.weekStart)?.getTime() ?? 0;
+    const bTime = parsePlannerDate(b.weekStart)?.getTime() ?? 0;
+    return bTime - aTime;
+  });
+  const latest = sorted[0];
+  const latestEnd = parsePlannerDate(latest.weekEnd);
+  if (!latestEnd) {
+    return new Date();
+  }
+  return addDaysUtc(latestEnd, 1);
 }
 
 function mapFormValuesToPayload(values: WeeklyTaskFormValues): WeeklyTaskPayload {
@@ -139,6 +197,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [settingsError, setSettingsError] = useState<ErrorResponse | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
+  const [generateWeekError, setGenerateWeekError] = useState<ErrorResponse | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
   const [taskFormMode, setTaskFormMode] = useState<WeeklyTaskFormMode>('create');
@@ -259,6 +318,68 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   function notify(type: ToastKind, text: string) {
     onShowToast?.(type, text);
   }
+
+  const {
+    mutate: generateWeek,
+    isPending: isGeneratingWeek,
+  } = useMutation<WeeklyPlannerWeekCollection, ErrorResponse, GenerateWeeklyPlannerWeeksPayload>({
+    mutationFn: payload => generateProjectWeeklyPlannerWeeks(project.id, payload),
+    onMutate: async () => {
+      setGenerateWeekError(null);
+    },
+    onError: error => {
+      setGenerateWeekError(error);
+    },
+    onSuccess: (collection, variables) => {
+      collection.weeks.forEach(week => {
+        setWeeklyTasksQueryData(queryClient, project.id, week.id, week.tasks);
+      });
+      setWeeks(prevWeeks => {
+        const merged = [...prevWeeks];
+        collection.weeks.forEach(week => {
+          const index = merged.findIndex(existing => existing.id === week.id);
+          if (index >= 0) {
+            merged[index] = week;
+          } else {
+            merged.push(week);
+          }
+        });
+        merged.sort((a, b) => {
+          const aTime = parsePlannerDate(a.weekStart)?.getTime() ?? 0;
+          const bTime = parsePlannerDate(b.weekStart)?.getTime() ?? 0;
+          return bTime - aTime;
+        });
+        return merged;
+      });
+      setRoles(collection.metadata.roles);
+      setWeekStartDay(collection.metadata.weekStartDay);
+      setWeekSettings(prev =>
+        prev
+          ? { ...prev, weekStartDay: collection.metadata.weekStartDay }
+          : { weekStartDay: collection.metadata.weekStartDay },
+      );
+      const preferredWeekId =
+        findWeekIdByDate(collection.weeks, variables.from) ??
+        collection.metadata.currentWeekId ??
+        collection.weeks[0]?.id ??
+        null;
+      if (preferredWeekId !== null) {
+        setSelectedWeekId(preferredWeekId);
+      }
+      setGenerateWeekError(null);
+      notify('success', 'Týden byl vytvořen.');
+    },
+  });
+
+  const handleGenerateNextWeek = useCallback(() => {
+    if (isGeneratingWeek) {
+      return;
+    }
+    const targetDate = getNextWeekTargetDate(weeks);
+    const isoDate = toIsoDate(targetDate);
+    const payload: GenerateWeeklyPlannerWeeksPayload = { from: isoDate, to: isoDate };
+    generateWeek(payload);
+  }, [generateWeek, isGeneratingWeek, weeks]);
 
   const createTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, CreateTaskVariables, TaskMutationContext>({
     mutationFn: async ({ weekId, values }) => {
@@ -713,55 +834,87 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         </div>
       </header>
 
-      <section className="projectWeeklyPlanner__settings" aria-labelledby="project-week-settings-title">
-        <div className="projectWeeklyPlanner__settingsHeader">
-          <div>
-            <h3 id="project-week-settings-title" className="projectWeeklyPlanner__settingsTitle">
-              Nastavení týdne
-            </h3>
-            <p className="projectWeeklyPlanner__settingsHint">Určete, který den je považován za začátek týdne.</p>
+      <div className="projectWeeklyPlanner__settingsRow">
+        <section className="projectWeeklyPlanner__settings" aria-labelledby="project-week-settings-title">
+          <div className="projectWeeklyPlanner__settingsHeader">
+            <div>
+              <h3 id="project-week-settings-title" className="projectWeeklyPlanner__settingsTitle">
+                Nastavení týdne
+              </h3>
+              <p className="projectWeeklyPlanner__settingsHint">Určete, který den je považován za začátek týdne.</p>
+            </div>
+            {(settingsSaving || settingsLoading) && (
+              <span className="projectWeeklyPlanner__settingsStatus" aria-live="polite">
+                {settingsSaving ? 'Ukládám…' : 'Načítám…'}
+              </span>
+            )}
           </div>
-          {(settingsSaving || settingsLoading) && (
-            <span className="projectWeeklyPlanner__settingsStatus" aria-live="polite">
-              {settingsSaving ? 'Ukládám…' : 'Načítám…'}
-            </span>
-          )}
-        </div>
-        <div className="projectWeeklyPlanner__settingsControls">
-          <label className="projectWeeklyPlanner__settingsField">
-            <span>První den týdne</span>
-            <select
-              value={String(currentWeekStartDay)}
-              onChange={handleWeekStartDayChange}
-              disabled={settingsLoading || settingsSaving}
-            >
-              {weekStartOptions.map(option => (
-                <option key={option.value} value={String(option.value)}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {settingsError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo načíst. {settingsError.error.message}{' '}
-              <button
-                type="button"
-                className="projectWeeklyPlanner__settingsRetry"
-                onClick={loadSettings}
-                disabled={settingsLoading}
+          <div className="projectWeeklyPlanner__settingsControls">
+            <label className="projectWeeklyPlanner__settingsField">
+              <span>První den týdne</span>
+              <select
+                value={String(currentWeekStartDay)}
+                onChange={handleWeekStartDayChange}
+                disabled={settingsLoading || settingsSaving}
               >
-                Zkusit znovu
-              </button>
+                {weekStartOptions.map(option => (
+                  <option key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {settingsError && (
+              <p className="projectWeeklyPlanner__settingsError" role="alert">
+                Nastavení se nepodařilo načíst. {settingsError.error.message}{' '}
+                <button
+                  type="button"
+                  className="projectWeeklyPlanner__settingsRetry"
+                  onClick={loadSettings}
+                  disabled={settingsLoading}
+                >
+                  Zkusit znovu
+                </button>
+              </p>
+            )}
+            {settingsSaveError && !settingsError && (
+              <p className="projectWeeklyPlanner__settingsError" role="alert">
+                Nastavení se nepodařilo uložit. {settingsSaveError.error.message}
+              </p>
+            )}
+          </div>
+        </section>
+        <section className="projectWeeklyPlanner__weekGenerator" aria-labelledby="project-week-generator-title">
+          <div className="projectWeeklyPlanner__weekGeneratorHeader">
+            <div>
+              <h3 id="project-week-generator-title" className="projectWeeklyPlanner__weekGeneratorTitle">
+                Správa týdnů
+              </h3>
+              <p className="projectWeeklyPlanner__weekGeneratorHint">
+                Přidejte další týden, pokud v seznamu žádný nevidíte nebo chcete plánovat dopředu.
+              </p>
+            </div>
+            {isGeneratingWeek && (
+              <span className="projectWeeklyPlanner__weekGeneratorStatus" aria-live="polite">
+                Zakládám…
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="projectWeeklyPlanner__actionButton"
+            onClick={handleGenerateNextWeek}
+            disabled={isGeneratingWeek || weeksLoading}
+          >
+            Přidat týden
+          </button>
+          {generateWeekError && (
+            <p className="projectWeeklyPlanner__weekGeneratorError" role="alert">
+              Týden se nepodařilo vytvořit. {generateWeekError.error.message}
             </p>
           )}
-          {settingsSaveError && !settingsError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo uložit. {settingsSaveError.error.message}
-            </p>
-          )}
-        </div>
-      </section>
+        </section>
+      </div>
 
       <WeeklySummaryPanel
         summary={summary}

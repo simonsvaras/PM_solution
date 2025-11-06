@@ -120,6 +120,18 @@
   font-size: 1.1rem;
 }
 
+.projectWeeklyPlanner__settingsRow {
+  display: grid;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+@media (min-width: 960px) {
+  .projectWeeklyPlanner__settingsRow {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
 .projectWeeklyPlanner__settings {
   display: flex;
   flex-direction: column;
@@ -208,6 +220,76 @@
 .projectWeeklyPlanner__settingsRetry:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.projectWeeklyPlanner__weekGenerator {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(26, 26, 26, 0.05);
+}
+
+.projectWeeklyPlanner__weekGeneratorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.projectWeeklyPlanner__weekGeneratorTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.projectWeeklyPlanner__weekGeneratorHint {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.projectWeeklyPlanner__weekGeneratorStatus {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary, #6f6f6f);
+}
+
+.projectWeeklyPlanner__actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border, #d7d7d7);
+  background: linear-gradient(135deg, #4b6bfb, #6574ff);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 16px rgba(26, 26, 26, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.projectWeeklyPlanner__actionButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(26, 26, 26, 0.12);
+}
+
+.projectWeeklyPlanner__actionButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.projectWeeklyPlanner__weekGeneratorError {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-danger, #b42318);
 }
 
 .projectWeeklyPlanner__weekSelect {
