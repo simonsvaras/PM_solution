@@ -148,6 +148,30 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
   const queryClient = useQueryClient();
 
+  const openCreateTaskModal = useCallback(
+    (weekId: number | null) => {
+      if (weekId === null) {
+        return;
+      }
+      setTaskFormMode('create');
+      setEditingTaskId(null);
+      setTaskFormInitial(null);
+      setSelectedWeekIdForForm(weekId);
+      setTaskMutationError(null);
+      setIsCreateModalOpen(true);
+    },
+    [],
+  );
+
+  const closeCreateTaskModal = useCallback(() => {
+    setIsCreateModalOpen(false);
+    setTaskFormInitial(null);
+    setSelectedWeekIdForForm(null);
+    setEditingTaskId(null);
+    setTaskFormMode('create');
+    setTaskMutationError(null);
+  }, []);
+
   const loadSettings = useCallback(() => {
     setSettingsLoading(true);
     setSettingsError(null);
@@ -436,30 +460,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setSelectedWeekId(value);
     loadWeeks();
   }
-
-  const openCreateTaskModal = useCallback(
-    (weekId: number | null) => {
-      if (weekId === null) {
-        return;
-      }
-      setTaskFormMode('create');
-      setEditingTaskId(null);
-      setTaskFormInitial(null);
-      setSelectedWeekIdForForm(weekId);
-      setTaskMutationError(null);
-      setIsCreateModalOpen(true);
-    },
-    [],
-  );
-
-  const closeCreateTaskModal = useCallback(() => {
-    setIsCreateModalOpen(false);
-    setTaskFormInitial(null);
-    setSelectedWeekIdForForm(null);
-    setEditingTaskId(null);
-    setTaskFormMode('create');
-    setTaskMutationError(null);
-  }, []);
 
   const handleEditTask = useCallback(
     (task: WeeklyPlannerTask) => {
