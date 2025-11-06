@@ -103,6 +103,8 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   const [settingsError, setSettingsError] = useState<ErrorResponse | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
 
   const loadSettings = useCallback(() => {
     setSettingsLoading(true);
@@ -195,6 +197,18 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
     }
     fetchWeek(selectedWeekId);
   }, [selectedWeekId, fetchWeek]);
+
+  useEffect(() => {
+    if (selectedWeekId === null) {
+      closeCreateTaskModal();
+    }
+  }, [selectedWeekId, closeCreateTaskModal]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen && selectedWeekId !== selectedWeekIdForForm) {
+      setSelectedWeekIdForForm(selectedWeekId);
+    }
+  }, [isCreateModalOpen, selectedWeekId, selectedWeekIdForForm]);
 
   const weekStartOptions = useMemo(
     () => dayNames.map((name, index) => ({ value: index + 1, label: `${index + 1} – ${name}` })),
@@ -293,6 +307,22 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
     setSelectedWeekId(value);
     loadWeeks();
   }
+
+  const openCreateTaskModal = useCallback(
+    (weekId: number | null) => {
+      if (weekId === null) {
+        return;
+      }
+      setSelectedWeekIdForForm(weekId);
+      setIsCreateModalOpen(true);
+    },
+    [],
+  );
+
+  const closeCreateTaskModal = useCallback(() => {
+    setIsCreateModalOpen(false);
+    setSelectedWeekIdForForm(null);
+  }, []);
 
   function handleOpenCloseModal() {
     setCloseError(null);
@@ -416,6 +446,25 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   }
 
   const carryOverTasks = carryOverContext?.sourceWeek.tasks.filter(task => !isIssueClosed(task)) ?? [];
+  const createTaskDisabled = selectedWeekId === null || isCreateModalOpen;
+
+  function renderCreateTaskButton(extraClassName = '', options?: { ariaLabel?: string }) {
+    const ariaLabel = options?.ariaLabel;
+    return (
+      <button
+        type="button"
+        className={`projectWeeklyPlanner__createButton ${extraClassName}`.trim()}
+        onClick={() => openCreateTaskModal(selectedWeekId)}
+        disabled={createTaskDisabled}
+        aria-label={ariaLabel}
+      >
+        <span className="projectWeeklyPlanner__createButtonIcon" aria-hidden="true">
+          +
+        </span>
+        <span>New task</span>
+      </button>
+    );
+  }
 
   return (
     <section className="projectWeeklyPlanner" aria-labelledby="project-weekly-planner-title">
@@ -459,6 +508,9 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
             <button type="button" disabled title="Coming soon">
               Notifikace
             </button>
+          </div>
+          <div className="projectWeeklyPlanner__createAction">
+            {renderCreateTaskButton('projectWeeklyPlanner__createButton--inline')}
           </div>
           {closeButtonVisible && (
             <button
@@ -545,39 +597,50 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
         </p>
       )}
 
-      {!weekLoading && !weekError && tasks.length === 0 && (
-        <div className="projectWeeklyPlanner__empty" role="status">
-          <p>V tomto týdnu zatím nejsou naplánovány žádné úkoly. Přidejte první, abyste mohli sdílet priority.</p>
-        </div>
+      {!weekLoading && !weekError && (
+        <>
+          <div className="projectWeeklyPlanner__tasksHeader">
+            <h3 className="projectWeeklyPlanner__tasksTitle">Plán úkolů</h3>
+            <div className="projectWeeklyPlanner__tasksHeaderAction">
+              {renderCreateTaskButton()}
+            </div>
+          </div>
+
+          {tasks.length === 0 ? (
+            <div className="projectWeeklyPlanner__empty" role="status">
+              <p>V tomto týdnu zatím nejsou naplánovány žádné úkoly. Přidejte první, abyste mohli sdílet priority.</p>
+            </div>
+          ) : (
+            <div className="projectWeeklyPlanner__tasks" role="list">
+              {tasks.map(task => {
+                const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
+                const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
+                return (
+                  <article key={task.id} className="projectWeeklyPlanner__taskCard" role="listitem">
+                    <div className="projectWeeklyPlanner__taskHeader">
+                      <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, currentWeekStartDay)}</span>
+                      {carriedFrom && (
+                        <span className="projectWeeklyPlanner__taskBadge">Carried over from week {formatDate(carriedFrom)}</span>
+                      )}
+                    </div>
+                    <h3 className="projectWeeklyPlanner__taskTitle">{headline}</h3>
+                    <p className="projectWeeklyPlanner__taskMeta">
+                      <span>{task.internName ?? 'Nepřiřazeno'}</span>
+                      <span aria-hidden="true">•</span>
+                      <span>{formatPlannedHours(task.plannedHours)}</span>
+                    </p>
+                    {task.note && task.note !== task.issueTitle && (
+                      <p className="projectWeeklyPlanner__taskNote">{task.note}</p>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
-      {!weekLoading && !weekError && tasks.length > 0 && (
-        <div className="projectWeeklyPlanner__tasks" role="list">
-          {tasks.map(task => {
-            const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
-            const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
-            return (
-              <article key={task.id} className="projectWeeklyPlanner__taskCard" role="listitem">
-                <div className="projectWeeklyPlanner__taskHeader">
-                  <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, currentWeekStartDay)}</span>
-                  {carriedFrom && (
-                    <span className="projectWeeklyPlanner__taskBadge">Carried over from week {formatDate(carriedFrom)}</span>
-                  )}
-                </div>
-                <h3 className="projectWeeklyPlanner__taskTitle">{headline}</h3>
-                <p className="projectWeeklyPlanner__taskMeta">
-                  <span>{task.internName ?? 'Nepřiřazeno'}</span>
-                  <span aria-hidden="true">•</span>
-                  <span>{formatPlannedHours(task.plannedHours)}</span>
-                </p>
-                {task.note && task.note !== task.issueTitle && (
-                  <p className="projectWeeklyPlanner__taskNote">{task.note}</p>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
+      {renderCreateTaskButton('projectWeeklyPlanner__floatingActionButton', { ariaLabel: 'New task' })}
 
       <Modal
         isOpen={closeModalOpen}
