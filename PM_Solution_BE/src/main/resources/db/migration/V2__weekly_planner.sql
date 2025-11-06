@@ -13,8 +13,19 @@ SET row_security = off;
 ALTER TABLE "public"."project"
     ADD COLUMN "week_start_day" smallint NOT NULL DEFAULT 1;
 
-ALTER TABLE "public"."project"
-    ADD CONSTRAINT IF NOT EXISTS "project_week_start_day_check" CHECK (("week_start_day" >= 1 AND "week_start_day" <= 7));
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'public.project'::regclass
+          AND conname = 'project_week_start_day_check'
+    ) THEN
+        ALTER TABLE "public"."project"
+            ADD CONSTRAINT "project_week_start_day_check" CHECK (("week_start_day" >= 1 AND "week_start_day" <= 7));
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE INDEX IF NOT EXISTS "idx_project_week_start_day"
     ON "public"."project" USING "btree" ("week_start_day");
