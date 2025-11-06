@@ -1415,3 +1415,379 @@ export async function deleteIntern(id: number): Promise<void> {
 }
 
 
+
+export type WeeklyTaskStatus = string;
+
+export type WeeklyTaskIssue = {
+  id: number;
+  title: string;
+  reference?: string | null;
+  status?: string | null;
+  dueDate?: string | null;
+};
+
+export type WeeklyTaskAssignee = {
+  id: number;
+  name: string;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+export type WeeklyTaskDTO = {
+  id: number;
+  name?: string | null;
+  title?: string | null;
+  description?: string | null;
+  note?: string | null;
+  status?: string | null;
+  issueState?: string | null;
+  deadline?: string | null;
+  issueDueDate?: string | null;
+  issue?: WeeklyTaskIssue | null;
+  issueId?: number | null;
+  issueTitle?: string | null;
+  issueReference?: string | null;
+  issueStatus?: string | null;
+  assigned?: WeeklyTaskAssignee | null;
+  assignee?: WeeklyTaskAssignee | null;
+  internId?: number | null;
+  internName?: string | null;
+  internUsername?: string | null;
+  carriedOverFrom?: string | null;
+  carryOverSourceWeek?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  dayOfWeek?: number | null;
+  plannedHours?: number | string | null;
+};
+
+export type WeeklyTask = {
+  id: number;
+  name: string;
+  description: string | null;
+  status: WeeklyTaskStatus;
+  deadline: string | null;
+  issue: WeeklyTaskIssue | null;
+  assignee: WeeklyTaskAssignee | null;
+  carriedOverFrom: string | null;
+  createdAt: string;
+  updatedAt: string;
+  dayOfWeek: number | null;
+  plannedHours: number | null;
+};
+
+export type WeeklyPlannerWeekDTO = {
+  id: number;
+  projectId: number;
+  weekStart: string;
+  weekEnd: string;
+  createdAt: string;
+  updatedAt: string;
+  tasks: WeeklyTaskDTO[];
+};
+
+export type WeeklyPlannerWeek = {
+  id: number;
+  projectId: number;
+  weekStart: string;
+  weekEnd: string;
+  createdAt: string;
+  updatedAt: string;
+  tasks: WeeklyTask[];
+};
+
+export type WeeklyPlannerMetadata = {
+  projectId: number;
+  weekStartDay: number;
+  today: string;
+  currentWeekStart: string;
+  currentWeekEnd: string;
+  currentWeekId: number | null;
+};
+
+export type WeeklyPlannerWeekCollection = {
+  weeks: WeeklyPlannerWeek[];
+  metadata: WeeklyPlannerMetadata;
+};
+
+export type WeeklyTaskPayload = {
+  name: string;
+  description?: string | null;
+  status: WeeklyTaskStatus;
+  deadline?: string | null;
+  issueId?: number | null;
+  assigneeId?: number | null;
+  carryOver?: boolean;
+};
+
+export type WeeklyTaskStatusChangePayload = {
+  status: WeeklyTaskStatus;
+};
+
+export type WeeklyCarryOverPayload = {
+  targetWeekStart: string;
+  taskIds: number[];
+};
+
+export type WeeklyPlannerIssueOptionDTO = {
+  id: number;
+  title: string;
+  reference?: string | null;
+  status?: string | null;
+  dueDate?: string | null;
+};
+
+export type WeeklyPlannerIssueOption = {
+  id: number;
+  title: string;
+  reference: string | null;
+  status: string | null;
+  dueDate: string | null;
+};
+
+function normalizeAssignee(raw: WeeklyTaskDTO): WeeklyTaskAssignee | null {
+  const candidate = raw.assigned ?? raw.assignee ?? null;
+  if (candidate && typeof candidate.id === 'number') {
+    return {
+      id: candidate.id,
+      name:
+        candidate.name && candidate.name.trim().length > 0
+          ? candidate.name.trim()
+          : [candidate.firstName, candidate.lastName]
+              .map(part => (typeof part === 'string' ? part.trim() : ''))
+              .filter(Boolean)
+              .join(' ') || candidate.username || raw.internName || '',
+      username: candidate.username ?? raw.internUsername ?? null,
+    };
+  }
+  if (typeof raw.internId === 'number') {
+    const name = raw.internName && raw.internName.trim().length > 0 ? raw.internName.trim() : '';
+    return { id: raw.internId, name, username: raw.internUsername ?? null };
+  }
+  return null;
+}
+
+function normalizeIssue(raw: WeeklyTaskDTO): WeeklyTaskIssue | null {
+  const source = raw.issue ?? null;
+  if (source && typeof source.id === 'number') {
+    const title = source.title && source.title.trim().length > 0 ? source.title.trim() : null;
+    return {
+      id: source.id,
+      title: title ?? (source.reference ?? source.status ?? 'Issue'),
+      reference: source.reference ?? null,
+      status: source.status ?? null,
+      dueDate: source.dueDate ?? null,
+    };
+  }
+  if (typeof raw.issueId === 'number') {
+    return {
+      id: raw.issueId,
+      title:
+        (raw.issueTitle && raw.issueTitle.trim().length > 0 ? raw.issueTitle.trim() : null) ??
+        raw.name ??
+        raw.note ??
+        'Bez názvu',
+      reference: raw.issueReference ?? null,
+      status: raw.issueStatus ?? raw.issueState ?? null,
+      dueDate: raw.deadline ?? raw.issueDueDate ?? null,
+    };
+  }
+  return null;
+}
+
+function normalizeWeeklyTask(dto: WeeklyTaskDTO): WeeklyTask {
+  const nameCandidate = dto.name ?? dto.title ?? dto.issueTitle ?? dto.note ?? 'Bez názvu';
+  const cleanedName = typeof nameCandidate === 'string' && nameCandidate.trim().length > 0 ? nameCandidate.trim() : 'Bez názvu';
+  const descriptionCandidate = dto.description ?? dto.note ?? null;
+  const description =
+    typeof descriptionCandidate === 'string' && descriptionCandidate.trim().length > 0
+      ? descriptionCandidate.trim()
+      : null;
+  const statusCandidate = dto.status ?? dto.issueStatus ?? dto.issueState ?? 'new';
+  const deadline = dto.deadline ?? dto.issueDueDate ?? null;
+  const createdAt = dto.createdAt ?? new Date().toISOString();
+  const updatedAt = dto.updatedAt ?? createdAt;
+  const plannedRaw = dto.plannedHours;
+  let plannedHours: number | null = null;
+  if (typeof plannedRaw === 'number') {
+    plannedHours = Number.isFinite(plannedRaw) ? plannedRaw : null;
+  } else if (typeof plannedRaw === 'string') {
+    const parsed = Number.parseFloat(plannedRaw.replace(',', '.'));
+    plannedHours = Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return {
+    id: dto.id,
+    name: cleanedName,
+    description,
+    status: typeof statusCandidate === 'string' && statusCandidate.trim().length > 0 ? statusCandidate : 'new',
+    deadline,
+    issue: normalizeIssue(dto),
+    assignee: normalizeAssignee(dto),
+    carriedOverFrom: dto.carriedOverFrom ?? dto.carryOverSourceWeek ?? null,
+    createdAt,
+    updatedAt,
+    dayOfWeek: dto.dayOfWeek ?? null,
+    plannedHours,
+  };
+}
+
+function mapWeeklyPlannerWeek(dto: WeeklyPlannerWeekDTO): WeeklyPlannerWeek {
+  return {
+    id: dto.id,
+    projectId: dto.projectId,
+    weekStart: dto.weekStart,
+    weekEnd: dto.weekEnd,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    tasks: (dto.tasks ?? []).map(task => normalizeWeeklyTask(task)),
+  };
+}
+
+function toWeeklyTaskRequest(payload: WeeklyTaskPayload): Record<string, unknown> {
+  return {
+    name: payload.name,
+    title: payload.name,
+    description: payload.description ?? null,
+    note: payload.description ?? payload.name,
+    status: payload.status,
+    issueState: payload.status,
+    deadline: payload.deadline ?? null,
+    issueId: payload.issueId ?? null,
+    assignedId: payload.assigneeId ?? null,
+    internId: payload.assigneeId ?? null,
+    carryOver: payload.carryOver ?? false,
+  };
+}
+
+function mapIssueOption(dto: WeeklyPlannerIssueOptionDTO): WeeklyPlannerIssueOption {
+  return {
+    id: dto.id,
+    title: dto.title?.trim() ?? 'Bez názvu',
+    reference: dto.reference ?? null,
+    status: dto.status ?? null,
+    dueDate: dto.dueDate ?? null,
+  };
+}
+
+export async function listWeeklyPlannerWeeks(
+  projectId: number,
+  limit = 20,
+  offset = 0,
+): Promise<WeeklyPlannerWeekCollection> {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks${params.toString() ? `?${params.toString()}` : ''}`,
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<{ weeks: WeeklyPlannerWeekDTO[]; metadata: WeeklyPlannerMetadata }>(res);
+  return {
+    weeks: (data.weeks ?? []).map(mapWeeklyPlannerWeek),
+    metadata: data.metadata,
+  };
+}
+
+export async function getWeeklyPlannerWeek(
+  projectId: number,
+  weekId: number,
+): Promise<{ week: WeeklyPlannerWeek; metadata: WeeklyPlannerMetadata }> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${weekId}`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<{ week: WeeklyPlannerWeekDTO; metadata: WeeklyPlannerMetadata }>(res);
+  return { week: mapWeeklyPlannerWeek(data.week), metadata: data.metadata };
+}
+
+export async function getWeeklyTasks(projectId: number, weekId: number): Promise<WeeklyTask[]> {
+  const { week } = await getWeeklyPlannerWeek(projectId, weekId);
+  return week.tasks;
+}
+
+export async function createWeeklyTask(
+  projectId: number,
+  weekId: number,
+  payload: WeeklyTaskPayload,
+): Promise<WeeklyTask> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${weekId}/tasks`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(toWeeklyTaskRequest(payload)),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyTaskDTO>(res);
+  return normalizeWeeklyTask(data);
+}
+
+export async function updateWeeklyTask(
+  projectId: number,
+  weekId: number,
+  taskId: number,
+  payload: WeeklyTaskPayload,
+): Promise<WeeklyTask> {
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${weekId}/tasks/${taskId}`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(toWeeklyTaskRequest(payload)),
+    },
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyTaskDTO>(res);
+  return normalizeWeeklyTask(data);
+}
+
+export async function changeWeeklyTaskStatus(
+  projectId: number,
+  weekId: number,
+  taskId: number,
+  payload: WeeklyTaskStatusChangePayload,
+): Promise<WeeklyTask> {
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${weekId}/tasks/${taskId}/status`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyTaskDTO>(res);
+  return normalizeWeeklyTask(data);
+}
+
+export async function carryOverWeeklyTasks(
+  projectId: number,
+  weekId: number,
+  payload: WeeklyCarryOverPayload,
+): Promise<WeeklyTask[]> {
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${weekId}/carry-over`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyTaskDTO[]>(res);
+  return data.map(normalizeWeeklyTask);
+}
+
+export async function getWeeklyPlannerIssues(
+  projectId: number,
+  search?: string,
+): Promise<WeeklyPlannerIssueOption[]> {
+  const params = new URLSearchParams();
+  if (search && search.trim().length > 0) {
+    params.set('search', search.trim());
+  }
+  const res = await fetch(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/issues${params.toString() ? `?${params.toString()}` : ''}`,
+  );
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<WeeklyPlannerIssueOptionDTO[]>(res);
+  return data.map(mapIssueOption);
+}

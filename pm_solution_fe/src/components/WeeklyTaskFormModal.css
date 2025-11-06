@@ -1,0 +1,118 @@
+.weeklyTaskForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  min-width: min(520px, 90vw);
+}
+
+.weeklyTaskForm__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.weeklyTaskForm__field--inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.weeklyTaskForm__inlineGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.weeklyTaskForm__label {
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.weeklyTaskForm__input,
+.weeklyTaskForm__textarea,
+.weeklyTaskForm__select {
+  width: 100%;
+  border: 1px solid var(--color-border, #cbd5f5);
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.95rem;
+  color: var(--color-text-primary, #111827);
+  background-color: var(--color-surface, #ffffff);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weeklyTaskForm__input:focus,
+.weeklyTaskForm__textarea:focus,
+.weeklyTaskForm__select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.weeklyTaskForm__textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.weeklyTaskForm__checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text-primary, #1f2937);
+}
+
+.weeklyTaskForm__checkboxLabel input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.weeklyTaskForm__error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.weeklyTaskForm__error--general {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  background-color: rgba(248, 113, 113, 0.18);
+}
+
+.weeklyTaskForm__footer {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.weeklyTaskForm__button {
+  border: 1px solid var(--color-border, #cbd5f5);
+  border-radius: 0.75rem;
+  padding: 0.45rem 1.1rem;
+  background-color: var(--color-surface, #ffffff);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weeklyTaskForm__button:hover:not(:disabled) {
+  background-color: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+.weeklyTaskForm__button--primary {
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.weeklyTaskForm__button--primary:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.weeklyTaskForm__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

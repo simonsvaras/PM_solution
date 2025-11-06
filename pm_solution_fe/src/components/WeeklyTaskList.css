@@ -1,0 +1,92 @@
+.weeklyTaskList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.weeklyTaskList__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.weeklyTaskList__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.weeklyTaskList__filterButton {
+  border: 1px solid transparent;
+  background-color: rgba(30, 64, 175, 0.08);
+  color: #1e3a8a;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.weeklyTaskList__filterButton--active {
+  background-color: #1e3a8a;
+  color: #ffffff;
+  border-color: #1e3a8a;
+}
+
+.weeklyTaskList__filterButton:hover {
+  background-color: rgba(30, 64, 175, 0.12);
+}
+
+.weeklyTaskList__filterButton--active:hover {
+  background-color: #1d4ed8;
+}
+
+.weeklyTaskList__create {
+  border: none;
+  background-color: #2563eb;
+  color: #ffffff;
+  padding: 0.5rem 1.2rem;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weeklyTaskList__create:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+}
+
+.weeklyTaskList__create:active {
+  transform: translateY(0);
+}
+
+.weeklyTaskList__create:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.weeklyTaskList__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  border: 1px dashed var(--color-border, #cbd5f5);
+  border-radius: 1rem;
+  background-color: rgba(30, 64, 175, 0.05);
+  color: var(--color-text-secondary, #475569);
+  font-size: 0.95rem;
+}
+
+.weeklyTaskList__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
