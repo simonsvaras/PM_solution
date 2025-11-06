@@ -35,11 +35,20 @@ public class WeeklyPlannerController {
         this.service = service;
     }
 
-    @PutMapping("/configuration/week-start")
+    @GetMapping("/settings")
+    public WeekConfigurationResponse getWeekSettings(@PathVariable long projectId) {
+        WeekConfiguration configuration = service.getWeekConfiguration(projectId);
+        return new WeekConfigurationResponse(configuration.projectId(), configuration.weekStartDay());
+    }
+
+    @PutMapping({"/settings", "/configuration/week-start"})
     public WeekConfigurationResponse configureWeekStart(@PathVariable long projectId,
                                                         @RequestBody WeekStartConfigurationRequest request) {
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        if (request.weekStartDay() == null) {
+            throw ApiException.validation("Začátek týdne je povinný.", "week_start_day_required");
         }
         WeekConfiguration configuration = service.configureWeekStart(projectId, request.weekStartDay());
         return new WeekConfigurationResponse(configuration.projectId(), configuration.weekStartDay());

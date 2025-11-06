@@ -41,6 +41,11 @@ public class WeeklyPlannerService {
         this.txTemplate = new TransactionTemplate(transactionManager);
     }
 
+    public WeekConfiguration getWeekConfiguration(long projectId) {
+        ProjectConfigurationRow project = requireProject(projectId);
+        return new WeekConfiguration(project.id(), project.weekStartDay());
+    }
+
     public WeekConfiguration configureWeekStart(long projectId, int weekStartDay) {
         if (weekStartDay < 1 || weekStartDay > 7) {
             throw ApiException.validation("Začátek týdne musí být v intervalu 1 až 7.", "week_start_day_invalid");
