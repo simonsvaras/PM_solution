@@ -162,6 +162,19 @@
   gap: 0.75rem;
 }
 
+.projectWeeklyPlanner__settingsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.projectWeeklyPlanner__settingsActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .projectWeeklyPlanner__settingsField {
   display: flex;
   flex-direction: column;
@@ -208,6 +221,35 @@
 .projectWeeklyPlanner__settingsRetry:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.projectWeeklyPlanner__createWeekButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border, #d7d7d7);
+  background: linear-gradient(135deg, #4b6bfb, #6574ff);
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 4px 16px rgba(26, 26, 26, 0.12);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projectWeeklyPlanner__createWeekButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.projectWeeklyPlanner__createWeekButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(26, 26, 26, 0.16);
 }
 
 .projectWeeklyPlanner__weekSelect {

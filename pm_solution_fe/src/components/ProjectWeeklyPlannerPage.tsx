@@ -18,12 +18,15 @@ import {
   type ProjectOverviewDTO,
   type WeeklyPlannerTask,
   type WeeklyPlannerWeek,
+  type WeeklyPlannerWeekCollection,
+  type WeeklyPlannerWeekGenerationPayload,
   type WeeklyPlannerSettings,
   type WeeklySummary,
   type WeeklyTaskPayload,
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
+  generateProjectWeeklyPlannerWeeks,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
   getWeeklyPlannerSettings,
@@ -62,6 +65,86 @@ let optimisticTaskIdCounter = -1;
 function nextOptimisticTaskId(): number {
   optimisticTaskIdCounter -= 1;
   return optimisticTaskIdCounter;
+}
+
+function normaliseDateToUTC(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date.getTime());
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function alignToWeekStart(date: Date, weekStartDay: number): Date {
+  const normalised = normaliseDateToUTC(date);
+  const target = ((weekStartDay % dayNames.length) + dayNames.length) % dayNames.length;
+  const current = normalised.getUTCDay();
+  const diff = (current - target + dayNames.length) % dayNames.length;
+  return addDays(normalised, -diff);
+}
+
+function formatIsoDate(date: Date): string {
+  return normaliseDateToUTC(date).toISOString().slice(0, 10);
+}
+
+function normaliseWeekStart(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  return formatIsoDate(new Date(parsed));
+}
+
+function findNextWeekStart(
+  weeks: WeeklyPlannerWeek[],
+  weekStartDay: number,
+  fallbackWeekStart: string | null,
+): string {
+  const existingStarts = new Set(
+    weeks
+      .map(week => normaliseWeekStart(week.weekStart))
+      .filter((value): value is string => value !== null),
+  );
+
+  let baseDate: Date | null = null;
+  const latestTimestamp = weeks.reduce<number>((latest, week) => {
+    const parsed = Date.parse(week.weekStart);
+    if (Number.isNaN(parsed)) {
+      return latest;
+    }
+    return Math.max(latest, parsed);
+  }, Number.NEGATIVE_INFINITY);
+
+  if (Number.isFinite(latestTimestamp) && latestTimestamp !== Number.NEGATIVE_INFINITY) {
+    baseDate = addDays(normaliseDateToUTC(new Date(latestTimestamp)), 7);
+  }
+
+  if (!baseDate && fallbackWeekStart) {
+    const parsed = Date.parse(fallbackWeekStart);
+    if (!Number.isNaN(parsed)) {
+      baseDate = addDays(normaliseDateToUTC(new Date(parsed)), 7);
+    }
+  }
+
+  if (!baseDate) {
+    baseDate = alignToWeekStart(new Date(), weekStartDay);
+  }
+
+  let candidate = baseDate;
+  let candidateIso = formatIsoDate(candidate);
+  let guard = 0;
+  while (existingStarts.has(candidateIso) && guard < 500) {
+    candidate = addDays(candidate, 7);
+    candidateIso = formatIsoDate(candidate);
+    guard += 1;
+  }
+
+  return candidateIso;
 }
 
 function mapFormValuesToPayload(values: WeeklyTaskFormValues): WeeklyTaskPayload {
@@ -139,6 +222,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [settingsError, setSettingsError] = useState<ErrorResponse | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
+  const [createWeekError, setCreateWeekError] = useState<ErrorResponse | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
   const [taskFormMode, setTaskFormMode] = useState<WeeklyTaskFormMode>('create');
@@ -317,6 +401,14 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         queryClient.invalidateQueries({ queryKey: context.queryKey });
       }
     },
+  });
+
+  const generateWeekMutation = useMutation<
+    WeeklyPlannerWeekCollection,
+    ErrorResponse,
+    WeeklyPlannerWeekGenerationPayload
+  >({
+    mutationFn: payload => generateProjectWeeklyPlannerWeeks(project.id, payload),
   });
 
   const updateTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, UpdateTaskVariables, TaskMutationContext>({
@@ -635,6 +727,37 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
   const carryOverTasks = carryOverContext?.sourceWeek.tasks.filter(task => !isIssueClosed(task)) ?? [];
   const createTaskDisabled = selectedWeekId === null || isCreateModalOpen;
+  const createWeekPending = generateWeekMutation.isPending;
+  const createWeekButtonDisabled = createWeekPending || weeksLoading || settingsLoading;
+  const selectedWeekStart = selectedWeek?.weekStart ?? null;
+
+  const handleCreateNextWeek = useCallback(async () => {
+    if (generateWeekMutation.isPending) {
+      return;
+    }
+    const nextWeekStart = findNextWeekStart(weeks, currentWeekStartDay, selectedWeekStart);
+    setCreateWeekError(null);
+    try {
+      const response = await generateWeekMutation.mutateAsync({ from: nextWeekStart, to: nextWeekStart });
+      const createdWeek = response.weeks.find(week => normaliseWeekStart(week.weekStart) === nextWeekStart);
+      if (createdWeek) {
+        setSelectedWeekId(createdWeek.id);
+        fetchWeek(createdWeek.id);
+      }
+      loadWeeks();
+      notify('success', 'Nový týden byl vytvořen.');
+    } catch (error) {
+      setCreateWeekError(error as ErrorResponse);
+    }
+  }, [
+    generateWeekMutation,
+    weeks,
+    currentWeekStartDay,
+    selectedWeekStart,
+    fetchWeek,
+    loadWeeks,
+    notify,
+  ]);
 
   function renderCreateTaskButton(extraClassName = '', options?: { ariaLabel?: string }) {
     const ariaLabel = options?.ariaLabel;
@@ -671,7 +794,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           </div>
           {weeksError && (
             <p className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error">
-              Týdny se nepodařilo načíst. {weeksError.error.message}
+              Týdny se nepodařilo načíst. {weeksError.error?.message ?? ''}
             </p>
           )}
         </div>
@@ -728,23 +851,43 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           )}
         </div>
         <div className="projectWeeklyPlanner__settingsControls">
-          <label className="projectWeeklyPlanner__settingsField">
-            <span>První den týdne</span>
-            <select
-              value={String(currentWeekStartDay)}
-              onChange={handleWeekStartDayChange}
-              disabled={settingsLoading || settingsSaving}
-            >
-              {weekStartOptions.map(option => (
-                <option key={option.value} value={String(option.value)}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="projectWeeklyPlanner__settingsRow">
+            <label className="projectWeeklyPlanner__settingsField">
+              <span>První den týdne</span>
+              <select
+                value={String(currentWeekStartDay)}
+                onChange={handleWeekStartDayChange}
+                disabled={settingsLoading || settingsSaving}
+              >
+                {weekStartOptions.map(option => (
+                  <option key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="projectWeeklyPlanner__settingsActions">
+              <button
+                type="button"
+                className="projectWeeklyPlanner__createWeekButton"
+                onClick={handleCreateNextWeek}
+                disabled={createWeekButtonDisabled}
+                aria-label="Vytvořit nový týden"
+                title="Vytvořit nový týden"
+                aria-busy={createWeekPending}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          {createWeekError && (
+            <p className="projectWeeklyPlanner__settingsError" role="alert">
+              Nový týden se nepodařilo vytvořit. {createWeekError.error?.message ?? ''}
+            </p>
+          )}
           {settingsError && (
             <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo načíst. {settingsError.error.message}{' '}
+              Nastavení se nepodařilo načíst. {settingsError.error?.message ?? ''}{' '}
               <button
                 type="button"
                 className="projectWeeklyPlanner__settingsRetry"
@@ -757,7 +900,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           )}
           {settingsSaveError && !settingsError && (
             <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo uložit. {settingsSaveError.error.message}
+              Nastavení se nepodařilo uložit. {settingsSaveError.error?.message ?? ''}
             </p>
           )}
         </div>
@@ -828,7 +971,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           </p>
           {closeError && (
             <p className="projectWeeklyPlanner__modalError" role="alert">
-              Uzavření se nezdařilo. {closeError.error.message}
+              Uzavření se nezdařilo. {closeError.error?.message ?? ''}
             </p>
           )}
         </div>
@@ -879,7 +1022,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           )}
           {carryOverError && (
             <p className="projectWeeklyPlanner__modalError" role="alert">
-              Přenos úkolů se nezdařil. {carryOverError.error.message}
+              Přenos úkolů se nezdařil. {carryOverError.error?.message ?? ''}
             </p>
           )}
         </div>

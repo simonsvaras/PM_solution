@@ -641,6 +641,11 @@ export type WeeklyPlannerWeekCollection = {
   metadata: WeeklyPlannerMetadata;
 };
 
+export type WeeklyPlannerWeekGenerationPayload = {
+  from: string;
+  to: string;
+};
+
 export type WeeklyPlannerWeekWithMetadataDTO = {
   week: WeeklyPlannerWeekDTO;
   metadata: WeeklyPlannerMetadataDTO;
@@ -1290,6 +1295,21 @@ export async function listProjectWeeklyPlannerWeeks(
   );
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<WeeklyPlannerWeekCollectionDTO>(res);
+  return mapWeeklyPlannerWeekCollection(data);
+}
+
+export async function generateProjectWeeklyPlannerWeeks(
+  projectId: number,
+  payload: WeeklyPlannerWeekGenerationPayload,
+): Promise<WeeklyPlannerWeekCollection> {
+  const data = await fetchJson<WeeklyPlannerWeekCollectionDTO>(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/generate`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
   return mapWeeklyPlannerWeekCollection(data);
 }
 
