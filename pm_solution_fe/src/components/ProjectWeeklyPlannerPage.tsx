@@ -1,6 +1,7 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import './ProjectWeeklyPlannerPage.css';
 import Modal from './Modal';
+import WeeklyTaskFormModal, { type WeeklyTaskFormInitialTask, type WeeklyTaskFormMode, type WeeklyTaskFormValues } from './WeeklyTaskFormModal';
 import WeeklySummaryPanel from './WeeklySummaryPanel';
 import {
   type CarryOverTasksPayload,
@@ -105,6 +106,8 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
+  const [taskFormMode, setTaskFormMode] = useState<WeeklyTaskFormMode>('create');
+  const [taskFormInitial, setTaskFormInitial] = useState<WeeklyTaskFormInitialTask | null>(null);
 
   const loadSettings = useCallback(() => {
     setSettingsLoading(true);
@@ -199,12 +202,6 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   }, [selectedWeekId, fetchWeek]);
 
   useEffect(() => {
-    if (selectedWeekId === null) {
-      closeCreateTaskModal();
-    }
-  }, [selectedWeekId, closeCreateTaskModal]);
-
-  useEffect(() => {
     if (!isCreateModalOpen && selectedWeekId !== selectedWeekIdForForm) {
       setSelectedWeekIdForForm(selectedWeekId);
     }
@@ -247,6 +244,16 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
   const closeButtonVisible = canCloseWeek && selectedWeekId !== null;
   const closeButtonDisabled = closingWeek || isClosed;
   const tasks = selectedWeek?.tasks ?? [];
+
+  const formWeek = useMemo(() => {
+    if (selectedWeekIdForForm === null) {
+      return null;
+    }
+    if (selectedWeek && selectedWeek.id === selectedWeekIdForForm) {
+      return selectedWeek;
+    }
+    return weeks.find(week => week.id === selectedWeekIdForForm) ?? null;
+  }, [selectedWeekIdForForm, selectedWeek, weeks]);
 
   const headerRange = formatDateRange(selectedWeek?.weekStart ?? summary?.weekStart ?? null, selectedWeek?.weekEnd ?? summary?.weekEnd ?? null);
 
@@ -313,6 +320,8 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       if (weekId === null) {
         return;
       }
+      setTaskFormMode('create');
+      setTaskFormInitial(null);
       setSelectedWeekIdForForm(weekId);
       setIsCreateModalOpen(true);
     },
@@ -321,8 +330,22 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
 
   const closeCreateTaskModal = useCallback(() => {
     setIsCreateModalOpen(false);
+    setTaskFormInitial(null);
     setSelectedWeekIdForForm(null);
   }, []);
+
+  const handleTaskFormSubmit = useCallback(
+    async (_values: WeeklyTaskFormValues) => {
+      closeCreateTaskModal();
+    },
+    [closeCreateTaskModal],
+  );
+
+  useEffect(() => {
+    if (selectedWeekId === null) {
+      closeCreateTaskModal();
+    }
+  }, [selectedWeekId, closeCreateTaskModal]);
 
   function handleOpenCloseModal() {
     setCloseError(null);
@@ -641,6 +664,17 @@ export default function ProjectWeeklyPlannerPage({ project }: ProjectWeeklyPlann
       )}
 
       {renderCreateTaskButton('projectWeeklyPlanner__floatingActionButton', { ariaLabel: 'New task' })}
+
+      <WeeklyTaskFormModal
+        isOpen={isCreateModalOpen}
+        mode={taskFormMode}
+        projectId={project.id}
+        weekId={selectedWeekIdForForm}
+        week={formWeek}
+        initialTask={taskFormInitial ?? undefined}
+        onSubmit={handleTaskFormSubmit}
+        onCancel={closeCreateTaskModal}
+      />
 
       <Modal
         isOpen={closeModalOpen}

@@ -515,6 +515,30 @@ export type ProjectReportDetailResponse = {
   issues: ProjectReportDetailIssue[];
 };
 
+export type ProjectIssueDTO = {
+  id: number | string | null;
+  issue_id?: number | string | null;
+  iid?: number | string | null;
+  title: string | null;
+  state?: string | null;
+  status?: string | null;
+  dueDate?: string | null;
+  due_date?: string | null;
+  reference?: string | null;
+  ref?: string | null;
+  webUrl?: string | null;
+  web_url?: string | null;
+};
+
+export type ProjectIssue = {
+  id: number;
+  title: string;
+  state: string | null;
+  dueDate: string | null;
+  reference: string | null;
+  webUrl: string | null;
+};
+
 export type WeeklyPlannerTaskDTO = {
   id: number;
   dayOfWeek: number | null;
@@ -746,6 +770,26 @@ function parseNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? NaN : parsed;
+}
+
+function mapProjectIssue(dto: ProjectIssueDTO): ProjectIssue {
+  const idCandidate = dto.id ?? dto.issue_id ?? dto.iid ?? null;
+  const parsedId = parseNumber(idCandidate as number | string | null | undefined);
+  const id = Number.isNaN(parsedId) ? 0 : parsedId;
+  const rawReference = dto.reference ?? dto.ref ?? dto.iid ?? null;
+  const reference = rawReference === null || rawReference === undefined ? null : String(rawReference);
+  const rawState = dto.state ?? dto.status ?? null;
+  const state = rawState === null ? null : String(rawState);
+  const dueDate = dto.dueDate ?? dto.due_date ?? null;
+  const webUrl = dto.webUrl ?? dto.web_url ?? null;
+  return {
+    id,
+    title: dto.title ?? '',
+    state,
+    dueDate,
+    reference,
+    webUrl,
+  };
 }
 
 function mapInternOverview(dto: InternOverviewDTO): InternOverview {
@@ -1145,6 +1189,13 @@ export async function updateProjectRepositories(projectId: number, repositoryIds
     body: JSON.stringify({ repositoryIds }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function getProjectIssues(projectId: number): Promise<ProjectIssue[]> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/issues`);
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<ProjectIssueDTO[]>(res);
+  return (data ?? []).map(mapProjectIssue);
 }
 
 export async function getProjectInterns(projectId: number, search?: string): Promise<ProjectInternAssignmentDTO[]> {

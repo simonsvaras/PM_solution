@@ -1,0 +1,100 @@
+.weeklyTaskFormModal__body {
+  gap: 16px;
+}
+
+.weeklyTaskFormModal__alert {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #f5c2c7;
+  background: #fdecea;
+  color: #58151c;
+}
+
+.weeklyTaskFormModal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.weeklyTaskFormModal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.weeklyTaskFormModal__label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.weeklyTaskFormModal__input,
+.weeklyTaskFormModal__textarea,
+.weeklyTaskFormModal__select {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: inherit;
+}
+
+.weeklyTaskFormModal__textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.weeklyTaskFormModal__error {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.weeklyTaskFormModal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
+}
+
+.weeklyTaskFormModal__button {
+  font: inherit;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.weeklyTaskFormModal__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.weeklyTaskFormModal__button--secondary {
+  background: transparent;
+  border-color: #cbd5e1;
+  color: #1f2937;
+}
+
+.weeklyTaskFormModal__button--secondary:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.weeklyTaskFormModal__button--primary {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.weeklyTaskFormModal__button--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.weeklyTaskFormModal__button--primary:disabled {
+  background: #93c5fd;
+  border-color: #93c5fd;
+}
+
+.weeklyTaskFormModal__select option[disabled] {
+  color: #6b7280;
+}
