@@ -57,6 +57,7 @@ const mockedCloseProjectWeek = vi.mocked(closeProjectWeek);
 const baseWeek: WeeklyPlannerWeek = {
   id: 10,
   projectId: 42,
+  sprintId: null,
   weekStart: '2025-01-06',
   weekEnd: '2025-01-12',
   createdAt: '2025-01-01T00:00:00Z',
@@ -69,6 +70,7 @@ const baseWeek: WeeklyPlannerWeek = {
 const newWeek: WeeklyPlannerWeek = {
   id: 11,
   projectId: 42,
+  sprintId: null,
   weekStart: '2025-01-13',
   weekEnd: '2025-01-19',
   createdAt: '2025-01-08T00:00:00Z',
@@ -99,6 +101,10 @@ const baseMetadata = {
   currentWeekEnd: baseWeek.weekEnd,
   currentWeekId: baseWeek.id,
   roles: [] as string[],
+  sprintId: null,
+  sprintName: null,
+  sprintStatus: null,
+  sprintDeadline: null,
 };
 
 const newMetadata = {

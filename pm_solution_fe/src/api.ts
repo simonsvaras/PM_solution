@@ -578,6 +578,7 @@ export type WeeklyPlannerTask = {
 export type WeeklyPlannerWeekDTO = {
   id: number;
   projectId: number;
+  sprintId?: number | null;
   weekStart: string;
   weekEnd: string;
   createdAt: string;
@@ -590,6 +591,7 @@ export type WeeklyPlannerWeekDTO = {
 export type WeeklyPlannerWeek = {
   id: number;
   projectId: number;
+  sprintId: number | null;
   weekStart: string;
   weekEnd: string;
   createdAt: string;
@@ -616,6 +618,10 @@ export type WeeklyPlannerMetadataDTO = {
   currentWeekEnd: string | null;
   currentWeekId: number | null;
   roles?: string[];
+  sprintId?: number | null;
+  sprintName?: string | null;
+  sprintStatus?: string | null;
+  sprintDeadline?: string | null;
 };
 
 export type WeeklyPlannerMetadata = {
@@ -626,6 +632,10 @@ export type WeeklyPlannerMetadata = {
   currentWeekEnd: string | null;
   currentWeekId: number | null;
   roles: string[];
+  sprintId: number | null;
+  sprintName: string | null;
+  sprintStatus: string | null;
+  sprintDeadline: string | null;
 };
 
 export type WeeklyPlannerWeekCollectionDTO = {
@@ -901,6 +911,7 @@ function mapWeeklyPlannerWeek(dto: WeeklyPlannerWeekDTO): WeeklyPlannerWeek {
   return {
     id: dto.id,
     projectId: dto.projectId,
+    sprintId: typeof dto.sprintId === 'number' && Number.isFinite(dto.sprintId) ? dto.sprintId : null,
     weekStart: dto.weekStart,
     weekEnd: dto.weekEnd,
     createdAt: dto.createdAt,
@@ -912,6 +923,7 @@ function mapWeeklyPlannerWeek(dto: WeeklyPlannerWeekDTO): WeeklyPlannerWeek {
 }
 
 function mapWeeklyPlannerMetadata(dto: WeeklyPlannerMetadataDTO): WeeklyPlannerMetadata {
+  const normalizedStatus = typeof dto.sprintStatus === 'string' ? dto.sprintStatus.trim().toUpperCase() : null;
   return {
     projectId: dto.projectId,
     weekStartDay: dto.weekStartDay,
@@ -920,6 +932,10 @@ function mapWeeklyPlannerMetadata(dto: WeeklyPlannerMetadataDTO): WeeklyPlannerM
     currentWeekEnd: dto.currentWeekEnd ?? null,
     currentWeekId: dto.currentWeekId ?? null,
     roles: Array.isArray(dto.roles) ? dto.roles : [],
+    sprintId: typeof dto.sprintId === 'number' && Number.isFinite(dto.sprintId) ? dto.sprintId : null,
+    sprintName: dto.sprintName ?? null,
+    sprintStatus: normalizedStatus,
+    sprintDeadline: dto.sprintDeadline ?? null,
   };
 }
 
@@ -1277,7 +1293,7 @@ export async function updateWeeklyPlannerSettings(
 
 export async function listProjectWeeklyPlannerWeeks(
   projectId: number,
-  params?: { limit?: number; offset?: number },
+  params?: { limit?: number; offset?: number; sprintId?: number },
 ): Promise<WeeklyPlannerWeekCollection> {
   const searchParams = new URLSearchParams();
   if (typeof params?.limit === 'number' && Number.isFinite(params.limit)) {
@@ -1285,6 +1301,9 @@ export async function listProjectWeeklyPlannerWeeks(
   }
   if (typeof params?.offset === 'number' && Number.isFinite(params.offset)) {
     searchParams.set('offset', String(params.offset));
+  }
+  if (typeof params?.sprintId === 'number' && Number.isFinite(params.sprintId)) {
+    searchParams.set('sprintId', String(params.sprintId));
   }
   const query = searchParams.toString();
   const res = await fetch(

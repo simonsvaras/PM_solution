@@ -66,6 +66,15 @@ public class SprintService {
                 .orElseThrow(() -> ApiException.conflict("Pro projekt není aktivní sprint.", "sprint_required"));
     }
 
+    public PlanningSprintEntity requireSprint(long projectId, long sprintId) {
+        PlanningSprintEntity sprint = sprintRepository.findById(sprintId)
+                .orElseThrow(() -> ApiException.notFound("Sprint nebyl nalezen.", "sprint_not_found"));
+        if (sprint.projectId() != projectId) {
+            throw ApiException.validation("Sprint nepatří do vybraného projektu.", "sprint_project_mismatch");
+        }
+        return sprint;
+    }
+
     private SprintInput normalizeInput(SprintInput input) {
         if (input == null || input.name() == null || input.name().isBlank()) {
             throw ApiException.validation("Název sprintu je povinný.", "sprint_name_required");

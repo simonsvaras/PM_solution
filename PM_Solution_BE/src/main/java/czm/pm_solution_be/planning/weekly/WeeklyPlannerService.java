@@ -1,5 +1,8 @@
 package czm.pm_solution_be.planning.weekly;
 
+import czm.pm_solution_be.modules.planning.service.SprintService;
+import czm.pm_solution_be.planning.sprint.PlanningSprintEntity;
+import czm.pm_solution_be.planning.sprint.SprintStatus;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerRepository.IssueMetadataRow;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerRepository.ProjectConfigurationRow;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerRepository.ProjectWeekRow;
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,14 +39,19 @@ public class WeeklyPlannerService {
 
     private final WeeklyPlannerRepository repository;
     private final TransactionTemplate txTemplate;
+    private final SprintService sprintService;
 
-    public WeeklyPlannerService(WeeklyPlannerRepository repository, PlatformTransactionManager transactionManager) {
+    public WeeklyPlannerService(WeeklyPlannerRepository repository,
+                                PlatformTransactionManager transactionManager,
+                                SprintService sprintService) {
         this.repository = repository;
+        this.sprintService = sprintService;
         this.txTemplate = new TransactionTemplate(transactionManager);
     }
 
     public WeekConfiguration getWeekConfiguration(long projectId) {
         ProjectConfigurationRow project = requireProject(projectId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         return new WeekConfiguration(project.id(), project.weekStartDay());
     }
 
@@ -64,6 +73,7 @@ public class WeeklyPlannerService {
 
     public WeekCollection generateWeeks(long projectId, LocalDate from, LocalDate to) {
         ProjectConfigurationRow project = requireProject(projectId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         if (from == null) {
             throw ApiException.validation("Datum 'od' je povinné.", "from_required");
         }
@@ -83,7 +93,7 @@ public class WeeklyPlannerService {
             LocalDate current = start;
             while (!current.isAfter(end)) {
                 if (!repository.projectWeekExists(projectId, current)) {
-                    repository.insertProjectWeek(projectId, current);
+                    repository.insertProjectWeek(projectId, sprint.id(), current);
                 }
                 current = current.plusWeeks(1);
             }
@@ -96,11 +106,11 @@ public class WeeklyPlannerService {
             result.add(mapWeek(row));
             current = current.plusWeeks(1);
         }
-        PlannerMetadata metadata = createMetadata(projectId, project);
+        PlannerMetadata metadata = createMetadata(projectId, project, sprint);
         return new WeekCollection(metadata, List.copyOf(result));
     }
 
-    public WeekCollection listWeeks(long projectId, int limit, int offset) {
+    public WeekCollection listWeeks(long projectId, Long sprintId, int limit, int offset) {
         ProjectConfigurationRow project = requireProject(projectId);
         if (limit <= 0 || limit > 200) {
             throw ApiException.validation("Limit musí být v intervalu 1 až 200.", "pagination_limit_invalid");
@@ -108,27 +118,26 @@ public class WeeklyPlannerService {
         if (offset < 0) {
             throw ApiException.validation("Offset nesmí být záporný.", "pagination_offset_invalid");
         }
-        List<ProjectWeekRow> rows = repository.listProjectWeeks(projectId, limit, offset);
-        PlannerMetadata metadata = createMetadata(projectId, project);
+        PlanningSprintEntity sprint = resolveSprint(projectId, sprintId);
+        List<ProjectWeekRow> rows = repository.listProjectWeeks(projectId, sprint.id(), limit, offset);
+        PlannerMetadata metadata = createMetadata(projectId, project, sprint);
         List<WeekDetail> weeks = rows.stream()
                 .map(this::mapWeek)
                 .toList();
         return new WeekCollection(metadata, weeks);
     }
 
-    public WeekWithMetadata getWeek(long projectId, long projectWeekId) {
+    public WeekWithMetadata getWeek(long projectId, long projectWeekId, Long sprintId) {
         ProjectConfigurationRow project = requireProject(projectId);
-        ProjectWeekRow row = repository.findProjectWeekById(projectWeekId)
-                .orElseThrow(() -> ApiException.notFound("Požadovaný týden neexistuje.", "project_week"));
-        if (row.projectId() != projectId) {
-            throw ApiException.notFound("Požadovaný týden neexistuje.", "project_week");
-        }
-        PlannerMetadata metadata = createMetadata(projectId, project);
+        ProjectWeekRow row = requireWeek(projectId, projectWeekId, sprintId);
+        PlanningSprintEntity sprint = loadSprint(projectId, row.sprintId());
+        PlannerMetadata metadata = createMetadata(projectId, project, sprint);
         return new WeekWithMetadata(metadata, mapWeek(row));
     }
 
     public TaskDetail createTask(long projectId, long projectWeekId, TaskInput input) {
-        ProjectWeekRow week = requireWeek(projectId, projectWeekId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
         validateTaskInput(projectId, week, input);
         WeeklyTaskRow inserted = txTemplate.execute(status -> {
             WeeklyTaskRow created = repository.insertTask(projectWeekId, toMutation(input));
@@ -143,7 +152,8 @@ public class WeeklyPlannerService {
     }
 
     public TaskDetail updateTask(long projectId, long projectWeekId, long taskId, TaskInput input) {
-        ProjectWeekRow week = requireWeek(projectId, projectWeekId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
         requireTask(projectWeekId, taskId);
         validateTaskInput(projectId, week, input);
         WeeklyTaskRow updated = txTemplate.execute(status -> {
@@ -160,7 +170,8 @@ public class WeeklyPlannerService {
     }
 
     public TaskDetail changeStatus(long projectId, long projectWeekId, long taskId, String newStatus) {
-        ProjectWeekRow week = requireWeek(projectId, projectWeekId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
         WeeklyTaskRow task = requireTask(projectWeekId, taskId);
         if (task.issueId() == null) {
             throw ApiException.validation("Úkol není navázán na issue, status nelze změnit.", "issue_required");
@@ -186,7 +197,8 @@ public class WeeklyPlannerService {
                                            long sourceProjectWeekId,
                                            LocalDate targetWeekStart,
                                            List<Long> taskIds) {
-        ProjectWeekRow source = requireWeek(projectId, sourceProjectWeekId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        ProjectWeekRow source = requireWeek(projectId, sourceProjectWeekId, sprint.id());
         if (targetWeekStart == null) {
             throw ApiException.validation("Datum cílového týdne je povinné.", "target_week_required");
         }
@@ -211,8 +223,14 @@ public class WeeklyPlannerService {
         LocalDate targetWeekEnd = computeWeekEnd(alignedTarget);
         List<Long> newTaskIds = txTemplate.execute(status -> {
             ProjectWeekRow targetWeek = repository.findProjectWeek(projectId, alignedTarget)
+                    .map(existing -> {
+                        if (existing.sprintId() != null && !existing.sprintId().equals(sprint.id())) {
+                            throw ApiException.validation("Týden nepatří do aktuálního sprintu.", "project_week_sprint_mismatch");
+                        }
+                        return existing;
+                    })
                     .orElseGet(() -> {
-                        var inserted = repository.insertProjectWeek(projectId, alignedTarget);
+                        var inserted = repository.insertProjectWeek(projectId, sprint.id(), alignedTarget);
                         return repository.findProjectWeekById(inserted.id())
                                 .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst cílový týden.", "target_week_reload_failed"));
                     });
@@ -236,7 +254,8 @@ public class WeeklyPlannerService {
 
     public WeekWithMetadata closeWeek(long projectId, long projectWeekId) {
         ProjectConfigurationRow project = requireProject(projectId);
-        ProjectWeekRow week = requireWeek(projectId, projectWeekId);
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
         LocalDate weekEnd = computeWeekEnd(week.weekStartDate());
         txTemplate.executeWithoutResult(status -> {
             for (WeeklyTaskRow task : week.tasks()) {
@@ -248,7 +267,7 @@ public class WeeklyPlannerService {
         });
         ProjectWeekRow refreshed = repository.findProjectWeekById(projectWeekId)
                 .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst týden po uzavření.", "week_reload_failed"));
-        PlannerMetadata metadata = createMetadata(projectId, project);
+        PlannerMetadata metadata = createMetadata(projectId, project, sprint);
         return new WeekWithMetadata(metadata, mapWeek(refreshed));
     }
 
@@ -270,10 +289,17 @@ public class WeeklyPlannerService {
     }
 
     private ProjectWeekRow requireWeek(long projectId, long projectWeekId) {
+        return requireWeek(projectId, projectWeekId, null);
+    }
+
+    private ProjectWeekRow requireWeek(long projectId, long projectWeekId, Long requiredSprintId) {
         ProjectWeekRow row = repository.findProjectWeekById(projectWeekId)
                 .orElseThrow(() -> ApiException.notFound("Požadovaný týden neexistuje.", "project_week"));
         if (row.projectId() != projectId) {
             throw ApiException.notFound("Požadovaný týden neexistuje.", "project_week");
+        }
+        if (requiredSprintId != null && row.sprintId() != null && !Objects.equals(row.sprintId(), requiredSprintId)) {
+            throw ApiException.validation("Týden nepatří do vybraného sprintu.", "project_week_sprint_mismatch");
         }
         return row;
     }
@@ -345,6 +371,7 @@ public class WeeklyPlannerService {
         return new WeekDetail(
                 row.id(),
                 row.projectId(),
+                row.sprintId(),
                 row.weekStartDate(),
                 weekEnd,
                 row.createdAt(),
@@ -352,14 +379,43 @@ public class WeeklyPlannerService {
                 tasks);
     }
 
-    private PlannerMetadata createMetadata(long projectId, ProjectConfigurationRow project) {
+    private PlanningSprintEntity resolveSprint(long projectId, Long sprintId) {
+        if (sprintId == null) {
+            return sprintService.requireActiveSprint(projectId);
+        }
+        return sprintService.requireSprint(projectId, sprintId);
+    }
+
+    private PlanningSprintEntity loadSprint(long projectId, Long sprintId) {
+        if (sprintId == null) {
+            return null;
+        }
+        return sprintService.requireSprint(projectId, sprintId);
+    }
+
+    private PlannerMetadata createMetadata(long projectId,
+                                           ProjectConfigurationRow project,
+                                           PlanningSprintEntity sprint) {
         LocalDate today = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate();
         LocalDate currentWeekStart = alignToWeekStart(today, project.weekStartDay());
         LocalDate currentWeekEnd = computeWeekEnd(currentWeekStart);
         Long currentWeekId = repository.findProjectWeek(projectId, currentWeekStart)
                 .map(ProjectWeekRow::id)
                 .orElse(null);
-        return new PlannerMetadata(projectId, project.weekStartDay(), today, currentWeekStart, currentWeekEnd, currentWeekId);
+        Long sprintId = sprint == null ? null : sprint.id();
+        String sprintName = sprint == null ? null : sprint.name();
+        SprintStatus sprintStatus = sprint == null ? null : sprint.status();
+        LocalDate sprintDeadline = sprint == null ? null : sprint.deadline();
+        return new PlannerMetadata(projectId,
+                project.weekStartDay(),
+                today,
+                currentWeekStart,
+                currentWeekEnd,
+                currentWeekId,
+                sprintId,
+                sprintName,
+                sprintStatus,
+                sprintDeadline);
     }
 
     private TaskDetail mapTask(WeeklyTaskRow row) {
@@ -423,11 +479,16 @@ public class WeeklyPlannerService {
                                    LocalDate today,
                                    LocalDate currentWeekStart,
                                    LocalDate currentWeekEnd,
-                                   Long currentWeekId) {
+                                   Long currentWeekId,
+                                   Long sprintId,
+                                   String sprintName,
+                                   SprintStatus sprintStatus,
+                                   LocalDate sprintDeadline) {
     }
 
     public record WeekDetail(long id,
                              long projectId,
+                             Long sprintId,
                              LocalDate weekStart,
                              LocalDate weekEnd,
                              OffsetDateTime createdAt,
