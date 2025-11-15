@@ -30,6 +30,10 @@ public class PlanningSprintRepository {
             FROM planning_sprint
             """;
 
+    private static final String SQL_SELECT_BY_ID =
+            SQL_SELECT_BASE +
+            " WHERE id = ?";
+
     private static final String SQL_SELECT_BY_PROJECT_AND_STATUS =
             SQL_SELECT_BASE +
             " WHERE project_id = ? AND status = ?\n" +
@@ -41,6 +45,11 @@ public class PlanningSprintRepository {
             " WHERE project_id = ?\n" +
             " ORDER BY created_at DESC, id DESC\n" +
             " LIMIT 1";
+
+    private static final String SQL_LIST_BY_PROJECT =
+            SQL_SELECT_BASE +
+            " WHERE project_id = ?\n" +
+            " ORDER BY created_at DESC, id DESC";
 
     private static final String SQL_INSERT =
             """
@@ -90,9 +99,18 @@ public class PlanningSprintRepository {
         return Optional.ofNullable(DataAccessUtils.singleResult(rows));
     }
 
+    public Optional<PlanningSprintEntity> findById(long sprintId) {
+        List<PlanningSprintEntity> rows = jdbc.query(SQL_SELECT_BY_ID, ROW_MAPPER, sprintId);
+        return Optional.ofNullable(DataAccessUtils.singleResult(rows));
+    }
+
     public Optional<PlanningSprintEntity> findLatestByProject(long projectId) {
         List<PlanningSprintEntity> rows = jdbc.query(SQL_SELECT_LATEST_BY_PROJECT, ROW_MAPPER, projectId);
         return Optional.ofNullable(DataAccessUtils.singleResult(rows));
+    }
+
+    public List<PlanningSprintEntity> findAllByProject(long projectId) {
+        return jdbc.query(SQL_LIST_BY_PROJECT, ROW_MAPPER, projectId);
     }
 
     public PlanningSprintEntity insert(long projectId,

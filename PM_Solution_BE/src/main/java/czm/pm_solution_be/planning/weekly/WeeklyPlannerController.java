@@ -1,5 +1,6 @@
 package czm.pm_solution_be.planning.weekly;
 
+import czm.pm_solution_be.modules.planning.service.SprintService;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.PlannerMetadata;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.TaskDetail;
 import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.TaskInput;
@@ -30,9 +31,11 @@ import java.util.List;
 public class WeeklyPlannerController {
 
     private final WeeklyPlannerService service;
+    private final SprintService sprintService;
 
-    public WeeklyPlannerController(WeeklyPlannerService service) {
+    public WeeklyPlannerController(WeeklyPlannerService service, SprintService sprintService) {
         this.service = service;
+        this.sprintService = sprintService;
     }
 
     @GetMapping("/settings")
@@ -57,6 +60,7 @@ public class WeeklyPlannerController {
     @PostMapping("/weeks/generate")
     public ResponseEntity<WeekCollectionResponse> generateWeeks(@PathVariable long projectId,
                                                                 @RequestBody WeekGenerationRequest request) {
+        requireActiveSprint(projectId);
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
@@ -68,12 +72,14 @@ public class WeeklyPlannerController {
     public WeekCollectionResponse listWeeks(@PathVariable long projectId,
                                             @RequestParam(defaultValue = "20") int limit,
                                             @RequestParam(defaultValue = "0") int offset) {
+        requireActiveSprint(projectId);
         WeekCollection weeks = service.listWeeks(projectId, limit, offset);
         return toWeekCollectionResponse(weeks);
     }
 
     @GetMapping("/weeks/{projectWeekId}")
     public WeekWithMetadataResponse getWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        requireActiveSprint(projectId);
         WeekWithMetadata detail = service.getWeek(projectId, projectWeekId);
         return new WeekWithMetadataResponse(toWeekResponse(detail.week()), toMetadataResponse(detail.metadata()));
     }
@@ -82,6 +88,7 @@ public class WeeklyPlannerController {
     public ResponseEntity<TaskDetailResponse> createTask(@PathVariable long projectId,
                                                          @PathVariable long projectWeekId,
                                                          @RequestBody WeeklyTaskRequest request) {
+        requireActiveSprint(projectId);
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
@@ -94,6 +101,7 @@ public class WeeklyPlannerController {
                                          @PathVariable long projectWeekId,
                                          @PathVariable long taskId,
                                          @RequestBody WeeklyTaskRequest request) {
+        requireActiveSprint(projectId);
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
@@ -106,6 +114,7 @@ public class WeeklyPlannerController {
                                            @PathVariable long projectWeekId,
                                            @PathVariable long taskId,
                                            @RequestBody ChangeStatusRequest request) {
+        requireActiveSprint(projectId);
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
@@ -117,6 +126,7 @@ public class WeeklyPlannerController {
     public List<TaskDetailResponse> carryOverTasks(@PathVariable long projectId,
                                                    @PathVariable long projectWeekId,
                                                    @RequestBody CarryOverRequest request) {
+        requireActiveSprint(projectId);
         if (request == null) {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
@@ -126,12 +136,14 @@ public class WeeklyPlannerController {
 
     @PostMapping("/weeks/{projectWeekId}/close")
     public WeekWithMetadataResponse closeWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        requireActiveSprint(projectId);
         WeekWithMetadata detail = service.closeWeek(projectId, projectWeekId);
         return new WeekWithMetadataResponse(toWeekResponse(detail.week()), toMetadataResponse(detail.metadata()));
     }
 
     @GetMapping("/weeks/{projectWeekId}/summary")
     public WeeklySummaryResponse getSummary(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        requireActiveSprint(projectId);
         WeeklySummary summary = service.getSummary(projectId, projectWeekId);
         List<DailySummaryResponse> perDay = summary.perDay().stream()
                 .map(day -> new DailySummaryResponse(day.dayOfWeek(), day.taskCount(), day.totalHours()))
@@ -265,5 +277,9 @@ public class WeeklyPlannerController {
     }
 
     public record InternSummaryResponse(Long internId, String internName, long taskCount, BigDecimal totalHours) {
+    }
+
+    private void requireActiveSprint(long projectId) {
+        sprintService.requireActiveSprint(projectId);
     }
 }
