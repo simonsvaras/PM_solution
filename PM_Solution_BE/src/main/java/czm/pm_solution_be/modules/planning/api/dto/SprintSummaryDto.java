@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SprintSummaryDto(
@@ -13,5 +14,7 @@ public record SprintSummaryDto(
         @NotNull Long projectId,
         @NotBlank String name,
         LocalDate deadline,
-        @NotNull SprintStatus status) {
+        @NotNull SprintStatus status,
+        SprintTaskSummaryDto taskSummary,
+        List<WeeklyTaskDto> tasks) {
 }

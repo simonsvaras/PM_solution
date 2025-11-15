@@ -1,6 +1,7 @@
 package czm.pm_solution_be.modules.planning.service;
 
 import czm.pm_solution_be.modules.planning.repository.WeeklyTaskRepository;
+import czm.pm_solution_be.modules.planning.repository.WeeklyTaskRepository.WeeklyTaskEntity;
 import czm.pm_solution_be.planning.sprint.PlanningSprintEntity;
 import czm.pm_solution_be.planning.sprint.PlanningSprintRepository;
 import czm.pm_solution_be.planning.sprint.SprintStatus;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class SprintService {
@@ -49,12 +51,22 @@ public class SprintService {
         if (sprint.status() != SprintStatus.OPEN) {
             throw ApiException.conflict("Sprint je již uzavřen.", "sprint_already_closed");
         }
-        long openTasks = weeklyTaskRepository.countOpenTasks(projectId);
+        long openTasks = weeklyTaskRepository.countOpenTasksBySprint(projectId, sprintId);
         if (openTasks > 0) {
             throw ApiException.conflict("Nelze uzavřít sprint s " + openTasks + " otevřenými úkoly.", "weekly_tasks_open");
         }
         return sprintRepository.update(sprintId, sprint.name(), sprint.description(), sprint.deadline(), SprintStatus.CLOSED)
                 .orElseThrow(() -> ApiException.internal("Nepodařilo se uzavřít sprint.", "sprint_close_failed"));
+    }
+
+    public List<WeeklyTaskEntity> listSprintTasks(long projectId, long sprintId) {
+        PlanningSprintEntity sprint = requireSprint(projectId, sprintId);
+        return listSprintTasks(sprint);
+    }
+
+    public List<WeeklyTaskEntity> listSprintTasks(PlanningSprintEntity sprint) {
+        Objects.requireNonNull(sprint, "sprint");
+        return weeklyTaskRepository.findTasksBySprint(sprint.projectId(), sprint.id());
     }
 
     public List<PlanningSprintEntity> getSprintHistory(long projectId) {

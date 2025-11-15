@@ -203,6 +203,7 @@ public class WeeklyPlannerRepository {
             """
             SELECT wt.id,
                    wt.project_week_id,
+                   pw.sprint_id,
                    wt.day_of_week,
                    wt.note,
                    wt.planned_hours,
@@ -215,6 +216,7 @@ public class WeeklyPlannerRepository {
                    iss.state AS issue_state,
                    iss.due_date AS issue_due_date
             FROM weekly_task wt
+            JOIN project_week pw ON pw.id = wt.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.id = ?
@@ -224,6 +226,7 @@ public class WeeklyPlannerRepository {
             """
             SELECT wt.id,
                    wt.project_week_id,
+                   pw.sprint_id,
                    wt.day_of_week,
                    wt.note,
                    wt.planned_hours,
@@ -236,6 +239,7 @@ public class WeeklyPlannerRepository {
                    iss.state AS issue_state,
                    iss.due_date AS issue_due_date
             FROM weekly_task wt
+            JOIN project_week pw ON pw.id = wt.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.project_week_id = ?
@@ -402,6 +406,7 @@ public class WeeklyPlannerRepository {
             return new WeeklyTaskRow(
                     rs.getLong("id"),
                     rs.getLong("project_week_id"),
+                    mapNullableLong(rs, "sprint_id"),
                     dayOfWeek,
                     rs.getString("note"),
                     plannedHours,
@@ -669,6 +674,7 @@ public class WeeklyPlannerRepository {
                 aggregation.addTask(new WeeklyTaskRow(
                         row.taskId(),
                         row.projectWeekId(),
+                        row.sprintId(),
                         row.dayOfWeek(),
                         row.note(),
                         row.plannedHours(),
@@ -770,6 +776,7 @@ public class WeeklyPlannerRepository {
 
     public record WeeklyTaskRow(long id,
                                 long projectWeekId,
+                                Long sprintId,
                                 Integer dayOfWeek,
                                 String note,
                                 BigDecimal plannedHours,
