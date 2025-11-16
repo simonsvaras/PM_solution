@@ -117,3 +117,8 @@
   font-size: 0.9rem;
   color: var(--color-text-secondary, #4a4a4a);
 }
+
+.backlogTaskColumn--dropActive {
+  outline: 2px dashed rgba(75, 107, 251, 0.5);
+  outline-offset: 6px;
+}

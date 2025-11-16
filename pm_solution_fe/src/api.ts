@@ -1645,6 +1645,22 @@ export async function updateWeeklyTask(
   return mapWeeklyPlannerTask(data);
 }
 
+export async function updateWeeklyTaskWeek(
+  projectId: number,
+  taskId: number,
+  weekId: number | null,
+): Promise<WeeklyPlannerTask> {
+  const data = await fetchJson<WeeklyPlannerTaskDTO>(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/tasks/${taskId}/assignment`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ weekId }),
+    },
+  );
+  return mapWeeklyPlannerTask(data);
+}
+
 export async function carryOverWeeklyTasks(
   projectId: number,
   projectWeekId: number,

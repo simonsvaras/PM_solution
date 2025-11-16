@@ -1,27 +1,195 @@
-.weeklyTaskList__summary {
+.weeklyTaskList {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 1rem;
-  margin: 0 0 1.2rem;
+}
+
+.weeklyTaskList__statusMessage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.weeklyTaskList__dismissButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.weeklyTaskList__dismissButton:hover {
+  text-decoration: none;
+}
+
+.weeklyTaskList__lanesWrapper {
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.weeklyTaskList__lanes {
+  display: flex;
+  gap: 1rem;
+  min-height: 320px;
+}
+
+.weekLane {
+  min-width: 280px;
+  max-width: 340px;
+  background: #fff;
+  border-radius: 1rem;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weekLane--active {
+  border-color: rgba(75, 107, 251, 0.35);
+  box-shadow: 0 12px 32px rgba(75, 107, 251, 0.18);
+}
+
+.weekLane--dropActive {
+  outline: 2px dashed rgba(75, 107, 251, 0.4);
+  outline-offset: 4px;
+}
+
+.weekLane__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.weekLane__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-tertiary, #6f6f6f);
+}
+
+.weekLane__titleButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.weekLane__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.weekLane__stats {
+  display: inline-flex;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.weekLane__tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.weekLane__empty {
+  padding: 1rem;
+  border: 1px dashed var(--color-border, #d7d7d7);
+  border-radius: 0.9rem;
+  text-align: center;
+  color: var(--color-text-secondary, #4a4a4a);
+  font-size: 0.9rem;
+}
+
+.weekLane__taskCard {
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  background: #f9f9fc;
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.weekLane__taskCard--dragging {
+  box-shadow: 0 12px 28px rgba(26, 26, 26, 0.2);
+  cursor: grabbing;
+}
+
+.weekLane__taskHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.weekLane__taskDay {
+  font-weight: 600;
+  color: #4b6bfb;
+}
+
+.weekLane__taskActions {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.weekLane__badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(75, 107, 251, 0.1);
+  color: #4b6bfb;
+  font-size: 0.75rem;
+}
+
+.weekLane__taskTitle {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.weekLane__taskMeta {
+  margin: 0.25rem 0 0;
+  display: flex;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #4a4a4a);
+}
+
+.weekLane__taskNote {
+  margin: 0.35rem 0 0;
   font-size: 0.9rem;
   color: var(--color-text-secondary, #4a4a4a);
 }
 
-.weeklyTaskList__summaryItem {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.25rem;
+.weekLane__addButton {
+  min-width: 180px;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px dashed rgba(75, 107, 251, 0.4);
+  background: rgba(75, 107, 251, 0.05);
+  color: #4b6bfb;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: stretch;
 }
 
-.weeklyTaskList__summaryItem strong {
-  color: var(--color-text-primary, #1a1a1a);
-  font-size: 1rem;
-}
-
-.weeklyTaskList__taskHeaderActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
+.weekLane__addButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .weeklyTaskList__editButton {
@@ -43,26 +211,4 @@
 .weeklyTaskList__editButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.weeklyTaskList__statusMessage {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.weeklyTaskList__dismissButton {
-  border: none;
-  background: transparent;
-  color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0;
-}
-
-.weeklyTaskList__dismissButton:hover {
-  text-decoration: none;
 }

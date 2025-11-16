@@ -31,6 +31,7 @@ vi.mock('../api', async original => {
     updateWeeklyPlannerSettings: vi.fn(),
     createWeeklyTask: vi.fn(),
     updateWeeklyTask: vi.fn(),
+    updateWeeklyTaskWeek: vi.fn(),
     carryOverWeeklyTasks: vi.fn(),
     closeProjectWeek: vi.fn(),
     getSprintSummary: vi.fn(),
@@ -49,6 +50,7 @@ const {
   updateWeeklyPlannerSettings,
   createWeeklyTask,
   updateWeeklyTask,
+  updateWeeklyTaskWeek,
   carryOverWeeklyTasks,
   closeProjectWeek,
   getSprintSummary,
@@ -65,6 +67,8 @@ const mockedGenerateProjectWeeklyPlannerWeeks = vi.mocked(generateProjectWeeklyP
 const mockedUpdateWeeklyPlannerSettings = vi.mocked(updateWeeklyPlannerSettings);
 const mockedCreateWeeklyTask = vi.mocked(createWeeklyTask);
 const mockedUpdateWeeklyTask = vi.mocked(updateWeeklyTask);
+const mockedUpdateWeeklyTaskWeek = vi.mocked(updateWeeklyTaskWeek);
+void mockedUpdateWeeklyTaskWeek;
 const mockedCarryOverWeeklyTasks = vi.mocked(carryOverWeeklyTasks);
 const mockedCloseProjectWeek = vi.mocked(closeProjectWeek);
 const mockedGetSprintSummary = vi.mocked(getSprintSummary);

@@ -371,15 +371,17 @@
 }
 
 .projectWeeklyPlanner__board {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(460px, 2fr);
+  display: flex;
   gap: 1.5rem;
-  align-items: flex-start;
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
 }
 
 @media (max-width: 960px) {
   .projectWeeklyPlanner__board {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    overflow-x: visible;
   }
 }
 

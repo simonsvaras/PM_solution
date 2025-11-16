@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import { useQuery, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import { useDroppable, useDraggable } from '@dnd-kit/core';
+import { type QueryClient, type QueryKey } from '@tanstack/react-query';
 import './WeeklyTaskList.css';
-import { getProjectWeeklyPlannerWeek, type ErrorResponse, type WeeklyPlannerTask } from '../api';
+import type { ErrorResponse, WeeklyPlannerTask, WeeklyPlannerWeek } from '../api';
 import { formatDate, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
 
 export type WeeklyTasksQueryData = {
@@ -126,83 +126,183 @@ export function replaceWeeklyTask(
   return previous;
 }
 
-export type WeeklyTaskListProps = {
-  projectId: number;
-  weekId: number | null;
+export function removeWeeklyTask(
+  queryClient: QueryClient,
+  projectId: number,
+  weekId: number,
+  taskId: number,
+): WeeklyTasksQueryData | undefined {
+  const key = getWeeklyTasksQueryKey(projectId, weekId);
+  const previous = queryClient.getQueryData<WeeklyTasksQueryData>(key);
+  if (!previous) {
+    return undefined;
+  }
+  const filtered = previous.weekTasks.filter(task => task.id !== taskId);
+  const next = buildWeeklyTasksQueryData(filtered, previous.unscheduledTasks);
+  queryClient.setQueryData(key, next);
+  return previous;
+}
+
+type WeekLaneProps = {
+  week: WeeklyPlannerWeek;
+  tasks: WeeklyPlannerTask[];
   weekStartDay: number;
   carriedAudit: Record<number, string>;
-  initialTasks?: WeeklyPlannerTask[];
+  onEditTask?: (task: WeeklyPlannerTask) => void;
+  isSelected: boolean;
+  onSelectWeek?: (weekId: number) => void;
+};
+
+function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelected, onSelectWeek }: WeekLaneProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: `week-drop-${week.id}`, data: { weekId: week.id } });
+  const openTasks = tasks.filter(task => task.status !== 'CLOSED').length;
+  const closedTasks = tasks.length - openTasks;
+  const headline = `${formatDate(week.weekStart)} – ${formatDate(week.weekEnd)}`;
+
+  return (
+    <section
+      ref={setNodeRef}
+      className={`weekLane${isSelected ? ' weekLane--active' : ''}${isOver ? ' weekLane--dropActive' : ''}`}
+      role="listitem"
+      aria-label={`Týden od ${formatDate(week.weekStart)}`}
+    >
+      <header className="weekLane__header">
+        <div>
+          <p className="weekLane__eyebrow">{week.isClosed ? 'Uzavřený týden' : 'Plánovaný týden'}</p>
+          <button type="button" className="weekLane__titleButton" onClick={() => onSelectWeek?.(week.id)}>
+            <span className="weekLane__title">{headline}</span>
+          </button>
+        </div>
+        <div className="weekLane__stats">
+          <span>{openTasks} otevřených</span>
+          <span aria-hidden="true">•</span>
+          <span>{closedTasks} uzavřených</span>
+        </div>
+      </header>
+      <ul className="weekLane__tasks">
+        {tasks.length === 0 && <li className="weekLane__empty">Přetáhněte sem první úkol</li>}
+        {tasks.map(task => (
+          <WeekTaskCard
+            key={task.id}
+            weekId={week.id}
+            task={task}
+            weekStartDay={weekStartDay}
+            carriedAudit={carriedAudit}
+            onEditTask={onEditTask}
+            isClosed={week.isClosed}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+type WeekTaskCardProps = {
+  weekId: number;
+  task: WeeklyPlannerTask;
+  weekStartDay: number;
+  carriedAudit: Record<number, string>;
+  onEditTask?: (task: WeeklyPlannerTask) => void;
   isClosed: boolean;
-  isWeekLoading: boolean;
-  weekError: ErrorResponse | null;
-  onRetryWeek: () => void;
+};
+
+function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, isClosed }: WeekTaskCardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `week-task-${task.id}`,
+    data: { taskId: task.id, weekId },
+  });
+  const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
+  const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
+  const style = transform
+    ? { transform: `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` }
+    : undefined;
+
+  return (
+    <li
+      ref={setNodeRef}
+      className={`weekLane__taskCard${isDragging ? ' weekLane__taskCard--dragging' : ''}`}
+      style={style}
+      {...listeners}
+      {...attributes}
+    >
+      <div className="weekLane__taskHeader">
+        <span className="weekLane__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
+        <div className="weekLane__taskActions">
+          {carriedFrom && <span className="weekLane__badge">Carried over {formatDate(carriedFrom)}</span>}
+          {onEditTask && (
+            <button
+              type="button"
+              className="weeklyTaskList__editButton"
+              onClick={() => onEditTask(task)}
+              disabled={isClosed}
+            >
+              Upravit
+            </button>
+          )}
+        </div>
+      </div>
+      <h4 className="weekLane__taskTitle">{headline}</h4>
+      <p className="weekLane__taskMeta">
+        <span>{task.internName ?? 'Nepřiřazeno'}</span>
+        <span aria-hidden="true">•</span>
+        <span>{formatPlannedHours(task.plannedHours)}</span>
+      </p>
+      {task.note && task.note !== task.issueTitle && <p className="weekLane__taskNote">{task.note}</p>}
+    </li>
+  );
+}
+
+export type WeeklyTaskListProps = {
+  weeks: WeeklyPlannerWeek[];
+  weekTasks: Map<number, WeeklyPlannerTask[]>;
+  weekStartDay: number;
+  carriedAudit: Record<number, string>;
+  isLoading: boolean;
+  error: ErrorResponse | null;
+  errorLabel?: string;
+  onRetry?: () => void;
   onEditTask?: (task: WeeklyPlannerTask) => void;
   mutationError: ErrorResponse | null;
   onDismissMutationError?: () => void;
+  selectedWeekId: number | null;
+  onSelectWeek?: (weekId: number) => void;
+  onCreateWeek?: () => void;
+  canCreateWeek?: boolean;
+  isCreateWeekLoading?: boolean;
 };
 
+function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () => void }) {
+  if (!onClick) {
+    return null;
+  }
+  return (
+    <button type="button" className="weekLane__addButton" onClick={onClick} disabled={disabled}>
+      + Týden
+    </button>
+  );
+}
+
 export default function WeeklyTaskList({
-  projectId,
-  weekId,
+  weeks,
+  weekTasks,
   weekStartDay,
   carriedAudit,
-  initialTasks,
-  isClosed,
-  isWeekLoading,
-  weekError,
-  onRetryWeek,
+  isLoading,
+  error,
+  errorLabel,
+  onRetry,
   onEditTask,
   mutationError,
   onDismissMutationError,
+  selectedWeekId,
+  onSelectWeek,
+  onCreateWeek,
+  canCreateWeek = false,
+  isCreateWeekLoading = false,
 }: WeeklyTaskListProps) {
-  const queryKey = useMemo(() => getWeeklyTasksQueryKey(projectId, weekId), [projectId, weekId]);
-  const initialData = useMemo(() => {
-    if (!initialTasks || weekId === null) return undefined;
-    return createWeeklyTasksQueryData(initialTasks, { defaultWeekId: weekId });
-  }, [initialTasks, weekId]);
-
-  const {
-    data,
-    error,
-    isPending,
-    isFetching,
-    refetch,
-  } = useQuery({
-    queryKey,
-    queryFn: async () => {
-      if (weekId === null) {
-        return createWeeklyTasksQueryData([]);
-      }
-      const detail = await getProjectWeeklyPlannerWeek(projectId, weekId);
-      return createWeeklyTasksQueryData(detail.week.tasks, { defaultWeekId: weekId });
-    },
-    enabled: weekId !== null,
-    initialData,
-  });
-
-  const tasks = data?.weekTasks ?? [];
-  const statusCounts = data?.statusCounts ?? { OPENED: 0, CLOSED: 0 };
-  const combinedError = weekError ?? (error as ErrorResponse | null);
-  const loading = isWeekLoading || isPending;
-  const showEmptyState = !loading && !combinedError && tasks.length === 0;
-
-  function handleRetry() {
-    onRetryWeek();
-    if (weekId !== null) {
-      refetch();
-    }
-  }
-
-  if (weekId === null) {
-    return (
-      <div className="projectWeeklyPlanner__empty" role="status">
-        <p>Vyberte týden pro zobrazení úkolů.</p>
-      </div>
-    );
-  }
-
+  const hasWeeks = weeks.length > 0;
   return (
-    <div aria-busy={loading || isFetching}>
+    <div className="weeklyTaskList" aria-live="polite">
       {mutationError && (
         <div className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error weeklyTaskList__statusMessage" role="alert">
           Úkol se nepodařilo uložit. {mutationError.error.message}
@@ -213,79 +313,41 @@ export default function WeeklyTaskList({
           )}
         </div>
       )}
-
-      {combinedError && !loading && (
+      {error && !isLoading && (
         <div className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error" role="alert">
-          Týden se nepodařilo načíst. {combinedError.error.message}{' '}
-          <button type="button" className="projectWeeklyPlanner__settingsRetry" onClick={handleRetry}>
-            Zkusit znovu
-          </button>
+          {errorLabel ?? 'Týdny se nepodařilo načíst.'} {error.error.message}
+          {onRetry && (
+            <button type="button" className="projectWeeklyPlanner__settingsRetry" onClick={onRetry}>
+              Zkusit znovu
+            </button>
+          )}
         </div>
       )}
-
-      {loading && (
-        <p className="projectWeeklyPlanner__status" role="status">
-          Načítám detail týdne…
-        </p>
-      )}
-
-      {!loading && !combinedError && (
-        <div className="weeklyTaskList__summary" role="status">
-          <span className="weeklyTaskList__summaryItem">
-            <strong>{statusCounts.OPENED}</strong> otevřených
-          </span>
-          <span className="weeklyTaskList__summaryItem">
-            <strong>{statusCounts.CLOSED}</strong> uzavřených
-          </span>
-          <span className="weeklyTaskList__summaryItem">
-            <strong>{tasks.length}</strong> celkem
-          </span>
-        </div>
-      )}
-
-      {showEmptyState && (
+      {isLoading && <p className="projectWeeklyPlanner__status">Načítám přehled týdnů…</p>}
+      {!isLoading && !hasWeeks && !error && (
         <div className="projectWeeklyPlanner__empty" role="status">
-          <p>V tomto týdnu zatím nejsou naplánovány žádné úkoly. Přidejte první, abyste mohli sdílet priority.</p>
+          <p>Zatím nemáte vytvořený žádný týden. Přidejte první a začněte plánovat.</p>
         </div>
       )}
-
-      {!showEmptyState && !loading && !combinedError && (
-        <div className="projectWeeklyPlanner__tasks" role="list">
-          {tasks.map(task => {
-            const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
-            const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
-            return (
-              <article key={task.id} className="projectWeeklyPlanner__taskCard" role="listitem">
-                <div className="projectWeeklyPlanner__taskHeader">
-                  <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
-                  <div className="weeklyTaskList__taskHeaderActions">
-                    {carriedFrom && (
-                      <span className="projectWeeklyPlanner__taskBadge">Carried over from week {formatDate(carriedFrom)}</span>
-                    )}
-                    {onEditTask && (
-                      <button
-                        type="button"
-                        className="weeklyTaskList__editButton"
-                        onClick={() => onEditTask(task)}
-                        disabled={isClosed}
-                      >
-                        Upravit
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <h3 className="projectWeeklyPlanner__taskTitle">{headline}</h3>
-                <p className="projectWeeklyPlanner__taskMeta">
-                  <span>{task.internName ?? 'Nepřiřazeno'}</span>
-                  <span aria-hidden="true">•</span>
-                  <span>{formatPlannedHours(task.plannedHours)}</span>
-                </p>
-                {task.note && task.note !== task.issueTitle && (
-                  <p className="projectWeeklyPlanner__taskNote">{task.note}</p>
-                )}
-              </article>
-            );
-          })}
+      {hasWeeks && (
+        <div className="weeklyTaskList__lanesWrapper">
+          <div className="weeklyTaskList__lanes" role="list" aria-label="Seznam týdnů">
+            {weeks.map(week => (
+              <WeekLane
+                key={week.id}
+                week={week}
+                tasks={weekTasks.get(week.id) ?? []}
+                weekStartDay={weekStartDay}
+                carriedAudit={carriedAudit}
+                onEditTask={onEditTask}
+                isSelected={selectedWeekId === week.id}
+                onSelectWeek={onSelectWeek}
+              />
+            ))}
+            {canCreateWeek && (
+              <AddWeekLane disabled={isCreateWeekLoading || isLoading} onClick={onCreateWeek} />
+            )}
+          </div>
         </div>
       )}
     </div>

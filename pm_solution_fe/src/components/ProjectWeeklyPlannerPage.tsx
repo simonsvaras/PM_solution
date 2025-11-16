@@ -1,4 +1,5 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
 import Modal from './Modal';
@@ -7,6 +8,7 @@ import WeeklySummaryPanel from './WeeklySummaryPanel';
 import WeeklyTaskList, {
   getWeeklyTasksQueryKey,
   prependWeeklyTask,
+  removeWeeklyTask,
   replaceWeeklyTask,
   setWeeklyTasksQueryData,
   type WeeklyTasksQueryData,
@@ -39,6 +41,7 @@ import {
   listProjectWeeklyPlannerWeeks,
   updateWeeklyPlannerSettings,
   updateWeeklyTask,
+  updateWeeklyTaskWeek,
 } from '../api';
 import SprintCreateForm from './planning/SprintCreateForm';
 import { getCurrentSprintQueryKey } from './planning/queryKeys';
@@ -74,6 +77,12 @@ type TaskMutationContext = {
 
 type CreateTaskVariables = { weekId: number; dayOfWeek: number; values: WeeklyTaskFormValues };
 type UpdateTaskVariables = { weekId: number; taskId: number; dayOfWeek: number; values: WeeklyTaskFormValues };
+type MoveTaskVariables = { taskId: number; fromWeekId: number | null; toWeekId: number | null };
+type MoveTaskContext = {
+  previousTasks: WeeklyPlannerTask[];
+  sourceWeek?: WeeklyTasksQueryData;
+  targetWeek?: WeeklyTasksQueryData;
+};
 
 let optimisticTaskIdCounter = -1;
 
@@ -220,6 +229,17 @@ function createOptimisticTaskFromForm(
   };
 }
 
+function mapTaskToPayloadFromTask(task: WeeklyPlannerTask): WeeklyTaskPayload {
+  return {
+    dayOfWeek: normaliseTaskDayOfWeek(task.dayOfWeek),
+    deadline: task.deadline ?? null,
+    issueId: task.issueId ?? null,
+    internId: task.internId ?? null,
+    note: task.note ?? task.issueTitle ?? null,
+    plannedHours: task.plannedHours ?? null,
+  };
+}
+
 function isIssueClosed(task: WeeklyPlannerTask): boolean {
   return task.status === 'CLOSED';
 }
@@ -230,7 +250,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [weeks, setWeeks] = useState<WeeklyPlannerWeek[]>([]);
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<WeeklyPlannerWeek | null>(null);
-  const [weekLoading, setWeekLoading] = useState(false);
   const [weekError, setWeekError] = useState<ErrorResponse | null>(null);
   const [summary, setSummary] = useState<WeeklySummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -318,6 +337,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     return map;
   }, [sprintTasks]);
   const sprintTasksErrorTyped = sprintTasksError as ErrorResponse | null;
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const applySprintMetadata = useCallback((metadata: WeeklyPlannerMetadata) => {
     setSprintMetadata({
@@ -411,7 +431,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
   const fetchWeek = useCallback(
     (weekId: number) => {
-      setWeekLoading(true);
       setWeekError(null);
       getProjectWeeklyPlannerWeek(project.id, weekId)
         .then(data => {
@@ -437,8 +456,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             });
           });
         })
-        .catch(err => setWeekError(err as ErrorResponse))
-        .finally(() => setWeekLoading(false));
+        .catch(err => setWeekError(err as ErrorResponse));
 
       setSummaryLoading(true);
       setSummaryError(null);
@@ -496,6 +514,22 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       refetchSprintTasks();
     }
   }, [currentSprintId, refetchSprintTasks]);
+
+  const boardError = weeksError ?? weekError;
+  const boardErrorLabel = weeksError
+    ? 'Týdny se nepodařilo načíst.'
+    : weekError
+      ? 'Detail vybraného týdne se nepodařilo načíst.'
+      : undefined;
+  const handleWeeksBoardRetry = useCallback(() => {
+    if (weeksError) {
+      loadWeeks();
+      return;
+    }
+    if (weekError && selectedWeekId !== null) {
+      fetchWeek(selectedWeekId);
+    }
+  }, [weeksError, weekError, loadWeeks, fetchWeek, selectedWeekId]);
 
   const handleSprintCreated = useCallback(() => {
     notify('success', 'Sprint byl vytvořen.');
@@ -595,23 +629,96 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
+  const moveTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, MoveTaskVariables, MoveTaskContext>({
+    mutationFn: async ({ taskId, toWeekId }: MoveTaskVariables) => {
+      const task = sprintTasks.find(item => item.id === taskId);
+      if (!task) {
+        throw new Error('Úkol nebyl nalezen.');
+      }
+      if (toWeekId === null) {
+        return updateWeeklyTaskWeek(project.id, taskId, null);
+      }
+      const payload = mapTaskToPayloadFromTask(task);
+      return updateWeeklyTask(project.id, toWeekId, taskId, payload);
+    },
+    onMutate: async ({ taskId, fromWeekId, toWeekId }: MoveTaskVariables) => {
+      const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WeeklyPlannerTask[]>(queryKey) ?? [];
+      const mapped = previous.map(existing =>
+        existing.id === taskId ? { ...existing, weekId: toWeekId } : existing,
+      );
+      queryClient.setQueryData(queryKey, mapped);
+
+      let sourceWeek: WeeklyTasksQueryData | undefined;
+      let targetWeek: WeeklyTasksQueryData | undefined;
+
+      if (typeof fromWeekId === 'number') {
+        sourceWeek = removeWeeklyTask(queryClient, project.id, fromWeekId, taskId);
+      }
+      if (typeof toWeekId === 'number') {
+        const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
+        if (optimisticTask) {
+          targetWeek = prependWeeklyTask(queryClient, project.id, toWeekId, optimisticTask);
+        }
+      }
+
+      setSelectedWeek(current => {
+        if (!current) {
+          return current;
+        }
+        if (typeof fromWeekId === 'number' && current.id === fromWeekId) {
+          return { ...current, tasks: current.tasks.filter(task => task.id !== taskId) };
+        }
+        if (typeof toWeekId === 'number' && current.id === toWeekId) {
+          const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
+          if (!optimisticTask) {
+            return current;
+          }
+          const without = current.tasks.filter(task => task.id !== taskId);
+          return { ...current, tasks: [optimisticTask, ...without] };
+        }
+        return current;
+      });
+
+      setTaskMutationError(null);
+      return { previousTasks: previous, sourceWeek, targetWeek } satisfies MoveTaskContext;
+    },
+    onError: (error: ErrorResponse, variables: MoveTaskVariables | undefined, context: MoveTaskContext | undefined) => {
+      const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.setQueryData(queryKey, context?.previousTasks ?? []);
+      if (typeof variables?.fromWeekId === 'number' && context?.sourceWeek) {
+        queryClient.setQueryData(getWeeklyTasksQueryKey(project.id, variables.fromWeekId), context.sourceWeek);
+      }
+      if (typeof variables?.toWeekId === 'number' && context?.targetWeek) {
+        queryClient.setQueryData(getWeeklyTasksQueryKey(project.id, variables.toWeekId), context.targetWeek);
+      }
+      setTaskMutationError(error);
+    },
+    onSuccess: (task: WeeklyPlannerTask) => {
+      const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.setQueryData<WeeklyPlannerTask[]>(queryKey, old => {
+        if (!old) {
+          return old;
+        }
+        return old.map(existing => (existing.id === task.id ? task : existing));
+      });
+      if (typeof task.weekId === 'number') {
+        replaceWeeklyTask(queryClient, project.id, task.weekId, task);
+      }
+    },
+    onSettled: () => {
+      const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const weekStartOptions = useMemo(
     () => dayNames.map((name, index) => ({ value: index + 1, label: `${index + 1} – ${name}` })),
     [],
   );
 
   const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
-
-  const derivedInitialTasks = useMemo(() => {
-    if (selectedWeekId === null) {
-      return undefined;
-    }
-    const sprintTasksForWeek = sprintWeekTasks.get(selectedWeekId);
-    if (sprintTasksForWeek && sprintTasksForWeek.length > 0) {
-      return sprintTasksForWeek;
-    }
-    return selectedWeek?.tasks ?? [];
-  }, [selectedWeekId, selectedWeek, sprintWeekTasks]);
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
   const hasPmRole = useMemo(
@@ -947,6 +1054,37 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     notify,
   ]);
 
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const taskId = event.active?.data?.current?.taskId;
+      if (typeof taskId !== 'number') {
+        return;
+      }
+      const fromWeekId = (event.active?.data?.current?.weekId ?? null) as number | null;
+      const overId = event.over?.id;
+      if (!overId) {
+        return;
+      }
+      let toWeekId: number | null | undefined = null;
+      if (overId === 'backlog-drop-zone') {
+        toWeekId = null;
+      } else if (typeof overId === 'string' && overId.startsWith('week-drop-')) {
+        const parsed = Number.parseInt(overId.replace('week-drop-', ''), 10);
+        if (!Number.isNaN(parsed)) {
+          toWeekId = parsed;
+        }
+      }
+      if (typeof toWeekId === 'undefined') {
+        return;
+      }
+      if (toWeekId === fromWeekId) {
+        return;
+      }
+      moveTaskMutation.mutate({ taskId, fromWeekId, toWeekId });
+    },
+    [moveTaskMutation],
+  );
+
   function renderCreateTaskButton(extraClassName = '', options?: { ariaLabel?: string }) {
     const ariaLabel = options?.ariaLabel;
     return (
@@ -1159,35 +1297,37 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         <div className="projectWeeklyPlanner__tasksHeaderAction">{renderCreateTaskButton()}</div>
       </div>
 
-      <div className="projectWeeklyPlanner__board">
-        <BacklogTaskColumn
-          projectId={project.id}
-          sprintId={currentSprintId}
-          tasks={backlogTasks}
-          isLoading={sprintTasksLoading}
-          error={sprintTasksErrorTyped}
-          onRetry={handleBacklogRetry}
-          onCreateTask={handleBacklogTaskSubmit}
-        />
-        <WeeklyTaskList
-          projectId={project.id}
-          weekId={selectedWeekId}
-          weekStartDay={currentWeekStartDay}
-          carriedAudit={carriedAudit}
-          initialTasks={derivedInitialTasks}
-          isClosed={isClosed}
-          isWeekLoading={weekLoading}
-          weekError={weekError}
-          onRetryWeek={() => {
-            if (selectedWeekId !== null) {
-              fetchWeek(selectedWeekId);
-            }
-          }}
-          onEditTask={handleEditTask}
-          mutationError={taskMutationError}
-          onDismissMutationError={() => setTaskMutationError(null)}
-        />
-      </div>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="projectWeeklyPlanner__board">
+          <BacklogTaskColumn
+            projectId={project.id}
+            sprintId={currentSprintId}
+            tasks={backlogTasks}
+            isLoading={sprintTasksLoading}
+            error={sprintTasksErrorTyped}
+            onRetry={handleBacklogRetry}
+            onCreateTask={handleBacklogTaskSubmit}
+          />
+          <WeeklyTaskList
+            weeks={weeks}
+            weekTasks={sprintWeekTasks}
+            weekStartDay={currentWeekStartDay}
+            carriedAudit={carriedAudit}
+            isLoading={weeksLoading}
+            error={boardError}
+            errorLabel={boardErrorLabel}
+            onRetry={handleWeeksBoardRetry}
+            onEditTask={handleEditTask}
+            mutationError={taskMutationError}
+            onDismissMutationError={() => setTaskMutationError(null)}
+            selectedWeekId={selectedWeekId}
+            onSelectWeek={setSelectedWeekId}
+            onCreateWeek={currentSprintId !== null ? handleCreateNextWeek : undefined}
+            canCreateWeek={currentSprintId !== null}
+            isCreateWeekLoading={createWeekPending}
+          />
+        </div>
+      </DndContext>
 
       {renderCreateTaskButton('projectWeeklyPlanner__floatingActionButton', { ariaLabel: 'New task' })}
 

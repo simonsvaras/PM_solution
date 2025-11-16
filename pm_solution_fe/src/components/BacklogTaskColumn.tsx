@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { DndContext, useDraggable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import './BacklogTaskColumn.css';
 import type { ErrorResponse, WeeklyPlannerTask } from '../api';
 import WeeklyTaskFormModal, { type WeeklyTaskFormValues } from './WeeklyTaskFormModal';
@@ -22,7 +22,7 @@ type BacklogTaskCardProps = {
 function BacklogTaskCard({ task }: BacklogTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
-    data: { taskId: task.id },
+    data: { taskId: task.id, weekId: null },
   });
 
   const style = transform
@@ -59,6 +59,7 @@ export default function BacklogTaskColumn({
   onRetry,
   onCreateTask,
 }: BacklogTaskColumnProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: 'backlog-drop-zone', data: { weekId: null } });
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const hasTasks = tasks.length > 0;
@@ -92,7 +93,11 @@ export default function BacklogTaskColumn({
   }
 
   return (
-    <section className="backlogTaskColumn" aria-live="polite">
+    <section
+      ref={setNodeRef}
+      className={`backlogTaskColumn${isOver ? ' backlogTaskColumn--dropActive' : ''}`}
+      aria-live="polite"
+    >
       <header className="backlogTaskColumn__header">
         <div>
           <p className="backlogTaskColumn__eyebrow">Sprint backlog</p>
@@ -122,13 +127,11 @@ export default function BacklogTaskColumn({
       <div className="backlogTaskColumn__body">
         {isLoading && <p className="backlogTaskColumn__status">Načítám backlog…</p>}
         {!isLoading && hasTasks && (
-          <DndContext>
-            <ul className="backlogTaskColumn__list">
-              {tasks.map(task => (
-                <BacklogTaskCard key={task.id} task={task} />
-              ))}
-            </ul>
-          </DndContext>
+          <ul className="backlogTaskColumn__list">
+            {tasks.map(task => (
+              <BacklogTaskCard key={task.id} task={task} />
+            ))}
+          </ul>
         )}
         {!isLoading && !hasTasks && <p className="backlogTaskColumn__status">{emptyStateLabel}</p>}
       </div>
