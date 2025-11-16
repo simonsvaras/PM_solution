@@ -215,6 +215,7 @@ function createOptimisticTaskFromForm(
   const trimmedDescription = values.description.trim();
   return {
     id: optimisticId,
+    weekId: overrides?.weekId ?? null,
     dayOfWeek: overrides?.dayOfWeek ?? null,
     note: overrides?.note ?? (trimmedDescription.length > 0 ? trimmedDescription : trimmedTitle),
     plannedHours: overrides?.plannedHours ?? null,
@@ -608,7 +609,9 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       const queryKey = getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId);
       await queryClient.cancelQueries({ queryKey });
       const current = queryClient.getQueryData<WeeklyTasksQueryData>(queryKey);
-      const existing = current?.tasks.find(task => task.id === taskId);
+      const existing =
+        current?.weekTasks.find(task => task.id === taskId) ??
+        current?.unscheduledTasks.find(task => task.id === taskId);
       const optimisticTask = createOptimisticTaskFromForm(values, existing ?? { id: taskId, dayOfWeek });
       const previous = replaceWeeklyTask(queryClient, project.id, plannerSprintId, weekId, optimisticTask, taskId);
       setTaskMutationError(null);
