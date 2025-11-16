@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import type {
   ErrorResponse,
   ProjectOverviewDTO,
+  Sprint,
+  SprintSummary,
   WeeklyPlannerWeek,
   WeeklyPlannerWeekCollection,
   WeeklyPlannerWeekWithMetadata,
@@ -27,6 +29,8 @@ vi.mock('../api', async original => {
     updateWeeklyTask: vi.fn(),
     carryOverWeeklyTasks: vi.fn(),
     closeProjectWeek: vi.fn(),
+    getSprintSummary: vi.fn(),
+    closeSprint: vi.fn(),
   };
 });
 
@@ -41,6 +45,8 @@ const {
   updateWeeklyTask,
   carryOverWeeklyTasks,
   closeProjectWeek,
+  getSprintSummary,
+  closeSprint,
 } = await import('../api');
 
 const mockedGetWeeklyPlannerSettings = vi.mocked(getWeeklyPlannerSettings);
@@ -53,6 +59,8 @@ const mockedCreateWeeklyTask = vi.mocked(createWeeklyTask);
 const mockedUpdateWeeklyTask = vi.mocked(updateWeeklyTask);
 const mockedCarryOverWeeklyTasks = vi.mocked(carryOverWeeklyTasks);
 const mockedCloseProjectWeek = vi.mocked(closeProjectWeek);
+const mockedGetSprintSummary = vi.mocked(getSprintSummary);
+const mockedCloseSprint = vi.mocked(closeSprint);
 
 const baseWeek: WeeklyPlannerWeek = {
   id: 10,
@@ -166,6 +174,27 @@ function setupSuccessfulMocks() {
   });
   mockedCarryOverWeeklyTasks.mockResolvedValue([]);
   mockedCloseProjectWeek.mockResolvedValue({ week: baseWeek, metadata: baseMetadata });
+  const sprintSummary: SprintSummary = {
+    id: 99,
+    projectId: project.id,
+    name: 'Sprint A',
+    deadline: null,
+    status: 'OPEN',
+    taskSummary: { totalTasks: 0, openTasks: 0, closedTasks: 0, totalPlannedHours: null },
+    tasks: [],
+  };
+  mockedGetSprintSummary.mockResolvedValue(sprintSummary);
+  const sprintDto: Sprint = {
+    id: sprintSummary.id,
+    projectId: project.id,
+    name: sprintSummary.name,
+    description: null,
+    deadline: null,
+    status: 'CLOSED',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+  };
+  mockedCloseSprint.mockResolvedValue(sprintDto);
 }
 
 function resetMocks() {
@@ -179,6 +208,8 @@ function resetMocks() {
   mockedUpdateWeeklyTask.mockReset();
   mockedCarryOverWeeklyTasks.mockReset();
   mockedCloseProjectWeek.mockReset();
+  mockedGetSprintSummary.mockReset();
+  mockedCloseSprint.mockReset();
 }
 
 function renderPlanner(onShowToast = vi.fn()) {

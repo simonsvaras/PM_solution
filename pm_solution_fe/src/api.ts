@@ -671,6 +671,88 @@ export type WeeklyPlannerSettings = {
   weekStartDay: number;
 };
 
+export type SprintStatus = 'OPEN' | 'CLOSED';
+
+export type SprintDTO = {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  deadline: string | null;
+  status: SprintStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Sprint = {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  deadline: string | null;
+  status: SprintStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SprintTaskSummaryDTO = {
+  totalTasks: number | string | null;
+  openTasks: number | string | null;
+  closedTasks: number | string | null;
+  totalPlannedHours: number | string | null;
+};
+
+export type SprintTaskSummary = {
+  totalTasks: number;
+  openTasks: number;
+  closedTasks: number;
+  totalPlannedHours: number | null;
+};
+
+export type SprintSummaryTaskDTO = {
+  id: number;
+  projectId: number;
+  projectWeekId: number;
+  sprintId: number;
+  dayOfWeek: number | null;
+  note: string | null;
+  plannedHours: number | string | null;
+  internId: number | null;
+  internName: string | null;
+  issueId: number | null;
+  issueTitle: string | null;
+  issueState: string | null;
+  deadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SprintSummaryTask = WeeklyPlannerTask & {
+  projectId: number;
+  projectWeekId: number;
+  sprintId: number;
+};
+
+export type SprintSummaryDTO = {
+  id: number;
+  projectId: number;
+  name: string;
+  deadline: string | null;
+  status: SprintStatus;
+  taskSummary?: SprintTaskSummaryDTO | null;
+  tasks?: SprintSummaryTaskDTO[] | null;
+};
+
+export type SprintSummary = {
+  id: number;
+  projectId: number;
+  name: string;
+  deadline: string | null;
+  status: SprintStatus;
+  taskSummary: SprintTaskSummary | null;
+  tasks: SprintSummaryTask[];
+};
+
 export type WeeklySummaryPermissionsDTO = {
   canCloseWeek?: boolean;
   canCarryOver?: boolean;
@@ -919,6 +1001,73 @@ function mapWeeklyPlannerWeek(dto: WeeklyPlannerWeekDTO): WeeklyPlannerWeek {
     closedAt,
     isClosed: explicitClosed ?? (closedAt !== null),
     tasks: (dto.tasks ?? []).map(mapWeeklyPlannerTask),
+  };
+}
+
+function mapSprintTaskSummary(dto: SprintTaskSummaryDTO | null | undefined): SprintTaskSummary | null {
+  if (!dto) {
+    return null;
+  }
+  const totalTasks = parseNumber(dto.totalTasks);
+  const openTasks = parseNumber(dto.openTasks);
+  const closedTasks = parseNumber(dto.closedTasks);
+  const totalPlannedHours = parseNumber(dto.totalPlannedHours);
+  return {
+    totalTasks: Number.isNaN(totalTasks) ? 0 : totalTasks,
+    openTasks: Number.isNaN(openTasks) ? 0 : openTasks,
+    closedTasks: Number.isNaN(closedTasks) ? 0 : closedTasks,
+    totalPlannedHours: Number.isNaN(totalPlannedHours) ? null : totalPlannedHours,
+  };
+}
+
+function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
+  const baseTask = mapWeeklyPlannerTask({
+    id: dto.id,
+    dayOfWeek: dto.dayOfWeek ?? null,
+    note: dto.note ?? null,
+    plannedHours: dto.plannedHours ?? null,
+    internId: dto.internId ?? null,
+    internName: dto.internName ?? null,
+    issueId: dto.issueId ?? null,
+    issueTitle: dto.issueTitle ?? null,
+    issueState: dto.issueState ?? null,
+    status: dto.issueState ?? null,
+    deadline: dto.deadline ?? null,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    carriedOverFromWeekStart: null,
+    carriedOverFromWeekId: null,
+  });
+  return {
+    ...baseTask,
+    projectId: dto.projectId,
+    projectWeekId: dto.projectWeekId,
+    sprintId: dto.sprintId,
+  };
+}
+
+function mapSprintSummary(dto: SprintSummaryDTO): SprintSummary {
+  return {
+    id: dto.id,
+    projectId: dto.projectId,
+    name: dto.name,
+    deadline: dto.deadline ?? null,
+    status: dto.status,
+    taskSummary: mapSprintTaskSummary(dto.taskSummary ?? null),
+    tasks: (dto.tasks ?? []).map(mapSprintSummaryTask),
+  };
+}
+
+function mapSprint(dto: SprintDTO): Sprint {
+  return {
+    id: dto.id,
+    projectId: dto.projectId,
+    name: dto.name,
+    description: dto.description ?? null,
+    deadline: dto.deadline ?? null,
+    status: dto.status,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
   };
 }
 
@@ -1359,6 +1508,20 @@ export async function closeProjectWeek(
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<WeeklyPlannerWeekWithMetadataDTO>(res);
   return mapWeeklyPlannerWeekWithMetadata(data);
+}
+
+export async function getSprintSummary(projectId: number, sprintId: number): Promise<SprintSummary> {
+  const data = await fetchJson<SprintSummaryDTO>(
+    `${API_BASE}/api/projects/${projectId}/sprints/${sprintId}/summary`,
+  );
+  return mapSprintSummary(data);
+}
+
+export async function closeSprint(projectId: number, sprintId: number): Promise<Sprint> {
+  const data = await fetchJson<SprintDTO>(`${API_BASE}/api/projects/${projectId}/sprints/${sprintId}/close`, {
+    method: "POST",
+  });
+  return mapSprint(data);
 }
 
 function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPayload {
