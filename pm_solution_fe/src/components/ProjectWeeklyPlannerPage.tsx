@@ -11,6 +11,7 @@ import WeeklyTaskList, {
   setWeeklyTasksQueryData,
   type WeeklyTasksQueryData,
 } from './WeeklyTaskList';
+import BacklogTaskColumn from './BacklogTaskColumn';
 import SprintHeader from './planning/SprintHeader';
 import { dayNames, formatDate, formatDateRange, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
 import {
@@ -31,6 +32,7 @@ import {
   createWeeklyTask,
   generateProjectWeeklyPlannerWeeks,
   getCurrentProjectSprint,
+  getSprintSummary,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
   getWeeklyPlannerSettings,
@@ -279,6 +281,44 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const sprintError = currentSprintError as ErrorResponse | null;
   const currentSprintId = currentSprint?.id ?? null;
 
+  const {
+    data: sprintTasksData,
+    error: sprintTasksError,
+    isPending: sprintTasksLoading,
+    refetch: refetchSprintTasks,
+  } = useQuery({
+    queryKey: ['project-sprint-tasks', project.id, currentSprintId],
+    queryFn: async () => {
+      if (currentSprintId === null) {
+        return [];
+      }
+      const summary = await getSprintSummary(project.id, currentSprintId);
+      return summary.tasks;
+    },
+    enabled: currentSprintId !== null,
+  });
+  const sprintTasks = sprintTasksData ?? [];
+  const backlogTasks = useMemo(
+    () => sprintTasks.filter(task => task.weekId === null),
+    [sprintTasks],
+  );
+  const sprintWeekTasks = useMemo(() => {
+    const map = new Map<number, WeeklyPlannerTask[]>();
+    sprintTasks.forEach(task => {
+      if (task.weekId === null) {
+        return;
+      }
+      const bucket = map.get(task.weekId);
+      if (bucket) {
+        bucket.push(task);
+        return;
+      }
+      map.set(task.weekId, [task]);
+    });
+    return map;
+  }, [sprintTasks]);
+  const sprintTasksErrorTyped = sprintTasksError as ErrorResponse | null;
+
   const applySprintMetadata = useCallback((metadata: WeeklyPlannerMetadata) => {
     setSprintMetadata({
       id: metadata.sprintId ?? null,
@@ -443,6 +483,20 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     [onShowToast],
   );
 
+  const handleBacklogTaskSubmit = useCallback(
+    async (_values: WeeklyTaskFormValues) => {
+      notify('warning', 'Vytváření backlogových úkolů zatím není dostupné.');
+      throw new Error('Vytváření backlogových úkolů zatím není dostupné.');
+    },
+    [notify],
+  );
+
+  const handleBacklogRetry = useCallback(() => {
+    if (currentSprintId !== null) {
+      refetchSprintTasks();
+    }
+  }, [currentSprintId, refetchSprintTasks]);
+
   const handleSprintCreated = useCallback(() => {
     notify('success', 'Sprint byl vytvořen.');
   }, [notify]);
@@ -547,6 +601,17 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   );
 
   const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
+
+  const derivedInitialTasks = useMemo(() => {
+    if (selectedWeekId === null) {
+      return undefined;
+    }
+    const sprintTasksForWeek = sprintWeekTasks.get(selectedWeekId);
+    if (sprintTasksForWeek && sprintTasksForWeek.length > 0) {
+      return sprintTasksForWeek;
+    }
+    return selectedWeek?.tasks ?? [];
+  }, [selectedWeekId, selectedWeek, sprintWeekTasks]);
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
   const hasPmRole = useMemo(
@@ -1094,24 +1159,35 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         <div className="projectWeeklyPlanner__tasksHeaderAction">{renderCreateTaskButton()}</div>
       </div>
 
-      <WeeklyTaskList
-        projectId={project.id}
-        weekId={selectedWeekId}
-        weekStartDay={currentWeekStartDay}
-        carriedAudit={carriedAudit}
-        initialTasks={selectedWeek?.tasks ?? []}
-        isClosed={isClosed}
-        isWeekLoading={weekLoading}
-        weekError={weekError}
-        onRetryWeek={() => {
-          if (selectedWeekId !== null) {
-            fetchWeek(selectedWeekId);
-          }
-        }}
-        onEditTask={handleEditTask}
-        mutationError={taskMutationError}
-        onDismissMutationError={() => setTaskMutationError(null)}
-      />
+      <div className="projectWeeklyPlanner__board">
+        <BacklogTaskColumn
+          projectId={project.id}
+          sprintId={currentSprintId}
+          tasks={backlogTasks}
+          isLoading={sprintTasksLoading}
+          error={sprintTasksErrorTyped}
+          onRetry={handleBacklogRetry}
+          onCreateTask={handleBacklogTaskSubmit}
+        />
+        <WeeklyTaskList
+          projectId={project.id}
+          weekId={selectedWeekId}
+          weekStartDay={currentWeekStartDay}
+          carriedAudit={carriedAudit}
+          initialTasks={derivedInitialTasks}
+          isClosed={isClosed}
+          isWeekLoading={weekLoading}
+          weekError={weekError}
+          onRetryWeek={() => {
+            if (selectedWeekId !== null) {
+              fetchWeek(selectedWeekId);
+            }
+          }}
+          onEditTask={handleEditTask}
+          mutationError={taskMutationError}
+          onDismissMutationError={() => setTaskMutationError(null)}
+        />
+      </div>
 
       {renderCreateTaskButton('projectWeeklyPlanner__floatingActionButton', { ariaLabel: 'New task' })}
 

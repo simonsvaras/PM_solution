@@ -541,6 +541,7 @@ export type ProjectIssue = {
 
 export type WeeklyPlannerTaskDTO = {
   id: number;
+  weekId?: number | null;
   dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | string | null;
@@ -559,6 +560,7 @@ export type WeeklyPlannerTaskDTO = {
 
 export type WeeklyPlannerTask = {
   id: number;
+  weekId: number | null;
   dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | null;
@@ -740,7 +742,7 @@ export type SprintTaskSummary = {
 export type SprintSummaryTaskDTO = {
   id: number;
   projectId: number;
-  projectWeekId: number;
+  projectWeekId: number | null;
   sprintId: number;
   dayOfWeek: number | null;
   note: string | null;
@@ -757,7 +759,7 @@ export type SprintSummaryTaskDTO = {
 
 export type SprintSummaryTask = WeeklyPlannerTask & {
   projectId: number;
-  projectWeekId: number;
+  projectWeekId: number | null;
   sprintId: number;
 };
 
@@ -996,8 +998,10 @@ function normaliseWeeklyTaskStatus(status: string | null | undefined): 'OPENED' 
 function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
   const plannedHoursRaw = parseNumber(dto.plannedHours);
   const status = normaliseWeeklyTaskStatus(dto.status ?? dto.issueState ?? null);
+  const weekId = typeof dto.weekId === 'number' && Number.isFinite(dto.weekId) ? dto.weekId : null;
   return {
     id: dto.id,
+    weekId,
     dayOfWeek: dto.dayOfWeek ?? null,
     note: dto.note ?? null,
     plannedHours: Number.isNaN(plannedHoursRaw) ? null : plannedHoursRaw,
@@ -1051,6 +1055,7 @@ function mapSprintTaskSummary(dto: SprintTaskSummaryDTO | null | undefined): Spr
 function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
   const baseTask = mapWeeklyPlannerTask({
     id: dto.id,
+    weekId: dto.projectWeekId ?? null,
     dayOfWeek: dto.dayOfWeek ?? null,
     note: dto.note ?? null,
     plannedHours: dto.plannedHours ?? null,

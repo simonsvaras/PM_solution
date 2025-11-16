@@ -15,6 +15,7 @@ import ProjectWeeklyPlannerPage from './ProjectWeeklyPlannerPage';
 
 vi.mock('@tanstack/react-query', () => import('../testUtils/reactQueryMock'));
 vi.mock('./WeeklyTaskList', () => ({ __esModule: true, default: () => <div data-testid="weekly-task-list" /> }));
+vi.mock('./BacklogTaskColumn', () => ({ __esModule: true, default: () => <div data-testid="backlog-column" /> }));
 
 vi.mock('../api', async original => {
   const actual = await original();

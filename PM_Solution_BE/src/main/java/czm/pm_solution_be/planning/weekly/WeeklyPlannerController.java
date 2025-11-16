@@ -176,6 +176,7 @@ public class WeeklyPlannerController {
     private TaskDetailResponse toTaskResponse(TaskDetail detail) {
         return new TaskDetailResponse(
                 detail.id(),
+                detail.weekId(),
                 detail.sprintId(),
                 detail.dayOfWeek(),
                 detail.note(),
@@ -254,6 +255,7 @@ public class WeeklyPlannerController {
     }
 
     public record TaskDetailResponse(long id,
+                                     Long weekId,
                                      Long sprintId,
                                      Integer dayOfWeek,
                                      String note,

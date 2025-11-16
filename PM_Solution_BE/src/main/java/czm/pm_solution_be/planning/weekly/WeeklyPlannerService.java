@@ -421,6 +421,7 @@ public class WeeklyPlannerService {
     private TaskDetail mapTask(WeeklyTaskRow row) {
         return new TaskDetail(
                 row.id(),
+                row.projectWeekId(),
                 row.sprintId(),
                 row.dayOfWeek(),
                 row.note(),
@@ -498,6 +499,7 @@ public class WeeklyPlannerService {
     }
 
     public record TaskDetail(long id,
+                             Long weekId,
                              Long sprintId,
                              Integer dayOfWeek,
                              String note,

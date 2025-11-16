@@ -5,7 +5,8 @@ import { getProjectWeeklyPlannerWeek, type ErrorResponse, type WeeklyPlannerTask
 import { formatDate, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
 
 export type WeeklyTasksQueryData = {
-  tasks: WeeklyPlannerTask[];
+  weekTasks: WeeklyPlannerTask[];
+  unscheduledTasks: WeeklyPlannerTask[];
   statusCounts: Record<'OPENED' | 'CLOSED', number>;
 };
 
@@ -13,12 +14,45 @@ function normaliseStatus(status: WeeklyPlannerTask['status']): 'OPENED' | 'CLOSE
   return status === 'CLOSED' ? 'CLOSED' : 'OPENED';
 }
 
-function createWeeklyTasksQueryData(tasks: WeeklyPlannerTask[]): WeeklyTasksQueryData {
+function normaliseWeekAssignment(task: WeeklyPlannerTask, fallbackWeekId: number | null): WeeklyPlannerTask {
+  const hasValidWeek = typeof task.weekId === 'number' && Number.isFinite(task.weekId);
+  if (hasValidWeek || task.weekId === null) {
+    return task;
+  }
+  return { ...task, weekId: fallbackWeekId };
+}
+
+function createWeeklyTasksQueryData(
+  tasks: WeeklyPlannerTask[],
+  options?: { defaultWeekId?: number | null },
+): WeeklyTasksQueryData {
   const counts: WeeklyTasksQueryData['statusCounts'] = { OPENED: 0, CLOSED: 0 };
+  const weekTasks: WeeklyPlannerTask[] = [];
+  const unscheduledTasks: WeeklyPlannerTask[] = [];
+  const fallbackWeekId = options?.defaultWeekId ?? null;
+
   for (const task of tasks) {
+    const mapped = normaliseWeekAssignment(task, fallbackWeekId);
+    if (mapped.weekId === null) {
+      unscheduledTasks.push(mapped);
+      continue;
+    }
+    weekTasks.push(mapped);
+    counts[normaliseStatus(mapped.status)] += 1;
+  }
+
+  return { weekTasks, unscheduledTasks, statusCounts: counts };
+}
+
+function buildWeeklyTasksQueryData(
+  weekTasks: WeeklyPlannerTask[],
+  unscheduledTasks: WeeklyPlannerTask[],
+): WeeklyTasksQueryData {
+  const counts: WeeklyTasksQueryData['statusCounts'] = { OPENED: 0, CLOSED: 0 };
+  for (const task of weekTasks) {
     counts[normaliseStatus(task.status)] += 1;
   }
-  return { tasks, statusCounts: counts };
+  return { weekTasks, unscheduledTasks, statusCounts: counts };
 }
 
 function dedupeTasks(tasks: WeeklyPlannerTask[]): WeeklyPlannerTask[] {
@@ -43,7 +77,7 @@ export function setWeeklyTasksQueryData(
   weekId: number,
   tasks: WeeklyPlannerTask[],
 ): WeeklyTasksQueryData {
-  const data = createWeeklyTasksQueryData(tasks);
+  const data = createWeeklyTasksQueryData(tasks, { defaultWeekId: weekId });
   queryClient.setQueryData<WeeklyTasksQueryData>(getWeeklyTasksQueryKey(projectId, weekId), data);
   return data;
 }
@@ -56,9 +90,11 @@ export function prependWeeklyTask(
 ): WeeklyTasksQueryData | undefined {
   const key = getWeeklyTasksQueryKey(projectId, weekId);
   const previous = queryClient.getQueryData<WeeklyTasksQueryData>(key);
-  const currentTasks = previous?.tasks ?? [];
-  const nextTasks = dedupeTasks([task, ...currentTasks]);
-  const next = createWeeklyTasksQueryData(nextTasks);
+  const currentTasks = previous?.weekTasks ?? [];
+  const unscheduledTasks = previous?.unscheduledTasks ?? [];
+  const nextTask = normaliseWeekAssignment(task, weekId);
+  const nextTasks = dedupeTasks([nextTask, ...currentTasks]);
+  const next = buildWeeklyTasksQueryData(nextTasks, unscheduledTasks);
   queryClient.setQueryData(key, next);
   return previous;
 }
@@ -72,18 +108,20 @@ export function replaceWeeklyTask(
 ): WeeklyTasksQueryData | undefined {
   const key = getWeeklyTasksQueryKey(projectId, weekId);
   const previous = queryClient.getQueryData<WeeklyTasksQueryData>(key);
-  const currentTasks = previous?.tasks ?? [];
+  const currentTasks = previous?.weekTasks ?? [];
+  const unscheduledTasks = previous?.unscheduledTasks ?? [];
   const targetId = typeof matchId === 'number' ? matchId : task.id;
   let replaced = false;
   const mapped = currentTasks.map((existing: WeeklyPlannerTask) => {
     if (existing.id === targetId) {
       replaced = true;
-      return task;
+      return normaliseWeekAssignment(task, weekId);
     }
     return existing;
   });
-  const nextTasks = replaced ? dedupeTasks(mapped) : dedupeTasks([task, ...mapped]);
-  const next = createWeeklyTasksQueryData(nextTasks);
+  const fallbackTask = normaliseWeekAssignment(task, weekId);
+  const nextTasks = replaced ? dedupeTasks(mapped) : dedupeTasks([fallbackTask, ...mapped]);
+  const next = buildWeeklyTasksQueryData(nextTasks, unscheduledTasks);
   queryClient.setQueryData(key, next);
   return previous;
 }
@@ -120,7 +158,7 @@ export default function WeeklyTaskList({
   const queryKey = useMemo(() => getWeeklyTasksQueryKey(projectId, weekId), [projectId, weekId]);
   const initialData = useMemo(() => {
     if (!initialTasks || weekId === null) return undefined;
-    return createWeeklyTasksQueryData(initialTasks);
+    return createWeeklyTasksQueryData(initialTasks, { defaultWeekId: weekId });
   }, [initialTasks, weekId]);
 
   const {
@@ -136,13 +174,13 @@ export default function WeeklyTaskList({
         return createWeeklyTasksQueryData([]);
       }
       const detail = await getProjectWeeklyPlannerWeek(projectId, weekId);
-      return createWeeklyTasksQueryData(detail.week.tasks);
+      return createWeeklyTasksQueryData(detail.week.tasks, { defaultWeekId: weekId });
     },
     enabled: weekId !== null,
     initialData,
   });
 
-  const tasks = data?.tasks ?? [];
+  const tasks = data?.weekTasks ?? [];
   const statusCounts = data?.statusCounts ?? { OPENED: 0, CLOSED: 0 };
   const combinedError = weekError ?? (error as ErrorResponse | null);
   const loading = isWeekLoading || isPending;

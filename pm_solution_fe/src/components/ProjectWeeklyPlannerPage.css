@@ -370,6 +370,19 @@
   gap: 1rem;
 }
 
+.projectWeeklyPlanner__board {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(460px, 2fr);
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+@media (max-width: 960px) {
+  .projectWeeklyPlanner__board {
+    grid-template-columns: 1fr;
+  }
+}
+
 .projectWeeklyPlanner__tasksTitle {
   margin: 0;
   font-size: 1.3rem;
