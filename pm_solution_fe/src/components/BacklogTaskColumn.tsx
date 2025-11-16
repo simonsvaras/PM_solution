@@ -13,26 +13,36 @@ type BacklogTaskColumnProps = {
   error?: ErrorResponse | null;
   onRetry?: () => void;
   onCreateTask?: (values: WeeklyTaskFormValues) => Promise<void>;
+  isInteractionDisabled?: boolean;
 };
 
 type BacklogTaskCardProps = {
   task: WeeklyPlannerTask;
+  isInteractionDisabled?: boolean;
 };
 
-function BacklogTaskCard({ task }: BacklogTaskCardProps) {
+function BacklogTaskCard({ task, isInteractionDisabled }: BacklogTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     data: { taskId: task.id, weekId: null },
+    disabled: isInteractionDisabled,
   });
 
   const style = transform
     ? { transform: `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` }
     : undefined;
+  const cardClassName = ['backlogTaskColumn__card'];
+  if (isDragging) {
+    cardClassName.push('backlogTaskColumn__card--dragging');
+  }
+  if (isInteractionDisabled) {
+    cardClassName.push('backlogTaskColumn__card--disabled');
+  }
 
   return (
     <li
       ref={setNodeRef}
-      className={`backlogTaskColumn__card${isDragging ? ' backlogTaskColumn__card--dragging' : ''}`}
+      className={cardClassName.join(' ')}
       style={style}
       {...listeners}
       {...attributes}
@@ -58,8 +68,13 @@ export default function BacklogTaskColumn({
   error = null,
   onRetry,
   onCreateTask,
+  isInteractionDisabled = false,
 }: BacklogTaskColumnProps) {
-  const { isOver, setNodeRef } = useDroppable({ id: 'backlog-drop-zone', data: { weekId: null } });
+  const { isOver, setNodeRef } = useDroppable({
+    id: 'backlog-drop-zone',
+    data: { weekId: null },
+    disabled: isInteractionDisabled,
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const hasTasks = tasks.length > 0;
@@ -70,13 +85,19 @@ export default function BacklogTaskColumn({
     if (error) {
       return 'Backlog se nepodařilo načíst.';
     }
+    if (isInteractionDisabled) {
+      return 'Sprint je uzavřený. Backlog je pouze pro čtení.';
+    }
     if (sprintId === null) {
       return 'Backlog je dostupný až po vytvoření sprintu.';
     }
     return 'Backlog je prázdný. Přidejte první úkol a přetáhněte ho do konkrétního týdne, jakmile budete mít jasno.';
-  }, [error, isLoading, sprintId]);
+  }, [error, isInteractionDisabled, isLoading, sprintId]);
 
   const handleCreateClick = () => {
+    if (isInteractionDisabled) {
+      return;
+    }
     setIsModalOpen(true);
   };
 
@@ -92,12 +113,16 @@ export default function BacklogTaskColumn({
     setIsModalOpen(false);
   }
 
+  const columnClassName = ['backlogTaskColumn'];
+  if (isOver) {
+    columnClassName.push('backlogTaskColumn--dropActive');
+  }
+  if (isInteractionDisabled) {
+    columnClassName.push('backlogTaskColumn--disabled');
+  }
+
   return (
-    <section
-      ref={setNodeRef}
-      className={`backlogTaskColumn${isOver ? ' backlogTaskColumn--dropActive' : ''}`}
-      aria-live="polite"
-    >
+    <section ref={setNodeRef} className={columnClassName.join(' ')} aria-live="polite">
       <header className="backlogTaskColumn__header">
         <div>
           <p className="backlogTaskColumn__eyebrow">Sprint backlog</p>
@@ -107,7 +132,7 @@ export default function BacklogTaskColumn({
           type="button"
           className="backlogTaskColumn__createButton"
           onClick={handleCreateClick}
-          disabled={!onCreateTask}
+          disabled={!onCreateTask || isInteractionDisabled}
         >
           + Nový úkol
         </button>
@@ -129,7 +154,7 @@ export default function BacklogTaskColumn({
         {!isLoading && hasTasks && (
           <ul className="backlogTaskColumn__list">
             {tasks.map(task => (
-              <BacklogTaskCard key={task.id} task={task} />
+              <BacklogTaskCard key={task.id} task={task} isInteractionDisabled={isInteractionDisabled} />
             ))}
           </ul>
         )}

@@ -41,7 +41,8 @@ export default function SprintCreateForm({ projectId, onSuccess }: SprintCreateF
       setTouched(false);
       setError(null);
       queryClient.invalidateQueries({ queryKey: getCurrentSprintQueryKey(projectId) });
-      queryClient.invalidateQueries({ queryKey: getProjectWeeksQueryKey(projectId) });
+      queryClient.invalidateQueries({ queryKey: getProjectWeeksQueryKey(projectId, null) });
+      queryClient.invalidateQueries({ queryKey: getProjectWeeksQueryKey(projectId, sprint.id ?? null) });
       onSuccess?.(sprint);
     },
     onError: err => {

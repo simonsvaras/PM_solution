@@ -8,6 +8,10 @@
   box-shadow: 0 6px 18px rgba(26, 26, 26, 0.05);
 }
 
+.backlogTaskColumn--disabled {
+  opacity: 0.75;
+}
+
 .backlogTaskColumn__header {
   display: flex;
   justify-content: space-between;
@@ -91,6 +95,10 @@
   background: #f9f9fc;
   cursor: grab;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.backlogTaskColumn__card--disabled {
+  cursor: default;
 }
 
 .backlogTaskColumn__card--dragging {

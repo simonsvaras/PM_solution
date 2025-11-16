@@ -106,6 +106,10 @@
   gap: 0.75rem;
 }
 
+.weekLane--readonly {
+  opacity: 0.75;
+}
+
 .weekLane__empty {
   padding: 1rem;
   border: 1px dashed var(--color-border, #d7d7d7);
@@ -127,6 +131,11 @@
 .weekLane__taskCard--dragging {
   box-shadow: 0 12px 28px rgba(26, 26, 26, 0.2);
   cursor: grabbing;
+}
+
+.weekLane__taskCard--disabled {
+  cursor: default;
+  opacity: 0.9;
 }
 
 .weekLane__taskHeader {
@@ -211,4 +220,10 @@
 .weeklyTaskList__editButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.weeklyTaskList__statusReadonly {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-tertiary, #6f6f6f);
 }

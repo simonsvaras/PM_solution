@@ -67,28 +67,30 @@ function dedupeTasks(tasks: WeeklyPlannerTask[]): WeeklyPlannerTask[] {
   return result;
 }
 
-export function getWeeklyTasksQueryKey(projectId: number, weekId: number | null): QueryKey {
-  return ['weekly-tasks', projectId, weekId];
+export function getWeeklyTasksQueryKey(projectId: number, sprintId: number | null, weekId: number | null): QueryKey {
+  return ['planner', projectId, sprintId, 'week', weekId];
 }
 
 export function setWeeklyTasksQueryData(
   queryClient: QueryClient,
   projectId: number,
+  sprintId: number | null,
   weekId: number,
   tasks: WeeklyPlannerTask[],
 ): WeeklyTasksQueryData {
   const data = createWeeklyTasksQueryData(tasks, { defaultWeekId: weekId });
-  queryClient.setQueryData<WeeklyTasksQueryData>(getWeeklyTasksQueryKey(projectId, weekId), data);
+  queryClient.setQueryData<WeeklyTasksQueryData>(getWeeklyTasksQueryKey(projectId, sprintId, weekId), data);
   return data;
 }
 
 export function prependWeeklyTask(
   queryClient: QueryClient,
   projectId: number,
+  sprintId: number | null,
   weekId: number,
   task: WeeklyPlannerTask,
 ): WeeklyTasksQueryData | undefined {
-  const key = getWeeklyTasksQueryKey(projectId, weekId);
+  const key = getWeeklyTasksQueryKey(projectId, sprintId, weekId);
   const previous = queryClient.getQueryData<WeeklyTasksQueryData>(key);
   const currentTasks = previous?.weekTasks ?? [];
   const unscheduledTasks = previous?.unscheduledTasks ?? [];
@@ -102,11 +104,12 @@ export function prependWeeklyTask(
 export function replaceWeeklyTask(
   queryClient: QueryClient,
   projectId: number,
+  sprintId: number | null,
   weekId: number,
   task: WeeklyPlannerTask,
   matchId?: number,
 ): WeeklyTasksQueryData | undefined {
-  const key = getWeeklyTasksQueryKey(projectId, weekId);
+  const key = getWeeklyTasksQueryKey(projectId, sprintId, weekId);
   const previous = queryClient.getQueryData<WeeklyTasksQueryData>(key);
   const currentTasks = previous?.weekTasks ?? [];
   const unscheduledTasks = previous?.unscheduledTasks ?? [];
@@ -129,10 +132,11 @@ export function replaceWeeklyTask(
 export function removeWeeklyTask(
   queryClient: QueryClient,
   projectId: number,
+  sprintId: number | null,
   weekId: number,
   taskId: number,
 ): WeeklyTasksQueryData | undefined {
-  const key = getWeeklyTasksQueryKey(projectId, weekId);
+  const key = getWeeklyTasksQueryKey(projectId, sprintId, weekId);
   const previous = queryClient.getQueryData<WeeklyTasksQueryData>(key);
   if (!previous) {
     return undefined;
@@ -151,18 +155,33 @@ type WeekLaneProps = {
   onEditTask?: (task: WeeklyPlannerTask) => void;
   isSelected: boolean;
   onSelectWeek?: (weekId: number) => void;
+  isInteractionDisabled?: boolean;
 };
 
-function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelected, onSelectWeek }: WeekLaneProps) {
-  const { isOver, setNodeRef } = useDroppable({ id: `week-drop-${week.id}`, data: { weekId: week.id } });
+function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `week-drop-${week.id}`,
+    data: { weekId: week.id },
+    disabled: isInteractionDisabled,
+  });
   const openTasks = tasks.filter(task => task.status !== 'CLOSED').length;
   const closedTasks = tasks.length - openTasks;
   const headline = `${formatDate(week.weekStart)} – ${formatDate(week.weekEnd)}`;
+  const laneClassName = ['weekLane'];
+  if (isSelected) {
+    laneClassName.push('weekLane--active');
+  }
+  if (isOver) {
+    laneClassName.push('weekLane--dropActive');
+  }
+  if (isInteractionDisabled) {
+    laneClassName.push('weekLane--readonly');
+  }
 
   return (
     <section
       ref={setNodeRef}
-      className={`weekLane${isSelected ? ' weekLane--active' : ''}${isOver ? ' weekLane--dropActive' : ''}`}
+      className={laneClassName.join(' ')}
       role="listitem"
       aria-label={`Týden od ${formatDate(week.weekStart)}`}
     >
@@ -190,6 +209,7 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
             carriedAudit={carriedAudit}
             onEditTask={onEditTask}
             isClosed={week.isClosed}
+            isInteractionDisabled={isInteractionDisabled}
           />
         ))}
       </ul>
@@ -204,23 +224,32 @@ type WeekTaskCardProps = {
   carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
   isClosed: boolean;
+  isInteractionDisabled?: boolean;
 };
 
-function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, isClosed }: WeekTaskCardProps) {
+function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `week-task-${task.id}`,
     data: { taskId: task.id, weekId },
+    disabled: isClosed || isInteractionDisabled,
   });
   const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
   const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
   const style = transform
     ? { transform: `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` }
     : undefined;
+  const cardClassName = ['weekLane__taskCard'];
+  if (isDragging) {
+    cardClassName.push('weekLane__taskCard--dragging');
+  }
+  if (isInteractionDisabled || isClosed) {
+    cardClassName.push('weekLane__taskCard--disabled');
+  }
 
   return (
     <li
       ref={setNodeRef}
-      className={`weekLane__taskCard${isDragging ? ' weekLane__taskCard--dragging' : ''}`}
+      className={cardClassName.join(' ')}
       style={style}
       {...listeners}
       {...attributes}
@@ -234,7 +263,7 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
               type="button"
               className="weeklyTaskList__editButton"
               onClick={() => onEditTask(task)}
-              disabled={isClosed}
+              disabled={isClosed || Boolean(isInteractionDisabled)}
             >
               Upravit
             </button>
@@ -269,6 +298,7 @@ export type WeeklyTaskListProps = {
   onCreateWeek?: () => void;
   canCreateWeek?: boolean;
   isCreateWeekLoading?: boolean;
+  isInteractionDisabled?: boolean;
 };
 
 function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () => void }) {
@@ -299,6 +329,7 @@ export default function WeeklyTaskList({
   onCreateWeek,
   canCreateWeek = false,
   isCreateWeekLoading = false,
+  isInteractionDisabled = false,
 }: WeeklyTaskListProps) {
   const hasWeeks = weeks.length > 0;
   return (
@@ -324,6 +355,11 @@ export default function WeeklyTaskList({
         </div>
       )}
       {isLoading && <p className="projectWeeklyPlanner__status">Načítám přehled týdnů…</p>}
+      {!isLoading && isInteractionDisabled && (
+        <p className="projectWeeklyPlanner__status weeklyTaskList__statusReadonly" role="status">
+          Sprint je uzavřený. Úkoly můžete jen prohlížet.
+        </p>
+      )}
       {!isLoading && !hasWeeks && !error && (
         <div className="projectWeeklyPlanner__empty" role="status">
           <p>Zatím nemáte vytvořený žádný týden. Přidejte první a začněte plánovat.</p>
@@ -342,10 +378,14 @@ export default function WeeklyTaskList({
                 onEditTask={onEditTask}
                 isSelected={selectedWeekId === week.id}
                 onSelectWeek={onSelectWeek}
+                isInteractionDisabled={isInteractionDisabled}
               />
             ))}
             {canCreateWeek && (
-              <AddWeekLane disabled={isCreateWeekLoading || isLoading} onClick={onCreateWeek} />
+              <AddWeekLane
+                disabled={isCreateWeekLoading || isLoading || isInteractionDisabled}
+                onClick={onCreateWeek}
+              />
             )}
           </div>
         </div>
