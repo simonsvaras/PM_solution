@@ -11,11 +11,14 @@ import WeeklyTaskList, {
   setWeeklyTasksQueryData,
   type WeeklyTasksQueryData,
 } from './WeeklyTaskList';
+import SprintHeader from './planning/SprintHeader';
 import { dayNames, formatDate, formatDateRange, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
 import {
   type CarryOverTasksPayload,
   type ErrorResponse,
   type ProjectOverviewDTO,
+  type Sprint,
+  type WeeklyPlannerMetadata,
   type WeeklyPlannerTask,
   type WeeklyPlannerWeek,
   type WeeklyPlannerWeekCollection,
@@ -49,6 +52,13 @@ type CarryOverContext = {
   sourceWeek: WeeklyPlannerWeek;
   targetWeekStart: string;
   targetWeekId: number | null;
+};
+
+type SprintMetadataState = {
+  id: number | null;
+  name: string | null;
+  status: string | null;
+  deadline: string | null;
 };
 
 const WEEK_FETCH_LIMIT = 20;
@@ -247,6 +257,12 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [taskMutationError, setTaskMutationError] = useState<ErrorResponse | null>(null);
   const [taskFormDayOfWeek, setTaskFormDayOfWeek] = useState<number>(1);
+  const [sprintMetadata, setSprintMetadata] = useState<SprintMetadataState>({
+    id: null,
+    name: null,
+    status: null,
+    deadline: null,
+  });
 
   const queryClient = useQueryClient();
   const fetchCurrentSprint = useCallback(() => getCurrentProjectSprint(project.id), [project.id]);
@@ -262,6 +278,15 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const currentSprint = currentSprintData ?? null;
   const sprintError = currentSprintError as ErrorResponse | null;
   const currentSprintId = currentSprint?.id ?? null;
+
+  const applySprintMetadata = useCallback((metadata: WeeklyPlannerMetadata) => {
+    setSprintMetadata({
+      id: metadata.sprintId ?? null,
+      name: metadata.sprintName ?? null,
+      status: metadata.sprintStatus ?? null,
+      deadline: metadata.sprintDeadline ?? null,
+    });
+  }, []);
 
   const openCreateTaskModal = useCallback(
     (weekId: number | null) => {
@@ -316,6 +341,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         setWeekSettings(prev =>
           prev ? { ...prev, weekStartDay: collection.metadata.weekStartDay } : { weekStartDay: collection.metadata.weekStartDay },
         );
+        applySprintMetadata(collection.metadata);
         setSelectedWeekId(prev => {
           if (prev !== null) return prev;
           if (collection.metadata.currentWeekId !== null) {
@@ -326,7 +352,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       })
       .catch(err => setWeeksError(err as ErrorResponse))
       .finally(() => setWeeksLoading(false));
-  }, [project.id, queryClient]);
+  }, [applySprintMetadata, project.id, queryClient]);
 
   useEffect(() => {
     loadSettings();
@@ -356,6 +382,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           setWeekSettings(prev =>
             prev ? { ...prev, weekStartDay: data.metadata.weekStartDay } : { weekStartDay: data.metadata.weekStartDay },
           );
+          applySprintMetadata(data.metadata);
           setWeeks(prev => {
             const exists = prev.findIndex(week => week.id === data.week.id);
             if (exists >= 0) {
@@ -380,7 +407,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         .catch(err => setSummaryError(err as ErrorResponse))
         .finally(() => setSummaryLoading(false));
     },
-    [project.id, queryClient],
+    [applySprintMetadata, project.id, queryClient],
   );
 
   useEffect(() => {
@@ -813,6 +840,19 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const createWeekPending = generateWeekMutation.isPending;
   const createWeekButtonDisabled = createWeekPending || weeksLoading || settingsLoading;
   const selectedWeekStart = selectedWeek?.weekStart ?? null;
+  const handleSprintClosed = useCallback((closedSprint: Sprint) => {
+    setSprintMetadata(prev => {
+      if (prev.id !== null && prev.id !== closedSprint.id) {
+        return prev;
+      }
+      return {
+        id: closedSprint.id,
+        name: closedSprint.name,
+        status: closedSprint.status,
+        deadline: closedSprint.deadline ?? null,
+      };
+    });
+  }, []);
 
   const handleCreateNextWeek = useCallback(async () => {
     if (generateWeekMutation.isPending) {
@@ -902,6 +942,15 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
   return (
     <section className="projectWeeklyPlanner" aria-labelledby="project-weekly-planner-title">
+      <SprintHeader
+        projectId={project.id}
+        sprintId={sprintMetadata.id}
+        initialName={sprintMetadata.name}
+        initialDeadline={sprintMetadata.deadline}
+        initialStatus={sprintMetadata.status}
+        onShowToast={notify}
+        onSprintClosed={handleSprintClosed}
+      />
       <header className="projectWeeklyPlanner__header">
         <div className="projectWeeklyPlanner__headingGroup">
           <p className="projectWeeklyPlanner__eyebrow">Týdenní plánování</p>

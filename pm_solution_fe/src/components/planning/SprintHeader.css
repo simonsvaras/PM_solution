@@ -1,0 +1,141 @@
+.sprintHeader {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background-color: #ffffff;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.sprintHeader--empty {
+  border-style: dashed;
+  background-color: #f8fafc;
+}
+
+.sprintHeader__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sprintHeader__eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #475569;
+}
+
+.sprintHeader__title {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+
+.sprintHeader__description {
+  margin: 0;
+  color: #475569;
+}
+
+.sprintHeader__badge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.sprintHeader__badge--open {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.sprintHeader__badge--closed {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.sprintHeader__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+.sprintHeader__deadlineLabel {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.sprintHeader__deadlineValue {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.sprintHeader__progress {
+  flex: 1;
+  min-width: 220px;
+}
+
+.sprintHeader__progressLabel {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.sprintHeader__progressBar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background-color: #e2e8f0;
+  overflow: hidden;
+}
+
+.sprintHeader__progressBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, #0f766e, #16a34a);
+  transition: width 0.3s ease;
+}
+
+.sprintHeader__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sprintHeader__closeButton {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #ffffff;
+  background-color: #111827;
+  cursor: pointer;
+}
+
+.sprintHeader__closeButton:disabled {
+  cursor: not-allowed;
+  background-color: #cbd5f5;
+  color: #475569;
+}
+
+.sprintHeader__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b91c1c;
+}
+
+.sprintHeader__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
