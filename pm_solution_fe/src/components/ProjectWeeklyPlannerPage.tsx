@@ -1,5 +1,5 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
 import Modal from './Modal';
 import WeeklyTaskFormModal, { type WeeklyTaskFormInitialTask, type WeeklyTaskFormMode, type WeeklyTaskFormValues } from './WeeklyTaskFormModal';
@@ -27,6 +27,7 @@ import {
   closeProjectWeek,
   createWeeklyTask,
   generateProjectWeeklyPlannerWeeks,
+  getCurrentProjectSprint,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
   getWeeklyPlannerSettings,
@@ -34,6 +35,8 @@ import {
   updateWeeklyPlannerSettings,
   updateWeeklyTask,
 } from '../api';
+import SprintCreateForm from './planning/SprintCreateForm';
+import { getCurrentSprintQueryKey } from './planning/queryKeys';
 
 type ToastKind = 'success' | 'warning' | 'error';
 
@@ -246,6 +249,19 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [taskFormDayOfWeek, setTaskFormDayOfWeek] = useState<number>(1);
 
   const queryClient = useQueryClient();
+  const fetchCurrentSprint = useCallback(() => getCurrentProjectSprint(project.id), [project.id]);
+  const {
+    data: currentSprintData,
+    error: currentSprintError,
+    isPending: sprintLoading,
+    refetch: refetchSprint,
+  } = useQuery({
+    queryKey: getCurrentSprintQueryKey(project.id),
+    queryFn: fetchCurrentSprint,
+  });
+  const currentSprint = currentSprintData ?? null;
+  const sprintError = currentSprintError as ErrorResponse | null;
+  const currentSprintId = currentSprint?.id ?? null;
 
   const openCreateTaskModal = useCallback(
     (weekId: number | null) => {
@@ -317,8 +333,15 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   }, [loadSettings]);
 
   useEffect(() => {
+    if (currentSprintId === null) {
+      setWeeks([]);
+      setSelectedWeek(null);
+      setSelectedWeekId(null);
+      setSummary(null);
+      return;
+    }
     loadWeeks();
-  }, [loadWeeks]);
+  }, [loadWeeks, currentSprintId]);
 
   const fetchWeek = useCallback(
     (weekId: number) => {
@@ -361,13 +384,18 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   );
 
   useEffect(() => {
+    if (currentSprintId === null) {
+      setSelectedWeek(null);
+      setSummary(null);
+      return;
+    }
     if (selectedWeekId === null) {
       setSelectedWeek(null);
       setSummary(null);
       return;
     }
     fetchWeek(selectedWeekId);
-  }, [selectedWeekId, fetchWeek]);
+  }, [selectedWeekId, fetchWeek, currentSprintId]);
 
   useEffect(() => {
     if (!isCreateModalOpen && selectedWeekId !== selectedWeekIdForForm) {
@@ -381,9 +409,16 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     }
   }, [closeCreateTaskModal, isCreateModalOpen, selectedWeekId, selectedWeekIdForForm]);
 
-  function notify(type: ToastKind, text: string) {
-    onShowToast?.(type, text);
-  }
+  const notify = useCallback(
+    (type: ToastKind, text: string) => {
+      onShowToast?.(type, text);
+    },
+    [onShowToast],
+  );
+
+  const handleSprintCreated = useCallback(() => {
+    notify('success', 'Sprint byl vytvořen.');
+  }, [notify]);
 
   const createTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, CreateTaskVariables, TaskMutationContext>({
     mutationFn: async ({ weekId, values, dayOfWeek }: CreateTaskVariables) => {
@@ -822,6 +857,46 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         </span>
         <span>New task</span>
       </button>
+    );
+  }
+
+  if (sprintLoading) {
+    return (
+      <section className="projectWeeklyPlanner" aria-labelledby="project-weekly-planner-title">
+        <p className="projectWeeklyPlanner__status" role="status">
+          Načítám sprint…
+        </p>
+      </section>
+    );
+  }
+
+  if (sprintError) {
+    return (
+      <section className="projectWeeklyPlanner" aria-labelledby="project-weekly-planner-title">
+        <div className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error" role="alert">
+          Aktuální sprint se nepodařilo načíst. {sprintError.error?.message ?? ''}
+          <button type="button" className="projectWeeklyPlanner__settingsRetry" onClick={() => refetchSprint()}>
+            Zkusit znovu
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (currentSprintId === null) {
+    return (
+      <section className="projectWeeklyPlanner" aria-labelledby="project-weekly-planner-title">
+        <div className="projectWeeklyPlanner__emptyStateCard">
+          <p className="projectWeeklyPlanner__eyebrow">Týdenní plánování</p>
+          <h2 className="projectWeeklyPlanner__emptyStateTitle">Vytvořte první sprint</h2>
+          <p className="projectWeeklyPlanner__emptyStateDescription">
+            Sprint drží všechny týdenní plány pohromadě. Nejprve ho vytvořte, poté se zpřístupní plánování jednotlivých týdnů.
+          </p>
+        </div>
+        <div className="projectWeeklyPlanner__sprintFormWrapper">
+          <SprintCreateForm projectId={project.id} onSuccess={handleSprintCreated} />
+        </div>
+      </section>
     );
   }
 

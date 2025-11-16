@@ -601,6 +601,34 @@ export type WeeklyPlannerWeek = {
   tasks: WeeklyPlannerTask[];
 };
 
+export type ProjectSprintDTO = {
+  id: number;
+  projectId: number;
+  name: string;
+  description?: string | null;
+  deadline?: string | null;
+  status: 'OPEN' | 'CLOSED' | string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectSprint = {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  deadline: string | null;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectSprintPayload = {
+  name: string;
+  description?: string | null;
+  deadline?: string | null;
+};
+
 export type WeeklyTaskPayload = {
   issueId: number | null;
   internId: number | null;
@@ -997,6 +1025,19 @@ function mapWeeklyPlannerWeekWithMetadata(dto: WeeklyPlannerWeekWithMetadataDTO)
   };
 }
 
+function mapProjectSprint(dto: ProjectSprintDTO): ProjectSprint {
+  return {
+    id: dto.id,
+    projectId: dto.projectId,
+    name: dto.name,
+    description: dto.description ?? null,
+    deadline: dto.deadline ?? null,
+    status: dto.status === 'CLOSED' ? 'CLOSED' : 'OPEN',
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+  };
+}
+
 function mapInternStatusHistoryEntry(dto: InternStatusHistoryEntryDTO): InternStatusHistoryEntry {
   // Technický komentář: Historii vracíme již ve formátu vhodném pro UI (camelCase + zachovaný rozsah platnosti).
   return {
@@ -1268,6 +1309,35 @@ export async function updateProjectInterns(projectId: number, interns: ProjectIn
     body: JSON.stringify({ interns }),
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
+export async function getCurrentProjectSprint(projectId: number): Promise<ProjectSprint | null> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/sprints/current`);
+  if (res.status === 404 || res.status === 204) {
+    return null;
+  }
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<ProjectSprintDTO>(res);
+  return mapProjectSprint(data);
+}
+
+export async function createProjectSprint(
+  projectId: number,
+  payload: CreateProjectSprintPayload,
+): Promise<ProjectSprint> {
+  const body: CreateProjectSprintPayload = {
+    name: payload.name,
+    description: payload.description?.trim() ? payload.description.trim() : undefined,
+    deadline: payload.deadline ?? null,
+  };
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/sprints`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  const data = await parseJson<ProjectSprintDTO>(res);
+  return mapProjectSprint(data);
 }
 
 export async function getWeeklyPlannerSettings(projectId: number): Promise<WeeklyPlannerSettings> {

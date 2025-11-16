@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 type QueryKey = unknown;
 
@@ -95,8 +95,69 @@ export function useMutation<TData = unknown, TError = unknown, TVariables = unkn
   return { mutateAsync, isPending };
 }
 
-export function useQuery() {
-  return { data: undefined, error: null, isPending: false, isFetching: false, refetch: async () => {} } as const;
+type UseQueryOptions<TData> = {
+  queryKey?: QueryKey;
+  queryFn: () => Promise<TData>;
+  enabled?: boolean;
+  initialData?: TData;
+};
+
+export function useQuery<TData = unknown, TError = unknown>(options: UseQueryOptions<TData>) {
+  const { queryFn, enabled = true, initialData } = options;
+  const [data, setData] = useState<TData | undefined>(initialData);
+  const [error, setError] = useState<TError | null>(null);
+  const [isPending, setIsPending] = useState<boolean>(enabled);
+
+  const execute = useCallback(async () => {
+    if (!enabled) {
+      setIsPending(false);
+      return undefined;
+    }
+    setIsPending(true);
+    try {
+      const result = await queryFn();
+      setData(result);
+      setError(null);
+      return result;
+    } catch (err) {
+      setError(err as TError);
+      throw err;
+    } finally {
+      setIsPending(false);
+    }
+  }, [enabled, queryFn]);
+
+  useEffect(() => {
+    if (!enabled) {
+      setIsPending(false);
+      return;
+    }
+    let cancelled = false;
+    setIsPending(true);
+    queryFn()
+      .then(result => {
+        if (!cancelled) {
+          setData(result);
+          setError(null);
+          setIsPending(false);
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setError(err as TError);
+          setIsPending(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, queryFn]);
+
+  const refetch = useCallback(async () => {
+    return execute();
+  }, [execute]);
+
+  return { data, error, isPending, isFetching: isPending, refetch } as const;
 }
 
 export class QueryClient {

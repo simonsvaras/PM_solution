@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type {
   ErrorResponse,
   ProjectOverviewDTO,
+  ProjectSprint,
   WeeklyPlannerWeek,
   WeeklyPlannerWeekCollection,
   WeeklyPlannerWeekWithMetadata,
@@ -18,6 +19,8 @@ vi.mock('../api', async original => {
   return {
     ...actual,
     getWeeklyPlannerSettings: vi.fn(),
+    getCurrentProjectSprint: vi.fn(),
+    createProjectSprint: vi.fn(),
     listProjectWeeklyPlannerWeeks: vi.fn(),
     getProjectWeeklyPlannerWeek: vi.fn(),
     getProjectWeekSummary: vi.fn(),
@@ -32,6 +35,8 @@ vi.mock('../api', async original => {
 
 const {
   getWeeklyPlannerSettings,
+  getCurrentProjectSprint,
+  createProjectSprint,
   listProjectWeeklyPlannerWeeks,
   getProjectWeeklyPlannerWeek,
   getProjectWeekSummary,
@@ -44,6 +49,8 @@ const {
 } = await import('../api');
 
 const mockedGetWeeklyPlannerSettings = vi.mocked(getWeeklyPlannerSettings);
+const mockedGetCurrentProjectSprint = vi.mocked(getCurrentProjectSprint);
+const mockedCreateProjectSprint = vi.mocked(createProjectSprint);
 const mockedListProjectWeeklyPlannerWeeks = vi.mocked(listProjectWeeklyPlannerWeeks);
 const mockedGetProjectWeeklyPlannerWeek = vi.mocked(getProjectWeeklyPlannerWeek);
 const mockedGetProjectWeekSummary = vi.mocked(getProjectWeekSummary);
@@ -93,6 +100,17 @@ const project: ProjectOverviewDTO = {
   hourlyRateCzk: null,
 };
 
+const baseSprint: ProjectSprint = {
+  id: 7,
+  projectId: project.id,
+  name: 'Q1 Sprint',
+  description: null,
+  deadline: null,
+  status: 'OPEN',
+  createdAt: '2025-01-01T00:00:00Z',
+  updatedAt: '2025-01-01T00:00:00Z',
+};
+
 const baseMetadata = {
   projectId: 42,
   weekStartDay: 1,
@@ -139,6 +157,8 @@ function createSummary(week: WeeklyPlannerWeek): WeeklySummary {
 
 function setupSuccessfulMocks() {
   mockedGetWeeklyPlannerSettings.mockResolvedValue({ weekStartDay: 1 });
+  mockedGetCurrentProjectSprint.mockResolvedValue(baseSprint);
+  mockedCreateProjectSprint.mockResolvedValue(baseSprint);
   let loadCount = 0;
   mockedListProjectWeeklyPlannerWeeks.mockImplementation(async (): Promise<WeeklyPlannerWeekCollection> => {
     loadCount += 1;
@@ -170,6 +190,8 @@ function setupSuccessfulMocks() {
 
 function resetMocks() {
   mockedGetWeeklyPlannerSettings.mockReset();
+  mockedGetCurrentProjectSprint.mockReset();
+  mockedCreateProjectSprint.mockReset();
   mockedListProjectWeeklyPlannerWeeks.mockReset();
   mockedGetProjectWeeklyPlannerWeek.mockReset();
   mockedGetProjectWeekSummary.mockReset();
@@ -209,6 +231,28 @@ describe('ProjectWeeklyPlannerPage', () => {
     await waitFor(() => expect(mockedListProjectWeeklyPlannerWeeks).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(mockedGetProjectWeeklyPlannerWeek).toHaveBeenCalledWith(42, newWeek.id));
     expect(toastSpy).toHaveBeenCalledWith('success', 'Nový týden byl vytvořen.');
+  });
+
+  it('renders sprint creation form when no sprint is active', async () => {
+    mockedGetCurrentProjectSprint.mockResolvedValueOnce(null);
+    const toastSpy = vi.fn();
+    const user = userEvent.setup();
+
+    renderPlanner(toastSpy);
+
+    await screen.findByText('Vytvořte první sprint');
+    expect(mockedListProjectWeeklyPlannerWeeks).not.toHaveBeenCalled();
+
+    const nameInput = screen.getByLabelText(/Název sprintu/i);
+    await user.type(nameInput, 'Nový sprint');
+
+    const submit = screen.getByRole('button', { name: 'Vytvořit sprint' });
+    await user.click(submit);
+
+    await waitFor(() =>
+      expect(mockedCreateProjectSprint).toHaveBeenCalledWith(project.id, { name: 'Nový sprint', deadline: null }),
+    );
+    expect(toastSpy).toHaveBeenCalledWith('success', 'Sprint byl vytvořen.');
   });
 
   it('shows an error message when creating a week fails', async () => {
