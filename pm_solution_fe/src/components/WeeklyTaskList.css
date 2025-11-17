@@ -145,11 +145,6 @@
   align-items: baseline;
 }
 
-.weekLane__taskDay {
-  font-weight: 600;
-  color: #4b6bfb;
-}
-
 .weekLane__taskActions {
   display: inline-flex;
   gap: 0.35rem;

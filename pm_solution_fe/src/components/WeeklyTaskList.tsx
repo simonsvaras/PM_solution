@@ -260,7 +260,7 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
       {...attributes}
     >
       <div className="weekLane__taskHeader">
-        <span className="weekLane__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
+        <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
         <div className="weekLane__taskActions">
           {carriedFrom && <span className="weekLane__badge">Carried over {formatDate(carriedFrom)}</span>}
           {onEditTask && (
