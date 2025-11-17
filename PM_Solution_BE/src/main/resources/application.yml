@@ -6,19 +6,24 @@ spring:
     username: ${DB_USER:issueviz}
     password: ${DB_PASSWORD:issueviz}
     hikari:
+      schema: ${DB_SCHEMA:public}
       maximum-pool-size: 5
+      data-source-properties:
+        currentSchema: ${DB_SCHEMA:public}
   jpa:
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
+        default_schema: ${DB_SCHEMA:public}
         jdbc:
           time_zone: UTC
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+    schemas: ${DB_SCHEMA:public}
 
 server:
   port: ${SERVER_PORT:8081}
