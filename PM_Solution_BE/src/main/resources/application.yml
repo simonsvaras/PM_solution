@@ -6,6 +6,7 @@ spring:
     username: ${DB_USER:issueviz}
     password: ${DB_PASSWORD:issueviz}
     hikari:
+      schema: ${DB_SCHEMA:public}
       maximum-pool-size: 5
       data-source-properties:
         currentSchema: ${DB_SCHEMA:public}
