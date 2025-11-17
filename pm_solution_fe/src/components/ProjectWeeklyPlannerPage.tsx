@@ -150,6 +150,27 @@ function normaliseWeekStart(value: string | null | undefined): string | null {
   return formatIsoDate(new Date(parsed));
 }
 
+function parsePlannerDate(value: string | null | undefined): number {
+  if (!value) {
+    return Number.NaN;
+  }
+  const isoString = value.includes('T') ? value : `${value}T00:00:00Z`;
+  const parsed = Date.parse(isoString);
+  return Number.isNaN(parsed) ? Number.NaN : parsed;
+}
+
+function getWeekSortValue(week: WeeklyPlannerWeek): number {
+  const start = parsePlannerDate(week.weekStart);
+  if (!Number.isNaN(start)) {
+    return start;
+  }
+  const end = parsePlannerDate(week.weekEnd);
+  if (!Number.isNaN(end)) {
+    return end;
+  }
+  return 0;
+}
+
 function findNextWeekStart(
   weeks: WeeklyPlannerWeek[],
   weekStartDay: number,
@@ -267,6 +288,10 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [weeksLoading, setWeeksLoading] = useState(false);
   const [weeksError, setWeeksError] = useState<ErrorResponse | null>(null);
   const [weeks, setWeeks] = useState<WeeklyPlannerWeek[]>([]);
+  const orderedWeeks = useMemo(
+    () => [...weeks].sort((first, second) => getWeekSortValue(first) - getWeekSortValue(second)),
+    [weeks],
+  );
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<WeeklyPlannerWeek | null>(null);
   const [weekError, setWeekError] = useState<ErrorResponse | null>(null);
@@ -904,12 +929,12 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   );
 
   const weekSelectOptions = useMemo<WeekSelectOption[]>(() => {
-    const options = weeks.map(week => ({
+    const options = orderedWeeks.map(week => ({
       id: week.id,
       label: `${formatDateRange(week.weekStart, week.weekEnd)}${week.isClosed ? ' • Uzavřený' : ''}`.trim(),
     }));
     return [{ id: null, label: 'Backlog' }, ...options];
-  }, [weeks]);
+  }, [orderedWeeks]);
 
   const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
 
@@ -1441,7 +1466,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
               <option value="" disabled>
                 Vyberte týden
               </option>
-              {weeks.map(week => (
+              {orderedWeeks.map(week => (
                 <option key={week.id} value={week.id}>
                   {formatDateRange(week.weekStart, week.weekEnd)} {week.isClosed ? '• Uzavřený' : ''}
                 </option>
@@ -1575,7 +1600,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         }
         weeksColumn={
           <WeeklyTaskList
-            weeks={weeks}
+            weeks={orderedWeeks}
             weekTasks={sprintWeekTasks}
             weekStartDay={currentWeekStartDay}
             carriedAudit={carriedAudit}
