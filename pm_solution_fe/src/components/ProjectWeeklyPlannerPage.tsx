@@ -556,13 +556,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     [onShowToast],
   );
 
-  const handleBacklogTaskSubmit = useCallback(
-    async (values: WeeklyTaskFormValues) => {
-      await backlogTaskMutation.mutateAsync(values);
-    },
-    [backlogTaskMutation],
-  );
-
   const handleBacklogRetry = useCallback(() => {
     if (currentSprintId !== null) {
       refetchSprintTasks();
@@ -640,7 +633,12 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
-  const backlogTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, WeeklyTaskFormValues, BacklogTaskMutationContext>({
+  const backlogTaskMutation = useMutation<
+    WeeklyPlannerTask,
+    ErrorResponse,
+    WeeklyTaskFormValues,
+    BacklogTaskMutationContext | undefined
+  >({
     mutationFn: async (values: WeeklyTaskFormValues) => {
       if (currentSprintId === null) {
         throw new Error('Backlog je dostupný až po vytvoření sprintu.');
@@ -652,7 +650,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       if (currentSprintId === null) {
         return undefined;
       }
-      const sprintTasksKey = ['project-sprint-tasks', project.id, currentSprintId] as const;
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
       const backlogTasksKey = getBacklogTasksQueryKey(project.id, currentSprintId);
       await Promise.all([
         queryClient.cancelQueries({ queryKey: sprintTasksKey }),
@@ -701,6 +699,13 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       }
     },
   });
+
+  const handleBacklogTaskSubmit = useCallback(
+    async (values: WeeklyTaskFormValues) => {
+      await backlogTaskMutation.mutateAsync(values);
+    },
+    [backlogTaskMutation],
+  );
 
   const generateWeekMutation = useMutation<WeeklyPlannerWeekCollection, ErrorResponse, WeeklyPlannerWeekGenerationPayload>({
     mutationFn: (payload: WeeklyPlannerWeekGenerationPayload) =>
