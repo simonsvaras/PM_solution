@@ -2,7 +2,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { type QueryClient, type QueryKey } from '@tanstack/react-query';
 import './WeeklyTaskList.css';
 import type { ErrorResponse, WeeklyPlannerTask, WeeklyPlannerWeek } from '../api';
-import { formatDate, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
+import { formatDate, formatPlannedHours } from './weeklyPlannerUtils';
 
 export type WeeklyTasksQueryData = {
   weekTasks: WeeklyPlannerTask[];
@@ -155,7 +155,6 @@ export function removeWeeklyTask(
 type WeekLaneProps = {
   week: WeeklyPlannerWeek;
   tasks: WeeklyPlannerTask[];
-  weekStartDay: number;
   carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
   isSelected: boolean;
@@ -163,7 +162,7 @@ type WeekLaneProps = {
   isInteractionDisabled?: boolean;
 };
 
-function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
+function WeekLane({ week, tasks, carriedAudit, onEditTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `week-drop-${week.id}`,
     data: { weekId: week.id },
@@ -210,7 +209,6 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
             key={task.id}
             weekId={week.id}
             task={task}
-            weekStartDay={weekStartDay}
             carriedAudit={carriedAudit}
             onEditTask={onEditTask}
             isClosed={week.isClosed}
@@ -225,14 +223,13 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
 type WeekTaskCardProps = {
   weekId: number;
   task: WeeklyPlannerTask;
-  weekStartDay: number;
   carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
   isClosed: boolean;
   isInteractionDisabled?: boolean;
 };
 
-function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
+function WeekTaskCard({ weekId, task, carriedAudit, onEditTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `week-task-${task.id}`,
     data: { taskId: task.id, weekId },
@@ -260,7 +257,6 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
       {...attributes}
     >
       <div className="weekLane__taskHeader">
-        <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
         <div className="weekLane__taskActions">
           {carriedFrom && <span className="weekLane__badge">Carried over {formatDate(carriedFrom)}</span>}
           {onEditTask && (
@@ -289,7 +285,6 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
 export type WeeklyTaskListProps = {
   weeks: WeeklyPlannerWeek[];
   weekTasks: Map<number, WeeklyPlannerTask[]>;
-  weekStartDay: number;
   carriedAudit: Record<number, string>;
   isLoading: boolean;
   error: ErrorResponse | null;
@@ -320,7 +315,6 @@ function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () =
 export default function WeeklyTaskList({
   weeks,
   weekTasks,
-  weekStartDay,
   carriedAudit,
   isLoading,
   error,
@@ -378,7 +372,6 @@ export default function WeeklyTaskList({
                 key={week.id}
                 week={week}
                 tasks={weekTasks.get(week.id) ?? []}
-                weekStartDay={weekStartDay}
                 carriedAudit={carriedAudit}
                 onEditTask={onEditTask}
                 isSelected={selectedWeekId === week.id}
