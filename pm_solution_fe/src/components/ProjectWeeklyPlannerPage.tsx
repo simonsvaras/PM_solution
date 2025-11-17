@@ -259,17 +259,6 @@ function createOptimisticTaskFromForm(
   };
 }
 
-function mapTaskToPayloadFromTask(task: WeeklyPlannerTask): WeeklyTaskPayload {
-  return {
-    dayOfWeek: normaliseTaskDayOfWeek(task.dayOfWeek),
-    deadline: task.deadline ?? null,
-    issueId: task.issueId ?? null,
-    internId: task.internId ?? null,
-    note: task.note ?? task.issueTitle ?? null,
-    plannedHours: task.plannedHours ?? null,
-  };
-}
-
 function isIssueClosed(task: WeeklyPlannerTask): boolean {
   return task.status === 'CLOSED';
 }
@@ -772,15 +761,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const moveTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, MoveTaskVariables, MoveTaskContext>({
     mutationFn: async ({ taskId, toWeekId }: MoveTaskVariables) => {
       const destinationWeekId = normaliseDestinationWeekId(toWeekId);
-      const task = sprintTasks.find(item => item.id === taskId);
-      if (!task) {
-        throw new Error('Úkol nebyl nalezen.');
-      }
-      if (destinationWeekId === null) {
-        return updateWeeklyTaskWeek(project.id, taskId, null);
-      }
-      const payload = mapTaskToPayloadFromTask(task);
-      return updateWeeklyTask(project.id, destinationWeekId, taskId, payload);
+      return updateWeeklyTaskWeek(project.id, taskId, destinationWeekId);
     },
     onMutate: async ({ taskId, fromWeekId, toWeekId }: MoveTaskVariables) => {
       const destinationWeekId = normaliseDestinationWeekId(toWeekId);
