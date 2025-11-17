@@ -533,10 +533,16 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   }, [isCreateModalOpen, selectedWeekId, selectedWeekIdForForm]);
 
   useEffect(() => {
-    if (isCreateModalOpen && selectedWeekIdForForm !== selectedWeekId) {
+    if (taskFormMode === 'create' && isCreateModalOpen && selectedWeekIdForForm !== selectedWeekId) {
       closeCreateTaskModal();
     }
-  }, [closeCreateTaskModal, isCreateModalOpen, selectedWeekId, selectedWeekIdForForm]);
+  }, [
+    closeCreateTaskModal,
+    isCreateModalOpen,
+    selectedWeekId,
+    selectedWeekIdForForm,
+    taskFormMode,
+  ]);
 
   const notify = useCallback(
     (type: ToastKind, text: string) => {
