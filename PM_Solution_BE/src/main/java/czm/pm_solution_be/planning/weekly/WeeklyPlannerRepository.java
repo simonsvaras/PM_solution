@@ -202,8 +202,9 @@ public class WeeklyPlannerRepository {
     private static final String SQL_SELECT_TASK_BY_ID =
             """
             SELECT wt.id,
+                   wt.project_id,
                    wt.project_week_id,
-                   pw.sprint_id,
+                   wt.sprint_id,
                    wt.day_of_week,
                    wt.note,
                    wt.planned_hours,
@@ -216,7 +217,6 @@ public class WeeklyPlannerRepository {
                    iss.state AS issue_state,
                    iss.due_date AS issue_due_date
             FROM weekly_task wt
-            JOIN project_week pw ON pw.id = wt.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.id = ?
@@ -225,8 +225,9 @@ public class WeeklyPlannerRepository {
     private static final String SQL_LIST_TASKS_BY_WEEK =
             """
             SELECT wt.id,
+                   wt.project_id,
                    wt.project_week_id,
-                   pw.sprint_id,
+                   wt.sprint_id,
                    wt.day_of_week,
                    wt.note,
                    wt.planned_hours,
@@ -239,7 +240,6 @@ public class WeeklyPlannerRepository {
                    iss.state AS issue_state,
                    iss.due_date AS issue_due_date
             FROM weekly_task wt
-            JOIN project_week pw ON pw.id = wt.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.project_week_id = ?
@@ -248,8 +248,8 @@ public class WeeklyPlannerRepository {
 
     private static final String SQL_INSERT_WEEKLY_TASK =
             """
-            INSERT INTO weekly_task (project_week_id, intern_id, issue_id, day_of_week, note, planned_hours)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO weekly_task (project_id, sprint_id, project_week_id, intern_id, issue_id, day_of_week, note, planned_hours)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             """;
 
@@ -269,7 +269,17 @@ public class WeeklyPlannerRepository {
     private static final String SQL_DELETE_WEEKLY_TASK = "DELETE FROM weekly_task WHERE id = ?";
 
     private static final String SQL_BATCH_INSERT_TASK =
-            "INSERT INTO weekly_task (project_week_id, intern_id, issue_id, day_of_week, note, planned_hours) VALUES (?, ?, ?, ?, ?, ?)";
+            "INSERT INTO weekly_task (project_id, sprint_id, project_week_id, intern_id, issue_id, day_of_week, note, planned_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+    private static final String SQL_UPDATE_TASK_ASSIGNMENT =
+            """
+            UPDATE weekly_task
+            SET project_week_id = ?,
+                sprint_id       = ?,
+                updated_at      = NOW()
+            WHERE id = ?
+            RETURNING id
+            """;
 
     private static final String SQL_BATCH_DELETE_TASK = "DELETE FROM weekly_task WHERE id = ?";
 
@@ -405,7 +415,8 @@ public class WeeklyPlannerRepository {
             LocalDate issueDueDate = rs.getObject("issue_due_date", LocalDate.class);
             return new WeeklyTaskRow(
                     rs.getLong("id"),
-                    rs.getLong("project_week_id"),
+                    mapNullableLong(rs, "project_week_id"),
+                    rs.getLong("project_id"),
                     mapNullableLong(rs, "sprint_id"),
                     dayOfWeek,
                     rs.getString("note"),
@@ -534,16 +545,18 @@ public class WeeklyPlannerRepository {
         return jdbc.query(SQL_LIST_TASKS_BY_WEEK, TASK_MAPPER, projectWeekId);
     }
 
-    public WeeklyTaskRow insertTask(long projectWeekId, WeeklyTaskMutation mutation) {
+    public WeeklyTaskRow insertTask(long projectId, long sprintId, Long projectWeekId, WeeklyTaskMutation mutation) {
         Objects.requireNonNull(mutation, "mutation");
         Long taskId = jdbc.query(con -> {
             PreparedStatement ps = con.prepareStatement(SQL_INSERT_WEEKLY_TASK);
-            ps.setLong(1, projectWeekId);
-            setNullableLong(ps, 2, mutation.internId());
-            setNullableLong(ps, 3, mutation.issueId());
-            ps.setInt(4, mutation.dayOfWeek());
-            setNullableString(ps, 5, mutation.note());
-            setNullableBigDecimal(ps, 6, mutation.plannedHours());
+            ps.setLong(1, projectId);
+            ps.setLong(2, sprintId);
+            setNullableLong(ps, 3, projectWeekId);
+            setNullableLong(ps, 4, mutation.internId());
+            setNullableLong(ps, 5, mutation.issueId());
+            setNullableInteger(ps, 6, mutation.dayOfWeek());
+            setNullableString(ps, 7, mutation.note());
+            setNullableBigDecimal(ps, 8, mutation.plannedHours());
             return ps;
         }, singleLongExtractor());
         if (taskId == null) {
@@ -560,7 +573,7 @@ public class WeeklyPlannerRepository {
                 PreparedStatement ps = con.prepareStatement(SQL_UPDATE_WEEKLY_TASK);
                 setNullableLong(ps, 1, mutation.internId());
                 setNullableLong(ps, 2, mutation.issueId());
-                ps.setInt(3, mutation.dayOfWeek());
+                setNullableInteger(ps, 3, mutation.dayOfWeek());
                 setNullableString(ps, 4, mutation.note());
                 setNullableBigDecimal(ps, 5, mutation.plannedHours());
                 ps.setLong(6, taskId);
@@ -579,7 +592,7 @@ public class WeeklyPlannerRepository {
         return jdbc.update(SQL_DELETE_WEEKLY_TASK, taskId);
     }
 
-    public int[] batchInsertTasks(long projectWeekId, List<WeeklyTaskMutation> tasks) {
+    public int[] batchInsertTasks(long projectId, long sprintId, long projectWeekId, List<WeeklyTaskMutation> tasks) {
         if (tasks == null || tasks.isEmpty()) {
             return new int[0];
         }
@@ -587,12 +600,14 @@ public class WeeklyPlannerRepository {
             @Override
             public void setValues(PreparedStatement ps, int i) throws SQLException {
                 WeeklyTaskMutation mutation = tasks.get(i);
-                ps.setLong(1, projectWeekId);
-                setNullableLong(ps, 2, mutation.internId());
-                setNullableLong(ps, 3, mutation.issueId());
-                ps.setInt(4, mutation.dayOfWeek());
-                setNullableString(ps, 5, mutation.note());
-                setNullableBigDecimal(ps, 6, mutation.plannedHours());
+                ps.setLong(1, projectId);
+                ps.setLong(2, sprintId);
+                ps.setLong(3, projectWeekId);
+                setNullableLong(ps, 4, mutation.internId());
+                setNullableLong(ps, 5, mutation.issueId());
+                setNullableInteger(ps, 6, mutation.dayOfWeek());
+                setNullableString(ps, 7, mutation.note());
+                setNullableBigDecimal(ps, 8, mutation.plannedHours());
             }
 
             @Override
@@ -600,6 +615,24 @@ public class WeeklyPlannerRepository {
                 return tasks.size();
             }
         });
+    }
+
+    public Optional<WeeklyTaskRow> updateTaskAssignment(long taskId, Long projectWeekId, long sprintId) {
+        try {
+            Long updatedId = jdbc.query(con -> {
+                PreparedStatement ps = con.prepareStatement(SQL_UPDATE_TASK_ASSIGNMENT);
+                setNullableLong(ps, 1, projectWeekId);
+                ps.setLong(2, sprintId);
+                ps.setLong(3, taskId);
+                return ps;
+            }, singleLongExtractor());
+            if (updatedId == null) {
+                return Optional.empty();
+            }
+            return findTaskById(updatedId);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
     }
 
     public int[] batchDeleteTasks(List<Long> taskIds) {
@@ -674,6 +707,7 @@ public class WeeklyPlannerRepository {
                 aggregation.addTask(new WeeklyTaskRow(
                         row.taskId(),
                         row.projectWeekId(),
+                        row.projectId(),
                         row.sprintId(),
                         row.dayOfWeek(),
                         row.note(),
@@ -727,6 +761,14 @@ public class WeeklyPlannerRepository {
         }
     }
 
+    private static void setNullableInteger(PreparedStatement ps, int parameterIndex, Integer value) throws SQLException {
+        if (value == null) {
+            ps.setNull(parameterIndex, Types.INTEGER);
+        } else {
+            ps.setInt(parameterIndex, value);
+        }
+    }
+
     private static ResultSetExtractor<Long> singleLongExtractor() {
         return rs -> {
             if (rs.next()) {
@@ -775,7 +817,8 @@ public class WeeklyPlannerRepository {
     }
 
     public record WeeklyTaskRow(long id,
-                                long projectWeekId,
+                                Long projectWeekId,
+                                long projectId,
                                 Long sprintId,
                                 Integer dayOfWeek,
                                 String note,
@@ -792,7 +835,7 @@ public class WeeklyPlannerRepository {
 
     public record WeeklyTaskMutation(Long internId,
                                      Long issueId,
-                                     int dayOfWeek,
+                                     Integer dayOfWeek,
                                      String note,
                                      BigDecimal plannedHours) {
     }

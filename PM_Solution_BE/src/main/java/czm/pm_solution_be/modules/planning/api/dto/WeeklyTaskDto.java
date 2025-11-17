@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record WeeklyTaskDto(long id,
                             long projectId,
-                            long projectWeekId,
+                            Long projectWeekId,
                             long sprintId,
                             Integer dayOfWeek,
                             String note,

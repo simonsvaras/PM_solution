@@ -135,14 +135,18 @@ public class WeeklyPlannerService {
         return new WeekWithMetadata(metadata, mapWeek(row));
     }
 
-    public TaskDetail createTask(long projectId, long projectWeekId, TaskInput input) {
+    public TaskDetail createTask(long projectId, Long projectWeekId, TaskInput input) {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
-        ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
+        ProjectWeekRow week = null;
+        if (projectWeekId != null) {
+            week = requireWeek(projectId, projectWeekId, sprint.id());
+        }
         validateTaskInput(projectId, week, input);
+        LocalDate weekStart = week == null ? null : week.weekStartDate();
         WeeklyTaskRow inserted = txTemplate.execute(status -> {
-            WeeklyTaskRow created = repository.insertTask(projectWeekId, toMutation(input));
+            WeeklyTaskRow created = repository.insertTask(projectId, sprint.id(), projectWeekId, toMutation(input));
             if (input.issueId() != null) {
-                LocalDate deadline = resolveDeadline(input.deadline(), week.weekStartDate());
+                LocalDate deadline = resolveDeadline(input.deadline(), weekStart);
                 repository.updateIssueDueDate(input.issueId(), deadline);
             }
             return repository.findTaskById(created.id())
@@ -154,7 +158,7 @@ public class WeeklyPlannerService {
     public TaskDetail updateTask(long projectId, long projectWeekId, long taskId, TaskInput input) {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
-        requireTask(projectWeekId, taskId);
+        requireTask(projectId, projectWeekId, taskId);
         validateTaskInput(projectId, week, input);
         WeeklyTaskRow updated = txTemplate.execute(status -> {
             WeeklyTaskRow row = repository.updateTask(taskId, toMutation(input))
@@ -172,7 +176,7 @@ public class WeeklyPlannerService {
     public TaskDetail changeStatus(long projectId, long projectWeekId, long taskId, String newStatus) {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
-        WeeklyTaskRow task = requireTask(projectWeekId, taskId);
+        WeeklyTaskRow task = requireTask(projectId, projectWeekId, taskId);
         if (task.issueId() == null) {
             throw ApiException.validation("Úkol není navázán na issue, status nelze změnit.", "issue_required");
         }
@@ -191,6 +195,33 @@ public class WeeklyPlannerService {
         WeeklyTaskRow reloaded = repository.findTaskById(task.id())
                 .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst úkol po změně stavu.", "task_reload_failed"));
         return mapTask(reloaded);
+    }
+
+    public TaskDetail assignTask(long projectId, long taskId, Long destinationWeekId) {
+        WeeklyTaskRow task = repository.findTaskById(taskId)
+                .orElseThrow(() -> ApiException.notFound("Úkol nebyl nalezen.", "weekly_task"));
+        if (task.projectId() != projectId) {
+            throw ApiException.validation("Úkol nepatří do vybraného projektu.", "weekly_task_project_mismatch");
+        }
+        Long newWeekId = destinationWeekId;
+        Long newSprintId = task.sprintId();
+        if (newSprintId == null) {
+            PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+            newSprintId = sprint.id();
+        }
+        if (destinationWeekId != null) {
+            ProjectWeekRow targetWeek = requireWeek(projectId, destinationWeekId, newSprintId);
+            if (targetWeek.sprintId() != null && !Objects.equals(targetWeek.sprintId(), newSprintId)) {
+                throw ApiException.validation("Týden nepatří do sprintu úkolu.", "project_week_sprint_mismatch");
+            }
+            newWeekId = targetWeek.id();
+            newSprintId = targetWeek.sprintId() == null ? newSprintId : targetWeek.sprintId();
+        }
+        Long sprintId = newSprintId;
+        Long targetWeekId = newWeekId;
+        WeeklyTaskRow updated = txTemplate.execute(status -> repository.updateTaskAssignment(taskId, targetWeekId, sprintId)
+                .orElseThrow(() -> ApiException.notFound("Úkol nebyl nalezen.", "weekly_task")));
+        return mapTask(updated);
     }
 
     public List<TaskDetail> carryOverTasks(long projectId,
@@ -235,8 +266,11 @@ public class WeeklyPlannerService {
                                 .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst cílový týden.", "target_week_reload_failed"));
                     });
             List<Long> ids = new ArrayList<>();
+            Long targetSprintId = targetWeek.sprintId() == null ? sprint.id() : targetWeek.sprintId();
             for (WeeklyTaskRow task : toCopy) {
-                WeeklyTaskRow inserted = repository.insertTask(targetWeek.id(),
+                WeeklyTaskRow inserted = repository.insertTask(projectId,
+                        targetSprintId,
+                        targetWeek.id(),
                         new WeeklyTaskMutation(task.internId(), task.issueId(), task.dayOfWeek(), task.note(), task.plannedHours()));
                 ids.add(inserted.id());
                 if (task.issueId() != null) {
@@ -304,10 +338,13 @@ public class WeeklyPlannerService {
         return row;
     }
 
-    private WeeklyTaskRow requireTask(long projectWeekId, long taskId) {
+    private WeeklyTaskRow requireTask(long projectId, Long projectWeekId, long taskId) {
         WeeklyTaskRow row = repository.findTaskById(taskId)
                 .orElseThrow(() -> ApiException.notFound("Úkol nebyl nalezen.", "weekly_task"));
-        if (row.projectWeekId() != projectWeekId) {
+        if (row.projectId() != projectId) {
+            throw ApiException.notFound("Úkol nepatří do vybraného projektu.", "weekly_task");
+        }
+        if (projectWeekId != null && !Objects.equals(row.projectWeekId(), projectWeekId)) {
             throw ApiException.notFound("Úkol nebyl nalezen v daném týdnu.", "weekly_task");
         }
         return row;
@@ -317,10 +354,13 @@ public class WeeklyPlannerService {
         if (input == null) {
             throw ApiException.validation("Tělo požadavku je povinné.", "task_body_required");
         }
-        if (input.dayOfWeek() == null) {
-            throw ApiException.validation("Den v týdnu je povinný.", "day_of_week_required");
-        }
-        if (input.dayOfWeek() < 1 || input.dayOfWeek() > 7) {
+        boolean backlog = week == null;
+        Integer dayOfWeek = input.dayOfWeek();
+        if (dayOfWeek == null) {
+            if (!backlog) {
+                throw ApiException.validation("Den v týdnu je povinný.", "day_of_week_required");
+            }
+        } else if (dayOfWeek < 1 || dayOfWeek > 7) {
             throw ApiException.validation("Den v týdnu musí být v intervalu 1 až 7.", "day_of_week_invalid");
         }
         if (input.plannedHours() != null) {
@@ -350,7 +390,7 @@ public class WeeklyPlannerService {
                 throw ApiException.validation("Stážista není přiřazen k projektu.", "intern_project_mismatch");
             }
         }
-        if (input.deadline() != null) {
+        if (input.deadline() != null && week != null) {
             LocalDate weekEnd = computeWeekEnd(week.weekStartDate());
             if (input.deadline().isBefore(week.weekStartDate()) || input.deadline().isAfter(weekEnd)) {
                 throw ApiException.validation("Deadline musí spadat do vybraného týdne.", "deadline_out_of_range");
@@ -423,6 +463,7 @@ public class WeeklyPlannerService {
                 row.id(),
                 row.projectWeekId(),
                 row.sprintId(),
+                row.projectWeekId() == null,
                 row.dayOfWeek(),
                 row.note(),
                 row.plannedHours(),
@@ -437,6 +478,9 @@ public class WeeklyPlannerService {
     }
 
     private LocalDate resolveDeadline(LocalDate requested, LocalDate weekStart) {
+        if (weekStart == null) {
+            return requested;
+        }
         LocalDate weekEnd = computeWeekEnd(weekStart);
         if (requested == null) {
             return weekEnd;
@@ -501,6 +545,7 @@ public class WeeklyPlannerService {
     public record TaskDetail(long id,
                              Long weekId,
                              Long sprintId,
+                             boolean isBacklog,
                              Integer dayOfWeek,
                              String note,
                              BigDecimal plannedHours,

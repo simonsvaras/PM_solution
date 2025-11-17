@@ -542,6 +542,7 @@ export type ProjectIssue = {
 export type WeeklyPlannerTaskDTO = {
   id: number;
   weekId?: number | null;
+  isBacklog?: boolean | null;
   dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | string | null;
@@ -561,6 +562,7 @@ export type WeeklyPlannerTaskDTO = {
 export type WeeklyPlannerTask = {
   id: number;
   weekId: number | null;
+  isBacklog: boolean;
   dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | null;
@@ -999,9 +1001,11 @@ function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
   const plannedHoursRaw = parseNumber(dto.plannedHours);
   const status = normaliseWeeklyTaskStatus(dto.status ?? dto.issueState ?? null);
   const weekId = typeof dto.weekId === 'number' && Number.isFinite(dto.weekId) ? dto.weekId : null;
+  const isBacklog = dto.isBacklog === true || weekId === null;
   return {
     id: dto.id,
     weekId,
+    isBacklog,
     dayOfWeek: dto.dayOfWeek ?? null,
     note: dto.note ?? null,
     plannedHours: Number.isNaN(plannedHoursRaw) ? null : plannedHoursRaw,
@@ -1056,6 +1060,7 @@ function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
   const baseTask = mapWeeklyPlannerTask({
     id: dto.id,
     weekId: dto.projectWeekId ?? null,
+    isBacklog: dto.projectWeekId == null,
     dayOfWeek: dto.dayOfWeek ?? null,
     note: dto.note ?? null,
     plannedHours: dto.plannedHours ?? null,
@@ -1655,7 +1660,23 @@ export async function updateWeeklyTaskWeek(
     {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ weekId }),
+      body: JSON.stringify({ weekId, destination: weekId === null ? 'backlog' : 'week' }),
+    },
+  );
+  return mapWeeklyPlannerTask(data);
+}
+
+export async function createBacklogWeeklyTask(
+  projectId: number,
+  payload: WeeklyTaskPayload,
+): Promise<WeeklyPlannerTask> {
+  const body = normaliseWeeklyTaskPayload(payload);
+  const data = await fetchJson<WeeklyPlannerTaskDTO>(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/tasks`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
     },
   );
   return mapWeeklyPlannerTask(data);

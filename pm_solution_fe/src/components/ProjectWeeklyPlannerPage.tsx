@@ -30,6 +30,7 @@ import {
   type WeeklyPlannerSettings,
   type WeeklySummary,
   type WeeklyTaskPayload,
+  createBacklogWeeklyTask,
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
@@ -85,6 +86,12 @@ type MoveTaskContext = {
   sourceWeek?: WeeklyTasksQueryData;
   targetWeek?: WeeklyTasksQueryData;
   sprintId: number | null;
+};
+
+type BacklogTaskMutationContext = {
+  queryKey: [string, number, number | null];
+  previous: WeeklyPlannerTask[];
+  optimisticId: number;
 };
 
 let optimisticTaskIdCounter = -1;
@@ -213,9 +220,12 @@ function createOptimisticTaskFromForm(
   const optimisticId = overrides?.id ?? nextOptimisticTaskId();
   const trimmedTitle = values.title.trim();
   const trimmedDescription = values.description.trim();
+  const inferredWeekId = overrides?.weekId ?? null;
+  const isBacklog = overrides?.isBacklog ?? inferredWeekId === null;
   return {
     id: optimisticId,
-    weekId: overrides?.weekId ?? null,
+    weekId: inferredWeekId,
+    isBacklog,
     dayOfWeek: overrides?.dayOfWeek ?? null,
     note: overrides?.note ?? (trimmedDescription.length > 0 ? trimmedDescription : trimmedTitle),
     plannedHours: overrides?.plannedHours ?? null,
@@ -325,7 +335,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   });
   const sprintTasks = sprintTasksData ?? [];
   const backlogTasks = useMemo(
-    () => sprintTasks.filter(task => task.weekId === null),
+    () => sprintTasks.filter(task => task.isBacklog || task.weekId === null),
     [sprintTasks],
   );
   const sprintWeekTasks = useMemo(() => {
@@ -511,11 +521,10 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   );
 
   const handleBacklogTaskSubmit = useCallback(
-    async (_values: WeeklyTaskFormValues) => {
-      notify('warning', 'Vytváření backlogových úkolů zatím není dostupné.');
-      throw new Error('Vytváření backlogových úkolů zatím není dostupné.');
+    async (values: WeeklyTaskFormValues) => {
+      await backlogTaskMutation.mutateAsync(values);
     },
-    [notify],
+    [backlogTaskMutation],
   );
 
   const handleBacklogRetry = useCallback(() => {
@@ -552,7 +561,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     onMutate: async ({ weekId, values, dayOfWeek }: CreateTaskVariables) => {
       const queryKey = getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId);
       await queryClient.cancelQueries({ queryKey });
-      const optimisticTask = createOptimisticTaskFromForm(values, { dayOfWeek });
+      const optimisticTask = createOptimisticTaskFromForm(values, { dayOfWeek, weekId, isBacklog: false });
       const optimisticId = optimisticTask.id;
       const previous = prependWeeklyTask(queryClient, project.id, plannerSprintId, weekId, optimisticTask);
       setTaskMutationError(null);
@@ -595,6 +604,48 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
+  const backlogTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, WeeklyTaskFormValues, BacklogTaskMutationContext>({
+    mutationFn: async (values: WeeklyTaskFormValues) => {
+      if (currentSprintId === null) {
+        throw new Error('Backlog je dostupný až po vytvoření sprintu.');
+      }
+      const payload = mapFormValuesToPayload(values, { dayOfWeek: null });
+      return createBacklogWeeklyTask(project.id, payload);
+    },
+    onMutate: async (values: WeeklyTaskFormValues) => {
+      if (currentSprintId === null) {
+        return undefined;
+      }
+      const queryKey = ['project-sprint-tasks', project.id, currentSprintId] as const;
+      await queryClient.cancelQueries({ queryKey });
+      const optimisticTask = createOptimisticTaskFromForm(values, { weekId: null, dayOfWeek: null, isBacklog: true });
+      const previous = queryClient.getQueryData<WeeklyPlannerTask[]>(queryKey) ?? [];
+      queryClient.setQueryData<WeeklyPlannerTask[]>(queryKey, [optimisticTask, ...previous]);
+      return { queryKey, previous, optimisticId: optimisticTask.id } satisfies BacklogTaskMutationContext;
+    },
+    onError: (_error: ErrorResponse, _values: WeeklyTaskFormValues | undefined, context: BacklogTaskMutationContext | undefined) => {
+      if (context) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
+    onSuccess: (task: WeeklyPlannerTask, _values: WeeklyTaskFormValues | undefined, context: BacklogTaskMutationContext | undefined) => {
+      if (context) {
+        queryClient.setQueryData<WeeklyPlannerTask[]>(context.queryKey, old => {
+          if (!old) {
+            return old;
+          }
+          return old.map(existing => (existing.id === context.optimisticId ? task : existing));
+        });
+      }
+      notify('success', 'Úkol byl přidán do backlogu.');
+    },
+    onSettled: (_result, _error, _values, context) => {
+      if (context) {
+        queryClient.invalidateQueries({ queryKey: context.queryKey });
+      }
+    },
+  });
+
   const generateWeekMutation = useMutation<WeeklyPlannerWeekCollection, ErrorResponse, WeeklyPlannerWeekGenerationPayload>({
     mutationFn: (payload: WeeklyPlannerWeekGenerationPayload) =>
       generateProjectWeeklyPlannerWeeks(project.id, payload),
@@ -612,7 +663,10 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       const existing =
         current?.weekTasks.find(task => task.id === taskId) ??
         current?.unscheduledTasks.find(task => task.id === taskId);
-      const optimisticTask = createOptimisticTaskFromForm(values, existing ?? { id: taskId, dayOfWeek });
+      const optimisticTask = createOptimisticTaskFromForm(
+        values,
+        existing ?? { id: taskId, dayOfWeek, weekId, isBacklog: false },
+      );
       const previous = replaceWeeklyTask(queryClient, project.id, plannerSprintId, weekId, optimisticTask, taskId);
       setTaskMutationError(null);
       return { queryKey, previous, weekId, optimisticId: taskId, sprintId: plannerSprintId } satisfies TaskMutationContext;
@@ -671,7 +725,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<WeeklyPlannerTask[]>(queryKey) ?? [];
       const mapped = previous.map(existing =>
-        existing.id === taskId ? { ...existing, weekId: toWeekId } : existing,
+        existing.id === taskId ? { ...existing, weekId: toWeekId, isBacklog: toWeekId === null } : existing,
       );
       queryClient.setQueryData(queryKey, mapped);
 
@@ -681,12 +735,18 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       if (typeof fromWeekId === 'number') {
         sourceWeek = removeWeeklyTask(queryClient, project.id, plannerSprintId, fromWeekId, taskId);
       }
-      if (typeof toWeekId === 'number') {
-        const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
-        if (optimisticTask) {
-          targetWeek = prependWeeklyTask(queryClient, project.id, plannerSprintId, toWeekId, optimisticTask);
+        if (typeof toWeekId === 'number') {
+          const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
+          if (optimisticTask) {
+            targetWeek = prependWeeklyTask(
+              queryClient,
+              project.id,
+              plannerSprintId,
+              toWeekId,
+              { ...optimisticTask, isBacklog: false },
+            );
+          }
         }
-      }
 
       setSelectedWeek(current => {
         if (!current) {
@@ -701,7 +761,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             return current;
           }
           const without = current.tasks.filter(task => task.id !== taskId);
-          return { ...current, tasks: [optimisticTask, ...without] };
+          return { ...current, tasks: [{ ...optimisticTask, isBacklog: false }, ...without] };
         }
         return current;
       });
@@ -1368,7 +1428,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             isLoading={sprintTasksLoading}
             error={sprintTasksErrorTyped}
             onRetry={handleBacklogRetry}
-            onCreateTask={handleBacklogTaskSubmit}
+            onCreateTask={currentSprintId === null || !isSprintOpen ? undefined : handleBacklogTaskSubmit}
             isInteractionDisabled={!isSprintOpen}
           />
         }

@@ -21,19 +21,18 @@ public class WeeklyTaskRepository {
             """
             SELECT COUNT(*)
             FROM weekly_task wt
-            JOIN project_week pw ON pw.id = wt.project_week_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
-            WHERE pw.project_id = ?
-              AND pw.sprint_id = ?
+            WHERE wt.project_id = ?
+              AND wt.sprint_id = ?
               AND (iss.state IS NULL OR LOWER(iss.state) <> 'closed')
             """;
 
     private static final String SQL_SELECT_TASKS_BY_SPRINT =
             """
             SELECT wt.id,
-                   pw.project_id,
-                   pw.sprint_id,
+                   wt.project_id,
                    wt.project_week_id,
+                   wt.sprint_id,
                    wt.day_of_week,
                    wt.note,
                    wt.planned_hours,
@@ -46,23 +45,24 @@ public class WeeklyTaskRepository {
                    wt.created_at,
                    wt.updated_at
             FROM weekly_task wt
-            JOIN project_week pw ON pw.id = wt.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
-            WHERE pw.project_id = ?
-              AND pw.sprint_id = ?
-            ORDER BY wt.day_of_week ASC, wt.id ASC
+            WHERE wt.project_id = ?
+              AND wt.sprint_id = ?
+            ORDER BY wt.day_of_week ASC NULLS LAST, wt.id ASC
             """;
 
     private static final RowMapper<WeeklyTaskEntity> TASK_ENTITY_MAPPER = new RowMapper<>() {
         @Override
         public WeeklyTaskEntity mapRow(ResultSet rs, int rowNum) throws SQLException {
+            Long projectWeekId = rs.getObject("project_week_id") == null ? null : rs.getLong("project_week_id");
+            Integer dayOfWeek = rs.getObject("day_of_week") == null ? null : rs.getInt("day_of_week");
             return new WeeklyTaskEntity(
                     rs.getLong("id"),
                     rs.getLong("project_id"),
-                    rs.getLong("project_week_id"),
+                    projectWeekId,
                     rs.getLong("sprint_id"),
-                    rs.getObject("day_of_week") == null ? null : rs.getInt("day_of_week"),
+                    dayOfWeek,
                     rs.getString("note"),
                     rs.getBigDecimal("planned_hours"),
                     rs.getObject("intern_id") == null ? null : rs.getLong("intern_id"),
@@ -93,7 +93,7 @@ public class WeeklyTaskRepository {
 
     public record WeeklyTaskEntity(long id,
                                    long projectId,
-                                   long projectWeekId,
+                                   Long projectWeekId,
                                    long sprintId,
                                    Integer dayOfWeek,
                                    String note,

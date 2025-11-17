@@ -92,6 +92,16 @@ public class WeeklyPlannerController {
         return ResponseEntity.status(HttpStatus.CREATED).body(toTaskResponse(created));
     }
 
+    @PostMapping("/tasks")
+    public ResponseEntity<TaskDetailResponse> createBacklogTask(@PathVariable long projectId,
+                                                                @RequestBody WeeklyTaskRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        TaskDetail created = service.createTask(projectId, null, toTaskInput(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toTaskResponse(created));
+    }
+
     @PutMapping("/weeks/{projectWeekId}/tasks/{taskId}")
     public TaskDetailResponse updateTask(@PathVariable long projectId,
                                          @PathVariable long projectWeekId,
@@ -113,6 +123,21 @@ public class WeeklyPlannerController {
             throw ApiException.validation("Request nesmí být prázdný.", "request_required");
         }
         TaskDetail updated = service.changeStatus(projectId, projectWeekId, taskId, request.status());
+        return toTaskResponse(updated);
+    }
+
+    @PutMapping("/tasks/{taskId}/assignment")
+    public TaskDetailResponse assignTask(@PathVariable long projectId,
+                                         @PathVariable long taskId,
+                                         @RequestBody TaskAssignmentRequest request) {
+        if (request == null) {
+            throw ApiException.validation("Request nesmí být prázdný.", "request_required");
+        }
+        Long targetWeekId = request.weekId();
+        if (request.destination() != null && "backlog".equalsIgnoreCase(request.destination().trim())) {
+            targetWeekId = null;
+        }
+        TaskDetail updated = service.assignTask(projectId, taskId, targetWeekId);
         return toTaskResponse(updated);
     }
 
@@ -178,6 +203,7 @@ public class WeeklyPlannerController {
                 detail.id(),
                 detail.weekId(),
                 detail.sprintId(),
+                detail.isBacklog(),
                 detail.dayOfWeek(),
                 detail.note(),
                 detail.plannedHours(),
@@ -216,6 +242,9 @@ public class WeeklyPlannerController {
     }
 
     public record ChangeStatusRequest(String status) {
+    }
+
+    public record TaskAssignmentRequest(Long weekId, String destination) {
     }
 
     public record CarryOverRequest(LocalDate targetWeekStart, List<Long> taskIds) {
@@ -257,6 +286,7 @@ public class WeeklyPlannerController {
     public record TaskDetailResponse(long id,
                                      Long weekId,
                                      Long sprintId,
+                                     boolean isBacklog,
                                      Integer dayOfWeek,
                                      String note,
                                      BigDecimal plannedHours,

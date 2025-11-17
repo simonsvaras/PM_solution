@@ -16,10 +16,15 @@ function normaliseStatus(status: WeeklyPlannerTask['status']): 'OPENED' | 'CLOSE
 
 function normaliseWeekAssignment(task: WeeklyPlannerTask, fallbackWeekId: number | null): WeeklyPlannerTask {
   const hasValidWeek = typeof task.weekId === 'number' && Number.isFinite(task.weekId);
-  if (hasValidWeek || task.weekId === null) {
-    return task;
+  if (hasValidWeek) {
+    return task.isBacklog ? { ...task, isBacklog: false } : task;
   }
-  return { ...task, weekId: fallbackWeekId };
+  if (task.weekId === null) {
+    return task.isBacklog ? task : { ...task, isBacklog: true };
+  }
+  const resolvedWeekId = fallbackWeekId;
+  const isBacklog = resolvedWeekId === null;
+  return { ...task, weekId: resolvedWeekId, isBacklog };
 }
 
 function createWeeklyTasksQueryData(
