@@ -1617,18 +1617,19 @@ function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPaylo
 
 export async function createWeeklyTask(
   projectId: number,
-  projectWeekId: number,
+  projectWeekId: number | null,
   payload: WeeklyTaskPayload,
 ): Promise<WeeklyPlannerTask> {
   const body = normaliseWeeklyTaskPayload(payload);
-  const data = await fetchJson<WeeklyPlannerTaskDTO>(
-    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  const endpoint =
+    projectWeekId === null
+      ? `${API_BASE}/api/projects/${projectId}/weekly-planner/tasks`
+      : `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks`;
+  const data = await fetchJson<WeeklyPlannerTaskDTO>(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   return mapWeeklyPlannerTask(data);
 }
 
@@ -1670,16 +1671,7 @@ export async function createBacklogWeeklyTask(
   projectId: number,
   payload: WeeklyTaskPayload,
 ): Promise<WeeklyPlannerTask> {
-  const body = normaliseWeeklyTaskPayload(payload);
-  const data = await fetchJson<WeeklyPlannerTaskDTO>(
-    `${API_BASE}/api/projects/${projectId}/weekly-planner/tasks`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
-  return mapWeeklyPlannerTask(data);
+  return createWeeklyTask(projectId, null, payload);
 }
 
 export async function carryOverWeeklyTasks(

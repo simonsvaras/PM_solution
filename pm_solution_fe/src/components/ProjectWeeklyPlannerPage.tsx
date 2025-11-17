@@ -14,6 +14,7 @@ import WeeklyTaskList, {
   type WeeklyTasksQueryData,
 } from './WeeklyTaskList';
 import BacklogTaskColumn from './BacklogTaskColumn';
+import { getBacklogTasksQueryKey, setBacklogTasksQueryData } from './backlogTasksQuery';
 import SprintHeader from './planning/SprintHeader';
 import PlannerBoard from './planning/PlannerBoard';
 import { dayNames, formatDate, formatDateRange, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
@@ -30,7 +31,6 @@ import {
   type WeeklyPlannerSettings,
   type WeeklySummary,
   type WeeklyTaskPayload,
-  createBacklogWeeklyTask,
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
@@ -86,12 +86,16 @@ type MoveTaskContext = {
   sourceWeek?: WeeklyTasksQueryData;
   targetWeek?: WeeklyTasksQueryData;
   sprintId: number | null;
+  backlogTasks?: WeeklyPlannerTask[];
 };
 
 type BacklogTaskMutationContext = {
-  queryKey: [string, number, number | null];
-  previous: WeeklyPlannerTask[];
+  sprintTasksKey: [string, number, number | null];
+  backlogTasksKey: ReturnType<typeof getBacklogTasksQueryKey>;
+  previousSprintTasks: WeeklyPlannerTask[];
+  previousBacklogTasks: WeeklyPlannerTask[];
   optimisticId: number;
+  sprintId: number;
 };
 
 let optimisticTaskIdCounter = -1;
@@ -338,6 +342,23 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     () => sprintTasks.filter(task => task.isBacklog || task.weekId === null),
     [sprintTasks],
   );
+  useEffect(() => {
+    if (currentSprintId === null) {
+      return;
+    }
+    setBacklogTasksQueryData(queryClient, project.id, currentSprintId, backlogTasks);
+  }, [backlogTasks, currentSprintId, project.id, queryClient]);
+  const backlogQueryKey = useMemo(
+    () => getBacklogTasksQueryKey(project.id, currentSprintId),
+    [project.id, currentSprintId],
+  );
+  const { data: backlogQueryTasks } = useQuery({
+    queryKey: backlogQueryKey,
+    enabled: currentSprintId !== null,
+    queryFn: async () => queryClient.getQueryData<WeeklyPlannerTask[]>(backlogQueryKey) ?? [],
+    initialData: () => queryClient.getQueryData<WeeklyPlannerTask[]>(backlogQueryKey) ?? backlogTasks,
+  });
+  const backlogColumnTasks = currentSprintId === null ? [] : backlogQueryTasks ?? backlogTasks;
   const sprintWeekTasks = useMemo(() => {
     const map = new Map<number, WeeklyPlannerTask[]>();
     sprintTasks.forEach(task => {
@@ -610,38 +631,58 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         throw new Error('Backlog je dostupný až po vytvoření sprintu.');
       }
       const payload = mapFormValuesToPayload(values, { dayOfWeek: null });
-      return createBacklogWeeklyTask(project.id, payload);
+      return createWeeklyTask(project.id, null, payload);
     },
     onMutate: async (values: WeeklyTaskFormValues) => {
       if (currentSprintId === null) {
         return undefined;
       }
-      const queryKey = ['project-sprint-tasks', project.id, currentSprintId] as const;
-      await queryClient.cancelQueries({ queryKey });
+      const sprintTasksKey = ['project-sprint-tasks', project.id, currentSprintId] as const;
+      const backlogTasksKey = getBacklogTasksQueryKey(project.id, currentSprintId);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: sprintTasksKey }),
+        queryClient.cancelQueries({ queryKey: backlogTasksKey }),
+      ]);
       const optimisticTask = createOptimisticTaskFromForm(values, { weekId: null, dayOfWeek: null, isBacklog: true });
-      const previous = queryClient.getQueryData<WeeklyPlannerTask[]>(queryKey) ?? [];
-      queryClient.setQueryData<WeeklyPlannerTask[]>(queryKey, [optimisticTask, ...previous]);
-      return { queryKey, previous, optimisticId: optimisticTask.id } satisfies BacklogTaskMutationContext;
+      const previousSprintTasks = queryClient.getQueryData<WeeklyPlannerTask[]>(sprintTasksKey) ?? [];
+      const previousBacklogTasks = queryClient.getQueryData<WeeklyPlannerTask[]>(backlogTasksKey) ?? [];
+      queryClient.setQueryData<WeeklyPlannerTask[]>(sprintTasksKey, [optimisticTask, ...previousSprintTasks]);
+      setBacklogTasksQueryData(queryClient, project.id, currentSprintId, [optimisticTask, ...previousBacklogTasks]);
+      return {
+        sprintTasksKey,
+        backlogTasksKey,
+        previousSprintTasks,
+        previousBacklogTasks,
+        optimisticId: optimisticTask.id,
+        sprintId: currentSprintId,
+      } satisfies BacklogTaskMutationContext;
     },
     onError: (_error: ErrorResponse, _values: WeeklyTaskFormValues | undefined, context: BacklogTaskMutationContext | undefined) => {
       if (context) {
-        queryClient.setQueryData(context.queryKey, context.previous);
+        queryClient.setQueryData(context.sprintTasksKey, context.previousSprintTasks);
+        setBacklogTasksQueryData(queryClient, project.id, context.sprintId, context.previousBacklogTasks);
       }
     },
     onSuccess: (task: WeeklyPlannerTask, _values: WeeklyTaskFormValues | undefined, context: BacklogTaskMutationContext | undefined) => {
       if (context) {
-        queryClient.setQueryData<WeeklyPlannerTask[]>(context.queryKey, old => {
+        queryClient.setQueryData<WeeklyPlannerTask[]>(context.sprintTasksKey, old => {
           if (!old) {
             return old;
           }
           return old.map(existing => (existing.id === context.optimisticId ? task : existing));
         });
+        const currentBacklog = queryClient.getQueryData<WeeklyPlannerTask[]>(context.backlogTasksKey) ?? [];
+        const nextBacklog = currentBacklog.map(existing =>
+          existing.id === context.optimisticId ? { ...task, weekId: null, isBacklog: true } : existing,
+        );
+        setBacklogTasksQueryData(queryClient, project.id, context.sprintId, nextBacklog);
       }
       notify('success', 'Úkol byl přidán do backlogu.');
     },
     onSettled: (_result, _error, _values, context) => {
       if (context) {
-        queryClient.invalidateQueries({ queryKey: context.queryKey });
+        queryClient.invalidateQueries({ queryKey: context.sprintTasksKey });
+        queryClient.invalidateQueries({ queryKey: context.backlogTasksKey });
       }
     },
   });
@@ -731,22 +772,39 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
       let sourceWeek: WeeklyTasksQueryData | undefined;
       let targetWeek: WeeklyTasksQueryData | undefined;
+      let backlogTasksSnapshot: WeeklyPlannerTask[] | undefined;
+      if (plannerSprintId !== null) {
+        const backlogKey = getBacklogTasksQueryKey(project.id, plannerSprintId);
+        backlogTasksSnapshot = queryClient.getQueryData<WeeklyPlannerTask[]>(backlogKey) ?? [];
+        let backlogNext = backlogTasksSnapshot;
+        if (fromWeekId === null) {
+          backlogNext = backlogNext.filter(task => task.id !== taskId);
+        }
+        if (toWeekId === null) {
+          const optimisticTask =
+            mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
+          if (optimisticTask) {
+            backlogNext = [{ ...optimisticTask, weekId: null, isBacklog: true }, ...backlogNext.filter(task => task.id !== taskId)];
+          }
+        }
+        setBacklogTasksQueryData(queryClient, project.id, plannerSprintId, backlogNext);
+      }
 
       if (typeof fromWeekId === 'number') {
         sourceWeek = removeWeeklyTask(queryClient, project.id, plannerSprintId, fromWeekId, taskId);
       }
-        if (typeof toWeekId === 'number') {
-          const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
-          if (optimisticTask) {
-            targetWeek = prependWeeklyTask(
-              queryClient,
-              project.id,
-              plannerSprintId,
-              toWeekId,
-              { ...optimisticTask, isBacklog: false },
-            );
-          }
+      if (typeof toWeekId === 'number') {
+        const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
+        if (optimisticTask) {
+          targetWeek = prependWeeklyTask(
+            queryClient,
+            project.id,
+            plannerSprintId,
+            toWeekId,
+            { ...optimisticTask, isBacklog: false },
+          );
         }
+      }
 
       setSelectedWeek(current => {
         if (!current) {
@@ -767,7 +825,13 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       });
 
       setTaskMutationError(null);
-      return { previousTasks: previous, sourceWeek, targetWeek, sprintId: plannerSprintId } satisfies MoveTaskContext;
+      return {
+        previousTasks: previous,
+        sourceWeek,
+        targetWeek,
+        sprintId: plannerSprintId,
+        backlogTasks: backlogTasksSnapshot,
+      } satisfies MoveTaskContext;
     },
     onError: (error: ErrorResponse, variables: MoveTaskVariables | undefined, context: MoveTaskContext | undefined) => {
       const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
@@ -785,6 +849,9 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           context.targetWeek,
         );
       }
+      if (context?.backlogTasks && contextSprintId !== null) {
+        setBacklogTasksQueryData(queryClient, project.id, contextSprintId, context.backlogTasks);
+      }
       setTaskMutationError(error);
     },
     onSuccess: (task: WeeklyPlannerTask) => {
@@ -798,10 +865,24 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       if (typeof task.weekId === 'number') {
         replaceWeeklyTask(queryClient, project.id, plannerSprintId, task.weekId, task);
       }
+      if (plannerSprintId !== null) {
+        const backlogKey = getBacklogTasksQueryKey(project.id, plannerSprintId);
+        const currentBacklog = queryClient.getQueryData<WeeklyPlannerTask[]>(backlogKey) ?? [];
+        if (task.weekId === null) {
+          const nextBacklog = [{ ...task, weekId: null, isBacklog: true }, ...currentBacklog.filter(existing => existing.id !== task.id)];
+          setBacklogTasksQueryData(queryClient, project.id, plannerSprintId, nextBacklog);
+        } else {
+          const nextBacklog = currentBacklog.filter(existing => existing.id !== task.id);
+          setBacklogTasksQueryData(queryClient, project.id, plannerSprintId, nextBacklog);
+        }
+      }
     },
     onSettled: () => {
       const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
       queryClient.invalidateQueries({ queryKey });
+      if (plannerSprintId !== null) {
+        queryClient.invalidateQueries({ queryKey: getBacklogTasksQueryKey(project.id, plannerSprintId) });
+      }
     },
   });
 
@@ -1424,7 +1505,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           <BacklogTaskColumn
             projectId={project.id}
             sprintId={currentSprintId}
-            tasks={backlogTasks}
+            tasks={backlogColumnTasks}
             isLoading={sprintTasksLoading}
             error={sprintTasksErrorTyped}
             onRetry={handleBacklogRetry}
