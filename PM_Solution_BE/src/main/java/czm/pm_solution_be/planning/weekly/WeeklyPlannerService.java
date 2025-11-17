@@ -219,7 +219,12 @@ public class WeeklyPlannerService {
         }
         Long sprintId = newSprintId;
         Long targetWeekId = newWeekId;
-        WeeklyTaskRow updated = txTemplate.execute(status -> repository.updateTaskAssignment(taskId, targetWeekId, sprintId)
+        boolean keepDayOfWeek = targetWeekId != null;
+        WeeklyTaskRow updated = txTemplate.execute(status -> repository.updateTaskAssignment(
+                        taskId,
+                        targetWeekId,
+                        sprintId,
+                        keepDayOfWeek)
                 .orElseThrow(() -> ApiException.notFound("Úkol nebyl nalezen.", "weekly_task")));
         return mapTask(updated);
     }

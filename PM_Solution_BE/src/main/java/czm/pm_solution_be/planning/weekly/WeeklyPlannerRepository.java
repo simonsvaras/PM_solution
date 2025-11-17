@@ -276,6 +276,7 @@ public class WeeklyPlannerRepository {
             UPDATE weekly_task
             SET project_week_id = ?,
                 sprint_id       = ?,
+                day_of_week     = CASE WHEN ? THEN day_of_week ELSE NULL END,
                 updated_at      = NOW()
             WHERE id = ?
             RETURNING id
@@ -617,13 +618,17 @@ public class WeeklyPlannerRepository {
         });
     }
 
-    public Optional<WeeklyTaskRow> updateTaskAssignment(long taskId, Long projectWeekId, long sprintId) {
+    public Optional<WeeklyTaskRow> updateTaskAssignment(long taskId,
+                                                        Long projectWeekId,
+                                                        long sprintId,
+                                                        boolean keepDayOfWeek) {
         try {
             Long updatedId = jdbc.query(con -> {
                 PreparedStatement ps = con.prepareStatement(SQL_UPDATE_TASK_ASSIGNMENT);
                 setNullableLong(ps, 1, projectWeekId);
                 ps.setLong(2, sprintId);
-                ps.setLong(3, taskId);
+                ps.setBoolean(3, keepDayOfWeek);
+                ps.setLong(4, taskId);
                 return ps;
             }, singleLongExtractor());
             if (updatedId == null) {

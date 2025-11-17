@@ -80,7 +80,7 @@ type TaskMutationContext = {
 
 type CreateTaskVariables = { weekId: number; dayOfWeek: number; values: WeeklyTaskFormValues };
 type UpdateTaskVariables = { weekId: number; taskId: number; dayOfWeek: number; values: WeeklyTaskFormValues };
-type MoveTaskVariables = { taskId: number; fromWeekId: number | null; toWeekId: number | null };
+type MoveTaskVariables = { taskId: number; fromWeekId: number | null; toWeekId: number | null | undefined };
 type MoveTaskContext = {
   previousTasks: WeeklyPlannerTask[];
   sourceWeek?: WeeklyTasksQueryData;
@@ -88,6 +88,13 @@ type MoveTaskContext = {
   sprintId: number | null;
   backlogTasks?: WeeklyPlannerTask[];
 };
+
+function normaliseDestinationWeekId(value: number | null | undefined): number | null {
+  if (typeof value === 'number') {
+    return value;
+  }
+  return null;
+}
 
 type BacklogTaskMutationContext = {
   sprintTasksKey: [string, number, number | null];
@@ -751,22 +758,26 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
   const moveTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, MoveTaskVariables, MoveTaskContext>({
     mutationFn: async ({ taskId, toWeekId }: MoveTaskVariables) => {
+      const destinationWeekId = normaliseDestinationWeekId(toWeekId);
       const task = sprintTasks.find(item => item.id === taskId);
       if (!task) {
         throw new Error('Úkol nebyl nalezen.');
       }
-      if (toWeekId === null) {
+      if (destinationWeekId === null) {
         return updateWeeklyTaskWeek(project.id, taskId, null);
       }
       const payload = mapTaskToPayloadFromTask(task);
-      return updateWeeklyTask(project.id, toWeekId, taskId, payload);
+      return updateWeeklyTask(project.id, destinationWeekId, taskId, payload);
     },
     onMutate: async ({ taskId, fromWeekId, toWeekId }: MoveTaskVariables) => {
+      const destinationWeekId = normaliseDestinationWeekId(toWeekId);
       const queryKey = ['project-sprint-tasks', project.id, currentSprintId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<WeeklyPlannerTask[]>(queryKey) ?? [];
       const mapped = previous.map(existing =>
-        existing.id === taskId ? { ...existing, weekId: toWeekId, isBacklog: toWeekId === null } : existing,
+        existing.id === taskId
+          ? { ...existing, weekId: destinationWeekId, isBacklog: destinationWeekId === null }
+          : existing,
       );
       queryClient.setQueryData(queryKey, mapped);
 
@@ -780,7 +791,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         if (fromWeekId === null) {
           backlogNext = backlogNext.filter(task => task.id !== taskId);
         }
-        if (toWeekId === null) {
+        if (destinationWeekId === null) {
           const optimisticTask =
             mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
           if (optimisticTask) {
@@ -793,14 +804,14 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       if (typeof fromWeekId === 'number') {
         sourceWeek = removeWeeklyTask(queryClient, project.id, plannerSprintId, fromWeekId, taskId);
       }
-      if (typeof toWeekId === 'number') {
+      if (typeof destinationWeekId === 'number') {
         const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
         if (optimisticTask) {
           targetWeek = prependWeeklyTask(
             queryClient,
             project.id,
             plannerSprintId,
-            toWeekId,
+            destinationWeekId,
             { ...optimisticTask, isBacklog: false },
           );
         }
@@ -813,7 +824,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         if (typeof fromWeekId === 'number' && current.id === fromWeekId) {
           return { ...current, tasks: current.tasks.filter(task => task.id !== taskId) };
         }
-        if (typeof toWeekId === 'number' && current.id === toWeekId) {
+        if (typeof destinationWeekId === 'number' && current.id === destinationWeekId) {
           const optimisticTask = mapped.find(task => task.id === taskId) ?? previous.find(task => task.id === taskId);
           if (!optimisticTask) {
             return current;
@@ -843,9 +854,10 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           context.sourceWeek,
         );
       }
-      if (typeof variables?.toWeekId === 'number' && context?.targetWeek) {
+      const destinationWeekId = normaliseDestinationWeekId(variables?.toWeekId);
+      if (typeof destinationWeekId === 'number' && context?.targetWeek) {
         queryClient.setQueryData(
-          getWeeklyTasksQueryKey(project.id, contextSprintId, variables.toWeekId),
+          getWeeklyTasksQueryKey(project.id, contextSprintId, destinationWeekId),
           context.targetWeek,
         );
       }
@@ -1261,26 +1273,30 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         return;
       }
       const fromWeekId = (event.active?.data?.current?.weekId ?? null) as number | null;
-      const overId = event.over?.id;
-      if (!overId) {
+      const over = event.over;
+      if (!over) {
         return;
       }
-      let toWeekId: number | null | undefined = null;
-      if (overId === 'backlog-drop-zone') {
-        toWeekId = null;
-      } else if (typeof overId === 'string' && overId.startsWith('week-drop-')) {
-        const parsed = Number.parseInt(overId.replace('week-drop-', ''), 10);
-        if (!Number.isNaN(parsed)) {
-          toWeekId = parsed;
+      const overId = over.id;
+      let toWeekId = (over.data?.current?.weekId ?? undefined) as number | null | undefined;
+      if (typeof toWeekId === 'undefined') {
+        if (overId === 'backlog-drop-zone') {
+          toWeekId = null;
+        } else if (typeof overId === 'string' && overId.startsWith('week-drop-')) {
+          const parsed = Number.parseInt(overId.replace('week-drop-', ''), 10);
+          if (!Number.isNaN(parsed)) {
+            toWeekId = parsed;
+          }
         }
       }
       if (typeof toWeekId === 'undefined') {
         return;
       }
-      if (toWeekId === fromWeekId) {
+      const targetWeekId = toWeekId ?? null;
+      if (targetWeekId === fromWeekId) {
         return;
       }
-      moveTaskMutation.mutate({ taskId, fromWeekId, toWeekId });
+      moveTaskMutation.mutate({ taskId, fromWeekId, toWeekId: targetWeekId });
     },
     [isSprintOpen, moveTaskMutation],
   );
