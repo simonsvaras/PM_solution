@@ -29,13 +29,13 @@ ALTER TABLE "public"."weekly_task"
     ALTER COLUMN "sprint_id" SET NOT NULL;
 
 ALTER TABLE "public"."weekly_task"
-    ADD CONSTRAINT IF NOT EXISTS "weekly_task_project_fk"
+    ADD CONSTRAINT "weekly_task_project_fk"
         FOREIGN KEY ("project_id")
         REFERENCES "public"."project"("id")
         ON DELETE CASCADE;
 
 ALTER TABLE "public"."weekly_task"
-    ADD CONSTRAINT IF NOT EXISTS "weekly_task_sprint_fk"
+    ADD CONSTRAINT "weekly_task_sprint_fk"
         FOREIGN KEY ("sprint_id")
         REFERENCES "public"."planning_sprint"("id")
         ON DELETE CASCADE;
