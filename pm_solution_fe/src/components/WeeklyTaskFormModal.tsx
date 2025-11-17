@@ -23,6 +23,11 @@ export type WeeklyTaskFormValues = {
 
 export type WeeklyTaskFormInitialTask = Partial<WeeklyTaskFormValues>;
 
+export type WeekSelectOption = {
+  id: number | null;
+  label: string;
+};
+
 export type WeeklyTaskFormModalProps = {
   isOpen: boolean;
   mode: WeeklyTaskFormMode;
@@ -32,6 +37,9 @@ export type WeeklyTaskFormModalProps = {
   initialTask?: WeeklyTaskFormInitialTask | null;
   onSubmit: (values: WeeklyTaskFormValues) => Promise<void> | void;
   onCancel: () => void;
+  weekOptions?: WeekSelectOption[];
+  selectedWeekId?: number | null;
+  onSelectWeek?: (weekId: number | null) => void;
 };
 
 type FieldErrors = Partial<Record<keyof WeeklyTaskFormValues, string>>;
@@ -82,10 +90,14 @@ export default function WeeklyTaskFormModal({
   isOpen,
   mode,
   projectId,
+  weekId,
   week,
   initialTask,
   onSubmit,
   onCancel,
+  weekOptions,
+  selectedWeekId,
+  onSelectWeek,
 }: WeeklyTaskFormModalProps) {
   const formId = useId();
   const [title, setTitle] = useState('');
@@ -250,6 +262,27 @@ export default function WeeklyTaskFormModal({
   const modalTitle = mode === 'create' ? 'Nový úkol' : 'Upravit úkol';
   const submitLabel = mode === 'create' ? 'Vytvořit úkol' : 'Uložit změny';
 
+  const resolvedWeekId = selectedWeekId ?? week?.id ?? weekId ?? null;
+  const showWeekSelect = Array.isArray(weekOptions) && weekOptions.length > 0;
+  const showBacklogHint = mode === 'create' && weekId === null;
+
+  function toWeekSelectValue(id: number | null): string {
+    return id === null ? '__backlog__' : String(id);
+  }
+
+  function handleWeekSelectChange(event: ChangeEvent<HTMLSelectElement>) {
+    if (!onSelectWeek) {
+      return;
+    }
+    const value = event.target.value;
+    if (value === '__backlog__') {
+      onSelectWeek(null);
+      return;
+    }
+    const parsed = Number.parseInt(value, 10);
+    onSelectWeek(Number.isNaN(parsed) ? null : parsed);
+  }
+
   const footer = (
     <div className="weeklyTaskFormModal__footer">
       <button
@@ -278,7 +311,32 @@ export default function WeeklyTaskFormModal({
           {submitError}
         </div>
       )}
+      {showBacklogHint && (
+        <p className="weeklyTaskFormModal__hint" role="status">
+          Nový úkol je uložen do backlogu, přiřaďte ho do týdne z boardu.
+        </p>
+      )}
       <form id={formId} className="weeklyTaskFormModal__form" onSubmit={handleSubmit} noValidate>
+        {showWeekSelect && (
+          <div className="weeklyTaskFormModal__field">
+            <label htmlFor={`${formId}-week`} className="weeklyTaskFormModal__label">
+              Týden
+            </label>
+            <select
+              id={`${formId}-week`}
+              value={toWeekSelectValue(resolvedWeekId)}
+              onChange={handleWeekSelectChange}
+              className="weeklyTaskFormModal__select"
+              disabled={isSubmitting || !onSelectWeek}
+            >
+              {weekOptions?.map(option => (
+                <option key={toWeekSelectValue(option.id)} value={toWeekSelectValue(option.id)}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="weeklyTaskFormModal__field">
           <label htmlFor={`${formId}-title`} className="weeklyTaskFormModal__label">
             Název úkolu<span aria-hidden="true">*</span>

@@ -17,6 +17,15 @@
   gap: 16px;
 }
 
+.weeklyTaskFormModal__hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
 .weeklyTaskFormModal__field {
   display: flex;
   flex-direction: column;

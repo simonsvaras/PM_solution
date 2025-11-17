@@ -3,7 +3,12 @@ import { type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-ki
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
 import Modal from './Modal';
-import WeeklyTaskFormModal, { type WeeklyTaskFormInitialTask, type WeeklyTaskFormMode, type WeeklyTaskFormValues } from './WeeklyTaskFormModal';
+import WeeklyTaskFormModal, {
+  type WeekSelectOption,
+  type WeeklyTaskFormInitialTask,
+  type WeeklyTaskFormMode,
+  type WeeklyTaskFormValues,
+} from './WeeklyTaskFormModal';
 import WeeklySummaryPanel from './WeeklySummaryPanel';
 import WeeklyTaskList, {
   getWeeklyTasksQueryKey,
@@ -301,6 +306,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [taskFormMode, setTaskFormMode] = useState<WeeklyTaskFormMode>('create');
   const [taskFormInitial, setTaskFormInitial] = useState<WeeklyTaskFormInitialTask | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editingTaskWeekId, setEditingTaskWeekId] = useState<number | null>(null);
   const [taskMutationError, setTaskMutationError] = useState<ErrorResponse | null>(null);
   const [taskFormDayOfWeek, setTaskFormDayOfWeek] = useState<number>(1);
   const [sprintMetadata, setSprintMetadata] = useState<SprintMetadataState>({
@@ -402,6 +408,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       setEditingTaskId(null);
       setTaskFormInitial(null);
       setSelectedWeekIdForForm(weekId);
+      setEditingTaskWeekId(weekId);
       setTaskMutationError(null);
       setTaskFormDayOfWeek(1);
       setIsCreateModalOpen(true);
@@ -414,6 +421,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setTaskFormInitial(null);
     setSelectedWeekIdForForm(null);
     setEditingTaskId(null);
+    setEditingTaskWeekId(null);
     setTaskFormMode('create');
     setTaskMutationError(null);
     setTaskFormDayOfWeek(1);
@@ -903,6 +911,14 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     [],
   );
 
+  const weekSelectOptions = useMemo<WeekSelectOption[]>(() => {
+    const options = weeks.map(week => ({
+      id: week.id,
+      label: `${formatDateRange(week.weekStart, week.weekEnd)}${week.isClosed ? ' • Uzavřený' : ''}`.trim(),
+    }));
+    return [{ id: null, label: 'Backlog' }, ...options];
+  }, [weeks]);
+
   const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
@@ -1011,7 +1027,8 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       }
       setTaskFormMode('edit');
       setEditingTaskId(task.id);
-      setSelectedWeekIdForForm(selectedWeekId);
+      setSelectedWeekIdForForm(task.weekId ?? selectedWeekId);
+      setEditingTaskWeekId(task.weekId ?? selectedWeekId);
       setTaskFormInitial({
         title: task.issueTitle ?? task.note ?? '',
         description: task.note ?? '',
@@ -1029,29 +1046,64 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
 
   const handleTaskFormSubmit = useCallback(
     async (values: WeeklyTaskFormValues) => {
-      const activeWeekId = selectedWeekIdForForm ?? selectedWeekId;
-      if (activeWeekId === null) {
-        throw new Error('Vyberte týden pro uložení úkolu.');
-      }
       const normalisedDayOfWeek = normaliseTaskDayOfWeek(taskFormDayOfWeek);
       setTaskFormDayOfWeek(normalisedDayOfWeek);
       if (taskFormMode === 'edit') {
         if (editingTaskId === null) {
           throw new Error('Úkol není k dispozici pro úpravu.');
         }
+        const currentWeekId = editingTaskWeekId ?? selectedWeekIdForForm ?? selectedWeekId;
+        if (currentWeekId === null) {
+          throw new Error('Úkol není přiřazen k žádnému týdnu.');
+        }
+        const targetWeekId = selectedWeekIdForForm;
+        if (targetWeekId === null) {
+          await updateTaskMutation.mutateAsync({
+            weekId: currentWeekId,
+            taskId: editingTaskId,
+            values,
+            dayOfWeek: normalisedDayOfWeek,
+          });
+          await moveTaskMutation.mutateAsync({
+            taskId: editingTaskId,
+            fromWeekId: currentWeekId,
+            toWeekId: null,
+          });
+          return;
+        }
+        if (targetWeekId !== currentWeekId) {
+          await moveTaskMutation.mutateAsync({
+            taskId: editingTaskId,
+            fromWeekId: currentWeekId,
+            toWeekId: targetWeekId,
+          });
+          await updateTaskMutation.mutateAsync({
+            weekId: targetWeekId,
+            taskId: editingTaskId,
+            values,
+            dayOfWeek: normalisedDayOfWeek,
+          });
+          return;
+        }
         await updateTaskMutation.mutateAsync({
-          weekId: activeWeekId,
+          weekId: currentWeekId,
           taskId: editingTaskId,
           values,
           dayOfWeek: normalisedDayOfWeek,
         });
         return;
       }
+      const activeWeekId = selectedWeekIdForForm ?? selectedWeekId;
+      if (activeWeekId === null) {
+        throw new Error('Vyberte týden pro uložení úkolu.');
+      }
       await createTaskMutation.mutateAsync({ weekId: activeWeekId, values, dayOfWeek: normalisedDayOfWeek });
     },
     [
       createTaskMutation,
       editingTaskId,
+      editingTaskWeekId,
+      moveTaskMutation,
       selectedWeekId,
       selectedWeekIdForForm,
       taskFormDayOfWeek,
@@ -1564,6 +1616,9 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         initialTask={taskFormInitial ?? undefined}
         onSubmit={handleTaskFormSubmit}
         onCancel={closeCreateTaskModal}
+        weekOptions={taskFormMode === 'edit' ? weekSelectOptions : undefined}
+        selectedWeekId={selectedWeekIdForForm}
+        onSelectWeek={setSelectedWeekIdForForm}
       />
 
       <Modal
