@@ -1602,7 +1602,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           <WeeklyTaskList
             weeks={orderedWeeks}
             weekTasks={sprintWeekTasks}
-            weekStartDay={currentWeekStartDay}
             carriedAudit={carriedAudit}
             isLoading={weeksLoading}
             error={boardError}
