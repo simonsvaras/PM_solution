@@ -1,0 +1,1 @@
+org.springframework.boot.env.EnvironmentPostProcessor=czm.pm_solution_be.config.SecretsPropertySourceEnvironmentPostProcessor
