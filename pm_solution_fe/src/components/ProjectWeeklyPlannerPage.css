@@ -146,92 +146,6 @@
   font-size: 1.1rem;
 }
 
-.projectWeeklyPlanner__settings {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.25rem 1.5rem;
-  border-radius: 1rem;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(26, 26, 26, 0.05);
-}
-
-.projectWeeklyPlanner__settingsHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.projectWeeklyPlanner__settingsTitle {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--color-text-primary, #1a1a1a);
-}
-
-.projectWeeklyPlanner__settingsHint {
-  margin: 0.35rem 0 0;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary, #4a4a4a);
-}
-
-.projectWeeklyPlanner__settingsStatus {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-tertiary, #6f6f6f);
-}
-
-.projectWeeklyPlanner__settingsControls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.projectWeeklyPlanner__settingsRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.75rem;
-}
-
-.projectWeeklyPlanner__settingsActions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.projectWeeklyPlanner__settingsField {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary, #4a4a4a);
-}
-
-.projectWeeklyPlanner__settingsField select {
-  appearance: none;
-  padding: 0.65rem 0.85rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--color-border, #d7d7d7);
-  background: #fff;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--color-text-primary, #1a1a1a);
-  box-shadow: 0 2px 12px rgba(26, 26, 26, 0.05);
-}
-
-.projectWeeklyPlanner__settingsField select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.projectWeeklyPlanner__settingsError {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--color-danger, #b42318);
-}
-
 .projectWeeklyPlanner__settingsRetry {
   margin-left: 0.5rem;
   padding: 0.3rem 0.65rem;
@@ -247,35 +161,6 @@
 .projectWeeklyPlanner__settingsRetry:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.projectWeeklyPlanner__createWeekButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border, #d7d7d7);
-  background: linear-gradient(135deg, #4b6bfb, #6574ff);
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 4px 16px rgba(26, 26, 26, 0.12);
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.projectWeeklyPlanner__createWeekButton:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.projectWeeklyPlanner__createWeekButton:not(:disabled):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(26, 26, 26, 0.16);
 }
 
 .projectWeeklyPlanner__weekSelect {

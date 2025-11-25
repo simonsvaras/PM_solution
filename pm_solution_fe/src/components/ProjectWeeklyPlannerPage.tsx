@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
@@ -33,7 +33,6 @@ import {
   type WeeklyPlannerWeek,
   type WeeklyPlannerWeekCollection,
   type WeeklyPlannerWeekGenerationPayload,
-  type WeeklyPlannerSettings,
   type WeeklySummary,
   type WeeklyTaskPayload,
   carryOverWeeklyTasks,
@@ -44,9 +43,7 @@ import {
   getSprintSummary,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
-  getWeeklyPlannerSettings,
   listProjectWeeklyPlannerWeeks,
-  updateWeeklyPlannerSettings,
   updateWeeklyTask,
   updateWeeklyTaskWeek,
 } from '../api';
@@ -309,11 +306,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [carriedAudit, setCarriedAudit] = useState<Record<number, string>>({});
   const [roles, setRoles] = useState<string[]>([]);
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
-  const [weekSettings, setWeekSettings] = useState<WeeklyPlannerSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsError, setSettingsError] = useState<ErrorResponse | null>(null);
-  const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
   const [createWeekError, setCreateWeekError] = useState<ErrorResponse | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
@@ -441,19 +433,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setTaskFormDayOfWeek(1);
   }, []);
 
-  const loadSettings = useCallback(() => {
-    setSettingsLoading(true);
-    setSettingsError(null);
-    getWeeklyPlannerSettings(project.id)
-      .then(settingsResponse => {
-        setWeekSettings(settingsResponse);
-        setWeekStartDay(settingsResponse.weekStartDay);
-        setSettingsSaveError(null);
-      })
-      .catch(err => setSettingsError(err as ErrorResponse))
-      .finally(() => setSettingsLoading(false));
-  }, [project.id]);
-
   const loadWeeks = useCallback(() => {
     setWeeksLoading(true);
     setWeeksError(null);
@@ -466,9 +445,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         });
         setRoles(collection.metadata.roles);
         setWeekStartDay(collection.metadata.weekStartDay);
-        setWeekSettings(prev =>
-          prev ? { ...prev, weekStartDay: collection.metadata.weekStartDay } : { weekStartDay: collection.metadata.weekStartDay },
-        );
         applySprintMetadata(collection.metadata);
         setSelectedWeekId(prev => {
           if (prev !== null) return prev;
@@ -481,10 +457,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       .catch(err => setWeeksError(err as ErrorResponse))
       .finally(() => setWeeksLoading(false));
   }, [applySprintMetadata, plannerSprintId, project.id, queryClient]);
-
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
 
   useEffect(() => {
     if (currentSprintId === null) {
@@ -507,9 +479,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           setSelectedWeek(data.week);
           setRoles(data.metadata.roles);
           setWeekStartDay(data.metadata.weekStartDay);
-          setWeekSettings(prev =>
-            prev ? { ...prev, weekStartDay: data.metadata.weekStartDay } : { weekStartDay: data.metadata.weekStartDay },
-          );
           applySprintMetadata(data.metadata);
           setWeeks(prev => {
             const exists = prev.findIndex(week => week.id === data.week.id);
@@ -923,11 +892,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
-  const weekStartOptions = useMemo(
-    () => dayNames.map((name, index) => ({ value: index + 1, label: `${index + 1} – ${name}` })),
-    [],
-  );
-
   const weekSelectOptions = useMemo<WeekSelectOption[]>(() => {
     const options = orderedWeeks.map(week => ({
       id: week.id,
@@ -936,7 +900,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     return [{ id: null, label: 'Backlog' }, ...options];
   }, [orderedWeeks]);
 
-  const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
+  const currentWeekStartDay = weekStartDay;
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
   const hasPmRole = useMemo(
@@ -1187,35 +1151,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       });
   }
 
-  function handleWeekStartDayChange(event: ChangeEvent<HTMLSelectElement>) {
-    const value = Number.parseInt(event.target.value, 10);
-    if (Number.isNaN(value) || value < 1 || value > dayNames.length) {
-      return;
-    }
-    const currentValue = weekSettings?.weekStartDay ?? weekStartDay;
-    if (value === currentValue) {
-      return;
-    }
-    setSettingsSaveError(null);
-    setSettingsSaving(true);
-    updateWeeklyPlannerSettings(project.id, { weekStartDay: value })
-      .then(updatedSettings => {
-        setSettingsSaving(false);
-        setWeekSettings(updatedSettings);
-        setWeekStartDay(updatedSettings.weekStartDay);
-        setSettingsError(null);
-        setSettingsSaveError(null);
-        loadWeeks();
-        if (selectedWeekId !== null) {
-          fetchWeek(selectedWeekId);
-        }
-      })
-      .catch(err => {
-        setSettingsSaving(false);
-        setSettingsSaveError(err as ErrorResponse);
-      });
-  }
-
   function toggleCarryOverSelection(taskId: number) {
     setCarryOverSelection(prev => {
       if (prev.includes(taskId)) {
@@ -1265,7 +1200,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const carryOverTasks = carryOverContext?.sourceWeek.tasks.filter(task => !isIssueClosed(task)) ?? [];
   const createTaskDisabled = selectedWeekId === null || isCreateModalOpen || !isSprintOpen;
   const createWeekPending = generateWeekMutation.isPending;
-  const createWeekButtonDisabled = createWeekPending || weeksLoading || settingsLoading || !isSprintOpen;
+  const createWeekButtonDisabled = createWeekPending || weeksLoading || !isSprintOpen;
   const selectedWeekStart = selectedWeek?.weekStart ?? null;
   const handleSprintClosed = useCallback((closedSprint: Sprint) => {
     setSprintMetadata(prev => {
@@ -1497,75 +1432,11 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         </div>
       </header>
 
-      <section className="projectWeeklyPlanner__settings" aria-labelledby="project-week-settings-title">
-        <div className="projectWeeklyPlanner__settingsHeader">
-          <div>
-            <h3 id="project-week-settings-title" className="projectWeeklyPlanner__settingsTitle">
-              Nastavení týdne
-            </h3>
-            <p className="projectWeeklyPlanner__settingsHint">Určete, který den je považován za začátek týdne.</p>
-          </div>
-          {(settingsSaving || settingsLoading) && (
-            <span className="projectWeeklyPlanner__settingsStatus" aria-live="polite">
-              {settingsSaving ? 'Ukládám…' : 'Načítám…'}
-            </span>
-          )}
-        </div>
-        <div className="projectWeeklyPlanner__settingsControls">
-          <div className="projectWeeklyPlanner__settingsRow">
-            <label className="projectWeeklyPlanner__settingsField">
-              <span>První den týdne</span>
-              <select
-                value={String(currentWeekStartDay)}
-                onChange={handleWeekStartDayChange}
-                disabled={settingsLoading || settingsSaving}
-              >
-                {weekStartOptions.map(option => (
-                  <option key={option.value} value={String(option.value)}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="projectWeeklyPlanner__settingsActions">
-              <button
-                type="button"
-                className="projectWeeklyPlanner__createWeekButton"
-                onClick={handleCreateNextWeek}
-                disabled={createWeekButtonDisabled}
-                aria-label="Vytvořit nový týden"
-                title="Vytvořit nový týden"
-                aria-busy={createWeekPending}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          {createWeekError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nový týden se nepodařilo vytvořit. {createWeekError.error?.message ?? ''}
-            </p>
-          )}
-          {settingsError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo načíst. {settingsError.error?.message ?? ''}{' '}
-              <button
-                type="button"
-                className="projectWeeklyPlanner__settingsRetry"
-                onClick={loadSettings}
-                disabled={settingsLoading}
-              >
-                Zkusit znovu
-              </button>
-            </p>
-          )}
-          {settingsSaveError && !settingsError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo uložit. {settingsSaveError.error?.message ?? ''}
-            </p>
-          )}
-        </div>
-      </section>
+      {createWeekError && (
+        <p className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error" role="alert">
+          Nový týden se nepodařilo vytvořit. {createWeekError.error?.message ?? ''}
+        </p>
+      )}
 
       <WeeklySummaryPanel
         summary={summary}
