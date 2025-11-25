@@ -20,10 +20,13 @@ public class SecretsPropertySourceEnvironmentPostProcessor implements Environmen
     private static final Logger log = LoggerFactory.getLogger(SecretsPropertySourceEnvironmentPostProcessor.class);
 
     private static final String DB_PASSWORD_KEY = "DB_PASSWORD";
+    private static final String DB_PASSWORD_FILE_ENV = "DB_PASSWORD_FILE";
     private static final String GITLAB_TOKEN_KEY = "GITLAB_TOKEN";
+    private static final String GITLAB_TOKEN_FILE_ENV = "GITLAB_TOKEN_FILE";
 
-    private static final Path DB_PASSWORD_PATH = Path.of("/run/secrets/czm-prod-projekty_project-pulse_postgres-password");
-    private static final Path GITLAB_TOKEN_PATH = Path.of("/run/secrets/czm-prod-projekty_project-pulse_gitlab-ro-access-token");
+    private static final String DB_PASSWORD_DEFAULT_PATH = "/run/secrets/czm-prod-projekty_project-pulse_postgres-password";
+    private static final String GITLAB_TOKEN_DEFAULT_PATH =
+            "/run/secrets/czm-prod-projekty_project-pulse_gitlab-ro-access-token";
 
     private static final String PROPERTY_SOURCE_NAME = "secretsPropertySource";
 
@@ -52,8 +55,8 @@ public class SecretsPropertySourceEnvironmentPostProcessor implements Environmen
         } else {
             log.info(
                     "No secrets found to load from {} or {}. Falling back to existing property sources (env vars, .env, application.yml)",
-                    DB_PASSWORD_PATH,
-                    GITLAB_TOKEN_PATH);
+                    dbPasswordPath(),
+                    gitlabTokenPath());
         }
     }
 
@@ -72,8 +75,24 @@ public class SecretsPropertySourceEnvironmentPostProcessor implements Environmen
 
     private static List<SecretDescriptor> defaultSecretDescriptors() {
         return List.of(
-                new SecretDescriptor(DB_PASSWORD_KEY, DB_PASSWORD_PATH),
-                new SecretDescriptor(GITLAB_TOKEN_KEY, GITLAB_TOKEN_PATH));
+                new SecretDescriptor(DB_PASSWORD_KEY, dbPasswordPath()),
+                new SecretDescriptor(GITLAB_TOKEN_KEY, gitlabTokenPath()));
+    }
+
+    private static Path dbPasswordPath() {
+        return pathFromEnvOrDefault(DB_PASSWORD_FILE_ENV, DB_PASSWORD_DEFAULT_PATH);
+    }
+
+    private static Path gitlabTokenPath() {
+        return pathFromEnvOrDefault(GITLAB_TOKEN_FILE_ENV, GITLAB_TOKEN_DEFAULT_PATH);
+    }
+
+    private static Path pathFromEnvOrDefault(String envKey, String defaultPath) {
+        String overriddenPath = System.getenv(envKey);
+        if (overriddenPath != null && !overriddenPath.isBlank()) {
+            return Path.of(overriddenPath);
+        }
+        return Path.of(defaultPath);
     }
 
     @Override
