@@ -38,6 +38,7 @@ import {
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
+  deleteWeeklyTask,
   generateProjectWeeklyPlannerWeeks,
   getCurrentProjectSprint,
   getSprintSummary,
@@ -303,7 +304,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [carryOverSelection, setCarryOverSelection] = useState<number[]>([]);
   const [carryOverSubmitting, setCarryOverSubmitting] = useState(false);
   const [carryOverError, setCarryOverError] = useState<ErrorResponse | null>(null);
-  const [carriedAudit, setCarriedAudit] = useState<Record<number, string>>({});
   const [roles, setRoles] = useState<string[]>([]);
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
   const [createWeekError, setCreateWeekError] = useState<ErrorResponse | null>(null);
@@ -758,6 +758,79 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
+  const deleteTaskMutation = useMutation<
+    void,
+    ErrorResponse,
+    { weekId: number; task: WeeklyPlannerTask },
+    {
+      previousSprintTasks: WeeklyPlannerTask[];
+      previousWeek?: WeeklyTasksQueryData;
+      previousSelectedWeek: WeeklyPlannerWeek | null;
+      previousBacklog?: WeeklyPlannerTask[];
+    }
+  >({
+    mutationFn: async ({ weekId, task }) => deleteWeeklyTask(project.id, weekId, task.id),
+    onMutate: async ({ weekId, task }) => {
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      await queryClient.cancelQueries({ queryKey: sprintTasksKey });
+      const previousSprintTasks = queryClient.getQueryData<WeeklyPlannerTask[]>(sprintTasksKey) ?? [];
+      queryClient.setQueryData(
+        sprintTasksKey,
+        previousSprintTasks.filter(existing => existing.id !== task.id),
+      );
+
+      let previousBacklog: WeeklyPlannerTask[] | undefined;
+      if (plannerSprintId !== null) {
+        const backlogKey = getBacklogTasksQueryKey(project.id, plannerSprintId);
+        previousBacklog = queryClient.getQueryData<WeeklyPlannerTask[]>(backlogKey) ?? [];
+        setBacklogTasksQueryData(
+          queryClient,
+          project.id,
+          plannerSprintId,
+          previousBacklog.filter(existing => existing.id !== task.id),
+        );
+      }
+
+      const previousWeek = removeWeeklyTask(queryClient, project.id, plannerSprintId, weekId, task.id);
+      const selectedWeekSnapshot = selectedWeek;
+
+      setSelectedWeek(current => {
+        if (current && current.id === weekId) {
+          return { ...current, tasks: current.tasks.filter(existing => existing.id !== task.id) };
+        }
+        return current;
+      });
+
+      setTaskMutationError(null);
+      return { previousSprintTasks, previousWeek, previousSelectedWeek: selectedWeekSnapshot, previousBacklog };
+    },
+    onError: (error, variables, context) => {
+      setTaskMutationError(error);
+      if (!context) {
+        return;
+      }
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.setQueryData(sprintTasksKey, context.previousSprintTasks);
+      if (plannerSprintId !== null && context.previousBacklog) {
+        setBacklogTasksQueryData(queryClient, project.id, plannerSprintId, context.previousBacklog);
+      }
+      if (context.previousWeek) {
+        queryClient.setQueryData(
+          getWeeklyTasksQueryKey(project.id, plannerSprintId, variables.weekId),
+          context.previousWeek,
+        );
+      }
+      setSelectedWeek(context.previousSelectedWeek ?? null);
+    },
+    onSettled: (_data, _error, variables) => {
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.invalidateQueries({ queryKey: sprintTasksKey });
+      queryClient.invalidateQueries({
+        queryKey: getWeeklyTasksQueryKey(project.id, plannerSprintId, variables.weekId),
+      });
+    },
+  });
+
   const moveTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, MoveTaskVariables, MoveTaskContext>({
     mutationFn: async ({ taskId, toWeekId }: MoveTaskVariables) => {
       const destinationWeekId = normaliseDestinationWeekId(toWeekId);
@@ -1025,6 +1098,16 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     [selectedWeekId],
   );
 
+  const handleDeleteTask = useCallback(
+    (task: WeeklyPlannerTask) => {
+      if (task.weekId === null) {
+        return;
+      }
+      deleteTaskMutation.mutate({ weekId: task.weekId, task });
+    },
+    [deleteTaskMutation],
+  );
+
   const handleTaskFormSubmit = useCallback(
     async (values: WeeklyTaskFormValues) => {
       const normalisedDayOfWeek = normaliseTaskDayOfWeek(taskFormDayOfWeek);
@@ -1169,20 +1252,11 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setCarryOverSubmitting(true);
     setCarryOverError(null);
     carryOverWeeklyTasks(project.id, carryOverContext.sourceWeek.id, payload)
-      .then(newTasks => {
+      .then(() => {
         setCarryOverSubmitting(false);
         setCarryOverModalOpen(false);
         setCarryOverContext(null);
         setCarryOverSelection([]);
-        if (newTasks.length > 0) {
-          setCarriedAudit(prev => {
-            const updates = { ...prev };
-            for (const task of newTasks) {
-              updates[task.id] = carryOverContext.sourceWeek.weekStart;
-            }
-            return updates;
-          });
-        }
         if (carryOverContext.targetWeekId !== null) {
           fetchWeek(carryOverContext.targetWeekId);
         }
@@ -1470,13 +1544,12 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           <WeeklyTaskList
             weeks={orderedWeeks}
             weekTasks={sprintWeekTasks}
-            weekStartDay={currentWeekStartDay}
-            carriedAudit={carriedAudit}
             isLoading={weeksLoading}
             error={boardError}
             errorLabel={boardErrorLabel}
             onRetry={handleWeeksBoardRetry}
             onEditTask={handleEditTask}
+            onDeleteTask={handleDeleteTask}
             mutationError={taskMutationError}
             onDismissMutationError={() => setTaskMutationError(null)}
             selectedWeekId={selectedWeekId}

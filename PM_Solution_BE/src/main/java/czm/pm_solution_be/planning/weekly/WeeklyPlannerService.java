@@ -173,6 +173,13 @@ public class WeeklyPlannerService {
         return mapTask(updated);
     }
 
+    public void deleteTask(long projectId, long projectWeekId, long taskId) {
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        requireWeek(projectId, projectWeekId, sprint.id());
+        WeeklyTaskRow task = requireTask(projectId, projectWeekId, taskId);
+        txTemplate.executeWithoutResult(status -> repository.deleteTask(task.id()));
+    }
+
     public TaskDetail changeStatus(long projectId, long projectWeekId, long taskId, String newStatus) {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());

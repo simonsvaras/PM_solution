@@ -1651,6 +1651,12 @@ export async function updateWeeklyTask(
   return mapWeeklyPlannerTask(data);
 }
 
+export async function deleteWeeklyTask(projectId: number, projectWeekId: number, taskId: number): Promise<void> {
+  await fetchJson<void>(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks/${taskId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function updateWeeklyTaskWeek(
   projectId: number,
   taskId: number,

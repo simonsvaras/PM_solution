@@ -2,7 +2,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { type QueryClient, type QueryKey } from '@tanstack/react-query';
 import './WeeklyTaskList.css';
 import type { ErrorResponse, WeeklyPlannerTask, WeeklyPlannerWeek } from '../api';
-import { formatDate, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
+import { formatDate } from './weeklyPlannerUtils';
 
 export type WeeklyTasksQueryData = {
   weekTasks: WeeklyPlannerTask[];
@@ -155,15 +155,14 @@ export function removeWeeklyTask(
 type WeekLaneProps = {
   week: WeeklyPlannerWeek;
   tasks: WeeklyPlannerTask[];
-  weekStartDay: number;
-  carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteTask?: (task: WeeklyPlannerTask) => void;
   isSelected: boolean;
   onSelectWeek?: (weekId: number) => void;
   isInteractionDisabled?: boolean;
 };
 
-function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
+function WeekLane({ week, tasks, onEditTask, onDeleteTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `week-drop-${week.id}`,
     data: { weekId: week.id },
@@ -210,9 +209,8 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
             key={task.id}
             weekId={week.id}
             task={task}
-            weekStartDay={weekStartDay}
-            carriedAudit={carriedAudit}
             onEditTask={onEditTask}
+            onDeleteTask={onDeleteTask}
             isClosed={week.isClosed}
             isInteractionDisabled={isInteractionDisabled}
           />
@@ -225,20 +223,18 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
 type WeekTaskCardProps = {
   weekId: number;
   task: WeeklyPlannerTask;
-  weekStartDay: number;
-  carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteTask?: (task: WeeklyPlannerTask) => void;
   isClosed: boolean;
   isInteractionDisabled?: boolean;
 };
 
-function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
+function WeekTaskCard({ weekId, task, onEditTask, onDeleteTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `week-task-${task.id}`,
     data: { taskId: task.id, weekId },
     disabled: isClosed || isInteractionDisabled,
   });
-  const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
   const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
   const style = transform
     ? { transform: `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` }
@@ -260,9 +256,7 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
       {...attributes}
     >
       <div className="weekLane__taskHeader">
-        <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
         <div className="weekLane__taskActions">
-          {carriedFrom && <span className="weekLane__badge">Carried over {formatDate(carriedFrom)}</span>}
           {onEditTask && (
             <button
               type="button"
@@ -273,15 +267,20 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
               Upravit
             </button>
           )}
+          {onDeleteTask && (
+            <button
+              type="button"
+              className="weeklyTaskList__deleteButton"
+              onClick={() => onDeleteTask(task)}
+              disabled={isClosed || Boolean(isInteractionDisabled)}
+            >
+              Smazat
+            </button>
+          )}
         </div>
       </div>
       <h4 className="weekLane__taskTitle">{headline}</h4>
-      <p className="weekLane__taskMeta">
-        <span>{task.internName ?? 'Nepřiřazeno'}</span>
-        <span aria-hidden="true">•</span>
-        <span>{formatPlannedHours(task.plannedHours)}</span>
-      </p>
-      {task.note && task.note !== task.issueTitle && <p className="weekLane__taskNote">{task.note}</p>}
+      <p className="weekLane__taskMeta">{task.internName ?? 'Nepřiřazeno'}</p>
     </li>
   );
 }
@@ -289,13 +288,12 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
 export type WeeklyTaskListProps = {
   weeks: WeeklyPlannerWeek[];
   weekTasks: Map<number, WeeklyPlannerTask[]>;
-  weekStartDay: number;
-  carriedAudit: Record<number, string>;
   isLoading: boolean;
   error: ErrorResponse | null;
   errorLabel?: string;
   onRetry?: () => void;
   onEditTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteTask?: (task: WeeklyPlannerTask) => void;
   mutationError: ErrorResponse | null;
   onDismissMutationError?: () => void;
   selectedWeekId: number | null;
@@ -320,13 +318,12 @@ function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () =
 export default function WeeklyTaskList({
   weeks,
   weekTasks,
-  weekStartDay,
-  carriedAudit,
   isLoading,
   error,
   errorLabel,
   onRetry,
   onEditTask,
+  onDeleteTask,
   mutationError,
   onDismissMutationError,
   selectedWeekId,
@@ -378,9 +375,8 @@ export default function WeeklyTaskList({
                 key={week.id}
                 week={week}
                 tasks={weekTasks.get(week.id) ?? []}
-                weekStartDay={weekStartDay}
-                carriedAudit={carriedAudit}
                 onEditTask={onEditTask}
+                onDeleteTask={onDeleteTask}
                 isSelected={selectedWeekId === week.id}
                 onSelectWeek={onSelectWeek}
                 isInteractionDisabled={isInteractionDisabled}
