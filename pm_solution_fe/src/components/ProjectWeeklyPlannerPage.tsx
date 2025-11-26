@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
@@ -1118,9 +1118,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         setCloseModalOpen(false);
         setRoles(response.metadata.roles);
         setWeekStartDay(response.metadata.weekStartDay);
-        setWeekSettings(prev =>
-          prev ? { ...prev, weekStartDay: response.metadata.weekStartDay } : { weekStartDay: response.metadata.weekStartDay },
-        );
         const targetWeekStart = response.metadata.currentWeekStart ?? response.week.weekStart;
         const targetWeekId = response.metadata.currentWeekId ?? null;
         const incompleteTasks = response.week.tasks.filter(task => !isIssueClosed(task));
