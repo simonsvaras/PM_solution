@@ -38,6 +38,7 @@ import {
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
+  deleteProjectWeeklyPlannerWeek,
   deleteWeeklyTask,
   generateProjectWeeklyPlannerWeeks,
   getCurrentProjectSprint,
@@ -90,6 +91,13 @@ type MoveTaskContext = {
   targetWeek?: WeeklyTasksQueryData;
   sprintId: number | null;
   backlogTasks?: WeeklyPlannerTask[];
+};
+
+type DeleteWeekContext = {
+  previousWeeks: WeeklyPlannerWeek[];
+  previousSelectedWeek: WeeklyPlannerWeek | null;
+  previousSelectedWeekId: number | null;
+  previousSummary: WeeklySummary | null;
 };
 
 function normaliseDestinationWeekId(value: number | null | undefined): number | null {
@@ -314,6 +322,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTaskWeekId, setEditingTaskWeekId] = useState<number | null>(null);
   const [taskMutationError, setTaskMutationError] = useState<ErrorResponse | null>(null);
+  const [deletingWeekId, setDeletingWeekId] = useState<number | null>(null);
   const [taskFormDayOfWeek, setTaskFormDayOfWeek] = useState<number>(1);
   const [sprintMetadata, setSprintMetadata] = useState<SprintMetadataState>({
     id: null,
@@ -825,6 +834,49 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
+  const deleteWeekMutation = useMutation<void, ErrorResponse, number, DeleteWeekContext>({
+    mutationFn: async (weekId: number) => deleteProjectWeeklyPlannerWeek(project.id, weekId),
+    onMutate: async (weekId: number) => {
+      setDeletingWeekId(weekId);
+      setTaskMutationError(null);
+      const previousWeeks = weeks;
+      const previousSelectedWeek = selectedWeek;
+      const previousSelectedWeekId = selectedWeekId;
+      const previousSummary = summary;
+      setWeeks(prev => prev.filter(week => week.id !== weekId));
+      if (selectedWeekId === weekId) {
+        setSelectedWeek(null);
+        setSelectedWeekId(null);
+        setSummary(null);
+      }
+      return { previousWeeks, previousSelectedWeek, previousSelectedWeekId, previousSummary } satisfies DeleteWeekContext;
+    },
+    onError: (error, _variables, context) => {
+      if (context) {
+        setWeeks(context.previousWeeks);
+        setSelectedWeek(context.previousSelectedWeek);
+        setSelectedWeekId(context.previousSelectedWeekId);
+        setSummary(context.previousSummary);
+      }
+      setTaskMutationError(error);
+      setDeletingWeekId(null);
+    },
+    onSuccess: (_data, weekId) => {
+      setTaskMutationError(null);
+      if (plannerSprintId !== null) {
+        queryClient.removeQueries({ queryKey: getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId) });
+        queryClient.invalidateQueries({ queryKey: getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId) });
+        queryClient.invalidateQueries({ queryKey: getBacklogTasksQueryKey(project.id, plannerSprintId) });
+      }
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.invalidateQueries({ queryKey: sprintTasksKey });
+      loadWeeks();
+    },
+    onSettled: () => {
+      setDeletingWeekId(null);
+    },
+  });
+
   const moveTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, MoveTaskVariables, MoveTaskContext>({
     mutationFn: async ({ taskId, toWeekId }: MoveTaskVariables) => {
       const destinationWeekId = normaliseDestinationWeekId(toWeekId);
@@ -1100,6 +1152,13 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       deleteTaskMutation.mutate({ weekId: task.weekId, task });
     },
     [deleteTaskMutation],
+  );
+
+  const handleDeleteWeek = useCallback(
+    (weekId: number) => {
+      deleteWeekMutation.mutate(weekId);
+    },
+    [deleteWeekMutation],
   );
 
   const handleTaskFormSubmit = useCallback(
@@ -1544,6 +1603,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             onRetry={handleWeeksBoardRetry}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
+            onDeleteWeek={handleDeleteWeek}
             mutationError={taskMutationError}
             onDismissMutationError={() => setTaskMutationError(null)}
             selectedWeekId={selectedWeekId}
@@ -1552,6 +1612,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             canCreateWeek={currentSprintId !== null}
             isCreateWeekLoading={createWeekPending}
             isInteractionDisabled={!isSprintOpen}
+            deletingWeekId={deletingWeekId}
           />
         }
         emptyState={plannerEmptyState}

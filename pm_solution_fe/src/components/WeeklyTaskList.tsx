@@ -157,12 +157,24 @@ type WeekLaneProps = {
   tasks: WeeklyPlannerTask[];
   onEditTask?: (task: WeeklyPlannerTask) => void;
   onDeleteTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteWeek?: (weekId: number) => void;
   isSelected: boolean;
   onSelectWeek?: (weekId: number) => void;
   isInteractionDisabled?: boolean;
+  deletingWeekId?: number | null;
 };
 
-function WeekLane({ week, tasks, onEditTask, onDeleteTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
+function WeekLane({
+  week,
+  tasks,
+  onEditTask,
+  onDeleteTask,
+  onDeleteWeek,
+  isSelected,
+  onSelectWeek,
+  isInteractionDisabled,
+  deletingWeekId,
+}: WeekLaneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `week-drop-${week.id}`,
     data: { weekId: week.id },
@@ -182,6 +194,9 @@ function WeekLane({ week, tasks, onEditTask, onDeleteTask, isSelected, onSelectW
     laneClassName.push('weekLane--readonly');
   }
 
+  const deleteDisabled =
+    Boolean(isInteractionDisabled) || tasks.length > 0 || (typeof deletingWeekId === 'number' && deletingWeekId === week.id);
+
   return (
     <section
       ref={setNodeRef}
@@ -196,10 +211,22 @@ function WeekLane({ week, tasks, onEditTask, onDeleteTask, isSelected, onSelectW
             <span className="weekLane__title">{headline}</span>
           </button>
         </div>
-        <div className="weekLane__stats">
-          <span>{openTasks} otevřených</span>
-          <span aria-hidden="true">•</span>
-          <span>{closedTasks} uzavřených</span>
+        <div className="weekLane__headerActions">
+          <div className="weekLane__stats">
+            <span>{openTasks} otevřených</span>
+            <span aria-hidden="true">•</span>
+            <span>{closedTasks} uzavřených</span>
+          </div>
+          {onDeleteWeek && (
+            <button
+              type="button"
+              className="weeklyTaskList__deleteButton"
+              onClick={() => onDeleteWeek(week.id)}
+              disabled={deleteDisabled}
+            >
+              Smazat
+            </button>
+          )}
         </div>
       </header>
       <ul className="weekLane__tasks">
@@ -294,6 +321,7 @@ export type WeeklyTaskListProps = {
   onRetry?: () => void;
   onEditTask?: (task: WeeklyPlannerTask) => void;
   onDeleteTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteWeek?: (weekId: number) => void;
   mutationError: ErrorResponse | null;
   onDismissMutationError?: () => void;
   selectedWeekId: number | null;
@@ -302,6 +330,7 @@ export type WeeklyTaskListProps = {
   canCreateWeek?: boolean;
   isCreateWeekLoading?: boolean;
   isInteractionDisabled?: boolean;
+  deletingWeekId?: number | null;
 };
 
 function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () => void }) {
@@ -324,6 +353,7 @@ export default function WeeklyTaskList({
   onRetry,
   onEditTask,
   onDeleteTask,
+  onDeleteWeek,
   mutationError,
   onDismissMutationError,
   selectedWeekId,
@@ -332,13 +362,14 @@ export default function WeeklyTaskList({
   canCreateWeek = false,
   isCreateWeekLoading = false,
   isInteractionDisabled = false,
+  deletingWeekId = null,
 }: WeeklyTaskListProps) {
   const hasWeeks = weeks.length > 0;
   return (
     <div className="weeklyTaskList" aria-live="polite">
       {mutationError && (
         <div className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error weeklyTaskList__statusMessage" role="alert">
-          Úkol se nepodařilo uložit. {mutationError.error.message}
+          Akci se nepodařilo dokončit. {mutationError.error?.message ?? ''}
           {onDismissMutationError && (
             <button type="button" className="weeklyTaskList__dismissButton" onClick={onDismissMutationError}>
               Skrýt
@@ -377,9 +408,11 @@ export default function WeeklyTaskList({
                 tasks={weekTasks.get(week.id) ?? []}
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
+                onDeleteWeek={onDeleteWeek}
                 isSelected={selectedWeekId === week.id}
                 onSelectWeek={onSelectWeek}
                 isInteractionDisabled={isInteractionDisabled}
+                deletingWeekId={deletingWeekId}
               />
             ))}
             {canCreateWeek && (

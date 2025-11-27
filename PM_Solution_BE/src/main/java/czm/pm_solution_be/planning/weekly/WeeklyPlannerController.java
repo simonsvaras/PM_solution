@@ -103,6 +103,12 @@ public class WeeklyPlannerController {
         return ResponseEntity.status(HttpStatus.CREATED).body(toTaskResponse(created));
     }
 
+    @DeleteMapping("/weeks/{projectWeekId}")
+    public ResponseEntity<Void> deleteWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        service.deleteWeek(projectId, projectWeekId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/weeks/{projectWeekId}/tasks/{taskId}")
     public TaskDetailResponse updateTask(@PathVariable long projectId,
                                          @PathVariable long projectWeekId,

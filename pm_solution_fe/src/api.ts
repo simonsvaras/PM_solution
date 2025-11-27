@@ -1568,6 +1568,13 @@ export async function getProjectWeeklyPlannerWeek(
   return mapWeeklyPlannerWeekWithMetadata(data);
 }
 
+export async function deleteProjectWeeklyPlannerWeek(projectId: number, projectWeekId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+}
+
 export async function getProjectWeekSummary(
   projectId: number,
   projectWeekId: number,

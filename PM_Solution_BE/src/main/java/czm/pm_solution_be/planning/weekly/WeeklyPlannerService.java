@@ -236,6 +236,20 @@ public class WeeklyPlannerService {
         return mapTask(updated);
     }
 
+    public void deleteWeek(long projectId, long projectWeekId) {
+        PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
+        ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
+        if (!week.tasks().isEmpty()) {
+            throw ApiException.validation("Týden nelze smazat, protože obsahuje úkoly.", "project_week_not_empty");
+        }
+        txTemplate.executeWithoutResult(status -> {
+            int removed = repository.deleteProjectWeek(projectWeekId);
+            if (removed == 0) {
+                throw ApiException.notFound("Požadovaný týden neexistuje.", "project_week");
+            }
+        });
+    }
+
     public List<TaskDetail> carryOverTasks(long projectId,
                                            long sourceProjectWeekId,
                                            LocalDate targetWeekStart,
