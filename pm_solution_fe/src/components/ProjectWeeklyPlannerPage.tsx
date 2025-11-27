@@ -765,7 +765,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     {
       previousSprintTasks: WeeklyPlannerTask[];
       previousWeek?: WeeklyTasksQueryData;
-      previousSelectedWeek: WeeklyPlannerWeek | null;
       previousBacklog?: WeeklyPlannerTask[];
     }
   >({
@@ -792,17 +791,8 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       }
 
       const previousWeek = removeWeeklyTask(queryClient, project.id, plannerSprintId, weekId, task.id);
-      const selectedWeekSnapshot = selectedWeek;
-
-      setSelectedWeek(current => {
-        if (current && current.id === weekId) {
-          return { ...current, tasks: current.tasks.filter(existing => existing.id !== task.id) };
-        }
-        return current;
-      });
-
       setTaskMutationError(null);
-      return { previousSprintTasks, previousWeek, previousSelectedWeek: selectedWeekSnapshot, previousBacklog };
+      return { previousSprintTasks, previousWeek, previousBacklog };
     },
     onError: (error, variables, context) => {
       setTaskMutationError(error);
@@ -820,7 +810,11 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           context.previousWeek,
         );
       }
-      setSelectedWeek(context.previousSelectedWeek ?? null);
+    },
+    onSuccess: (_data, variables) => {
+      if (variables.weekId === selectedWeekId) {
+        fetchWeek(variables.weekId);
+      }
     },
     onSettled: (_data, _error, variables) => {
       const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
