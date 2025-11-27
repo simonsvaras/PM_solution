@@ -11,6 +11,7 @@ import czm.pm_solution_be.planning.weekly.WeeklyPlannerService.WeeklySummary;
 import czm.pm_solution_be.web.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -102,6 +103,12 @@ public class WeeklyPlannerController {
         return ResponseEntity.status(HttpStatus.CREATED).body(toTaskResponse(created));
     }
 
+    @DeleteMapping("/weeks/{projectWeekId}")
+    public ResponseEntity<Void> deleteWeek(@PathVariable long projectId, @PathVariable long projectWeekId) {
+        service.deleteWeek(projectId, projectWeekId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/weeks/{projectWeekId}/tasks/{taskId}")
     public TaskDetailResponse updateTask(@PathVariable long projectId,
                                          @PathVariable long projectWeekId,
@@ -112,6 +119,14 @@ public class WeeklyPlannerController {
         }
         TaskDetail updated = service.updateTask(projectId, projectWeekId, taskId, toTaskInput(request));
         return toTaskResponse(updated);
+    }
+
+    @DeleteMapping("/weeks/{projectWeekId}/tasks/{taskId}")
+    public ResponseEntity<Void> deleteTask(@PathVariable long projectId,
+                                           @PathVariable long projectWeekId,
+                                           @PathVariable long taskId) {
+        service.deleteTask(projectId, projectWeekId, taskId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/weeks/{projectWeekId}/tasks/{taskId}/status")

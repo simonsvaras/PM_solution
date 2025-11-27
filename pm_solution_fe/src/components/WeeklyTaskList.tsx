@@ -2,7 +2,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { type QueryClient, type QueryKey } from '@tanstack/react-query';
 import './WeeklyTaskList.css';
 import type { ErrorResponse, WeeklyPlannerTask, WeeklyPlannerWeek } from '../api';
-import { formatDate, formatPlannedHours, getDayLabel } from './weeklyPlannerUtils';
+import { formatDate } from './weeklyPlannerUtils';
 
 export type WeeklyTasksQueryData = {
   weekTasks: WeeklyPlannerTask[];
@@ -155,15 +155,28 @@ export function removeWeeklyTask(
 type WeekLaneProps = {
   week: WeeklyPlannerWeek;
   tasks: WeeklyPlannerTask[];
-  weekStartDay: number;
-  carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteWeek?: (weekId: number) => void;
+  canDeleteWeek?: boolean;
   isSelected: boolean;
   onSelectWeek?: (weekId: number) => void;
   isInteractionDisabled?: boolean;
+  deletingWeekId?: number | null;
 };
 
-function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelected, onSelectWeek, isInteractionDisabled }: WeekLaneProps) {
+function WeekLane({
+  week,
+  tasks,
+  onEditTask,
+  onDeleteTask,
+  onDeleteWeek,
+  canDeleteWeek,
+  isSelected,
+  onSelectWeek,
+  isInteractionDisabled,
+  deletingWeekId,
+}: WeekLaneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `week-drop-${week.id}`,
     data: { weekId: week.id },
@@ -183,6 +196,11 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
     laneClassName.push('weekLane--readonly');
   }
 
+  const deleteDisabled =
+    Boolean(isInteractionDisabled) ||
+    tasks.length > 0 ||
+    (typeof deletingWeekId === 'number' && deletingWeekId === week.id);
+
   return (
     <section
       ref={setNodeRef}
@@ -197,10 +215,22 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
             <span className="weekLane__title">{headline}</span>
           </button>
         </div>
-        <div className="weekLane__stats">
-          <span>{openTasks} otevřených</span>
-          <span aria-hidden="true">•</span>
-          <span>{closedTasks} uzavřených</span>
+        <div className="weekLane__headerActions">
+          <div className="weekLane__stats">
+            <span>{openTasks} otevřených</span>
+            <span aria-hidden="true">•</span>
+            <span>{closedTasks} uzavřených</span>
+          </div>
+          {onDeleteWeek && canDeleteWeek && (
+            <button
+              type="button"
+              className="weeklyTaskList__deleteButton"
+              onClick={() => onDeleteWeek(week.id)}
+              disabled={deleteDisabled}
+            >
+              Smazat
+            </button>
+          )}
         </div>
       </header>
       <ul className="weekLane__tasks">
@@ -210,9 +240,8 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
             key={task.id}
             weekId={week.id}
             task={task}
-            weekStartDay={weekStartDay}
-            carriedAudit={carriedAudit}
             onEditTask={onEditTask}
+            onDeleteTask={onDeleteTask}
             isClosed={week.isClosed}
             isInteractionDisabled={isInteractionDisabled}
           />
@@ -225,20 +254,18 @@ function WeekLane({ week, tasks, weekStartDay, carriedAudit, onEditTask, isSelec
 type WeekTaskCardProps = {
   weekId: number;
   task: WeeklyPlannerTask;
-  weekStartDay: number;
-  carriedAudit: Record<number, string>;
   onEditTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteTask?: (task: WeeklyPlannerTask) => void;
   isClosed: boolean;
   isInteractionDisabled?: boolean;
 };
 
-function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
+function WeekTaskCard({ weekId, task, onEditTask, onDeleteTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `week-task-${task.id}`,
     data: { taskId: task.id, weekId },
     disabled: isClosed || isInteractionDisabled,
   });
-  const carriedFrom = task.carriedOverFromWeekStart ?? carriedAudit[task.id] ?? null;
   const headline = task.issueTitle ?? task.note ?? 'Bez názvu';
   const style = transform
     ? { transform: `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` }
@@ -260,9 +287,7 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
       {...attributes}
     >
       <div className="weekLane__taskHeader">
-        <span className="projectWeeklyPlanner__taskDay">{getDayLabel(task.dayOfWeek, weekStartDay)}</span>
         <div className="weekLane__taskActions">
-          {carriedFrom && <span className="weekLane__badge">Carried over {formatDate(carriedFrom)}</span>}
           {onEditTask && (
             <button
               type="button"
@@ -273,15 +298,20 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
               Upravit
             </button>
           )}
+          {onDeleteTask && (
+            <button
+              type="button"
+              className="weeklyTaskList__deleteButton"
+              onClick={() => onDeleteTask(task)}
+              disabled={isClosed || Boolean(isInteractionDisabled)}
+            >
+              Smazat
+            </button>
+          )}
         </div>
       </div>
       <h4 className="weekLane__taskTitle">{headline}</h4>
-      <p className="weekLane__taskMeta">
-        <span>{task.internName ?? 'Nepřiřazeno'}</span>
-        <span aria-hidden="true">•</span>
-        <span>{formatPlannedHours(task.plannedHours)}</span>
-      </p>
-      {task.note && task.note !== task.issueTitle && <p className="weekLane__taskNote">{task.note}</p>}
+      <p className="weekLane__taskMeta">{task.internName ?? 'Nepřiřazeno'}</p>
     </li>
   );
 }
@@ -289,13 +319,14 @@ function WeekTaskCard({ weekId, task, weekStartDay, carriedAudit, onEditTask, is
 export type WeeklyTaskListProps = {
   weeks: WeeklyPlannerWeek[];
   weekTasks: Map<number, WeeklyPlannerTask[]>;
-  weekStartDay: number;
-  carriedAudit: Record<number, string>;
   isLoading: boolean;
   error: ErrorResponse | null;
   errorLabel?: string;
   onRetry?: () => void;
   onEditTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteTask?: (task: WeeklyPlannerTask) => void;
+  onDeleteWeek?: (weekId: number) => void;
+  deletableWeekId?: number | null;
   mutationError: ErrorResponse | null;
   onDismissMutationError?: () => void;
   selectedWeekId: number | null;
@@ -304,6 +335,7 @@ export type WeeklyTaskListProps = {
   canCreateWeek?: boolean;
   isCreateWeekLoading?: boolean;
   isInteractionDisabled?: boolean;
+  deletingWeekId?: number | null;
 };
 
 function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () => void }) {
@@ -320,13 +352,14 @@ function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () =
 export default function WeeklyTaskList({
   weeks,
   weekTasks,
-  weekStartDay,
-  carriedAudit,
   isLoading,
   error,
   errorLabel,
   onRetry,
   onEditTask,
+  onDeleteTask,
+  onDeleteWeek,
+  deletableWeekId,
   mutationError,
   onDismissMutationError,
   selectedWeekId,
@@ -335,13 +368,14 @@ export default function WeeklyTaskList({
   canCreateWeek = false,
   isCreateWeekLoading = false,
   isInteractionDisabled = false,
+  deletingWeekId = null,
 }: WeeklyTaskListProps) {
   const hasWeeks = weeks.length > 0;
   return (
     <div className="weeklyTaskList" aria-live="polite">
       {mutationError && (
         <div className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error weeklyTaskList__statusMessage" role="alert">
-          Úkol se nepodařilo uložit. {mutationError.error.message}
+          Akci se nepodařilo dokončit. {mutationError.error?.message ?? ''}
           {onDismissMutationError && (
             <button type="button" className="weeklyTaskList__dismissButton" onClick={onDismissMutationError}>
               Skrýt
@@ -378,12 +412,14 @@ export default function WeeklyTaskList({
                 key={week.id}
                 week={week}
                 tasks={weekTasks.get(week.id) ?? []}
-                weekStartDay={weekStartDay}
-                carriedAudit={carriedAudit}
                 onEditTask={onEditTask}
+                onDeleteTask={onDeleteTask}
+                onDeleteWeek={onDeleteWeek}
+                canDeleteWeek={week.id === deletableWeekId}
                 isSelected={selectedWeekId === week.id}
                 onSelectWeek={onSelectWeek}
                 isInteractionDisabled={isInteractionDisabled}
+                deletingWeekId={deletingWeekId}
               />
             ))}
             {canCreateWeek && (

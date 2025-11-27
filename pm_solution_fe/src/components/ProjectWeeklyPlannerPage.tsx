@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
@@ -33,20 +33,19 @@ import {
   type WeeklyPlannerWeek,
   type WeeklyPlannerWeekCollection,
   type WeeklyPlannerWeekGenerationPayload,
-  type WeeklyPlannerSettings,
   type WeeklySummary,
   type WeeklyTaskPayload,
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
+  deleteProjectWeeklyPlannerWeek,
+  deleteWeeklyTask,
   generateProjectWeeklyPlannerWeeks,
   getCurrentProjectSprint,
   getSprintSummary,
   getProjectWeekSummary,
   getProjectWeeklyPlannerWeek,
-  getWeeklyPlannerSettings,
   listProjectWeeklyPlannerWeeks,
-  updateWeeklyPlannerSettings,
   updateWeeklyTask,
   updateWeeklyTaskWeek,
 } from '../api';
@@ -92,6 +91,13 @@ type MoveTaskContext = {
   targetWeek?: WeeklyTasksQueryData;
   sprintId: number | null;
   backlogTasks?: WeeklyPlannerTask[];
+};
+
+type DeleteWeekContext = {
+  previousWeeks: WeeklyPlannerWeek[];
+  previousSelectedWeek: WeeklyPlannerWeek | null;
+  previousSelectedWeekId: number | null;
+  previousSummary: WeeklySummary | null;
 };
 
 function normaliseDestinationWeekId(value: number | null | undefined): number | null {
@@ -292,6 +298,25 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     () => [...weeks].sort((first, second) => getWeekSortValue(first) - getWeekSortValue(second)),
     [weeks],
   );
+  const deletableWeekId = useMemo(() => {
+    if (weeks.length === 0) {
+      return null;
+    }
+    const latest = weeks.reduce<WeeklyPlannerWeek | null>((current, candidate) => {
+      if (current === null) {
+        return candidate;
+      }
+      const diff = getWeekSortValue(candidate) - getWeekSortValue(current);
+      if (diff > 0) {
+        return candidate;
+      }
+      if (diff === 0 && candidate.id > current.id) {
+        return candidate;
+      }
+      return current;
+    }, null);
+    return latest?.id ?? null;
+  }, [weeks]);
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<WeeklyPlannerWeek | null>(null);
   const [weekError, setWeekError] = useState<ErrorResponse | null>(null);
@@ -306,14 +331,8 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [carryOverSelection, setCarryOverSelection] = useState<number[]>([]);
   const [carryOverSubmitting, setCarryOverSubmitting] = useState(false);
   const [carryOverError, setCarryOverError] = useState<ErrorResponse | null>(null);
-  const [carriedAudit, setCarriedAudit] = useState<Record<number, string>>({});
   const [roles, setRoles] = useState<string[]>([]);
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
-  const [weekSettings, setWeekSettings] = useState<WeeklyPlannerSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsError, setSettingsError] = useState<ErrorResponse | null>(null);
-  const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsSaveError, setSettingsSaveError] = useState<ErrorResponse | null>(null);
   const [createWeekError, setCreateWeekError] = useState<ErrorResponse | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
@@ -322,6 +341,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTaskWeekId, setEditingTaskWeekId] = useState<number | null>(null);
   const [taskMutationError, setTaskMutationError] = useState<ErrorResponse | null>(null);
+  const [deletingWeekId, setDeletingWeekId] = useState<number | null>(null);
   const [taskFormDayOfWeek, setTaskFormDayOfWeek] = useState<number>(1);
   const [sprintMetadata, setSprintMetadata] = useState<SprintMetadataState>({
     id: null,
@@ -345,6 +365,10 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const sprintError = currentSprintError as ErrorResponse | null;
   const currentSprintId = currentSprint?.id ?? null;
   const plannerSprintId = sprintMetadata.id ?? currentSprintId;
+  const plannerSprintIdRef = useRef<number | null>(plannerSprintId);
+  useEffect(() => {
+    plannerSprintIdRef.current = plannerSprintId;
+  }, [plannerSprintId]);
   const sprintStatus = sprintMetadata.status ?? currentSprint?.status ?? null;
   const isSprintOpen = (sprintStatus ?? '').toUpperCase() === 'OPEN';
 
@@ -441,34 +465,18 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setTaskFormDayOfWeek(1);
   }, []);
 
-  const loadSettings = useCallback(() => {
-    setSettingsLoading(true);
-    setSettingsError(null);
-    getWeeklyPlannerSettings(project.id)
-      .then(settingsResponse => {
-        setWeekSettings(settingsResponse);
-        setWeekStartDay(settingsResponse.weekStartDay);
-        setSettingsSaveError(null);
-      })
-      .catch(err => setSettingsError(err as ErrorResponse))
-      .finally(() => setSettingsLoading(false));
-  }, [project.id]);
-
   const loadWeeks = useCallback(() => {
     setWeeksLoading(true);
     setWeeksError(null);
     listProjectWeeklyPlannerWeeks(project.id, { limit: WEEK_FETCH_LIMIT, offset: 0 })
       .then(collection => {
         setWeeks(collection.weeks);
-        const metadataSprintId = collection.metadata.sprintId ?? plannerSprintId;
+        const metadataSprintId = collection.metadata.sprintId ?? plannerSprintIdRef.current;
         collection.weeks.forEach(week => {
           setWeeklyTasksQueryData(queryClient, project.id, metadataSprintId, week.id, week.tasks);
         });
         setRoles(collection.metadata.roles);
         setWeekStartDay(collection.metadata.weekStartDay);
-        setWeekSettings(prev =>
-          prev ? { ...prev, weekStartDay: collection.metadata.weekStartDay } : { weekStartDay: collection.metadata.weekStartDay },
-        );
         applySprintMetadata(collection.metadata);
         setSelectedWeekId(prev => {
           if (prev !== null) return prev;
@@ -480,11 +488,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       })
       .catch(err => setWeeksError(err as ErrorResponse))
       .finally(() => setWeeksLoading(false));
-  }, [applySprintMetadata, plannerSprintId, project.id, queryClient]);
-
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+  }, [applySprintMetadata, project.id, queryClient]);
 
   useEffect(() => {
     if (currentSprintId === null) {
@@ -502,14 +506,11 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       setWeekError(null);
       getProjectWeeklyPlannerWeek(project.id, weekId)
         .then(data => {
-          const metadataSprintId = data.metadata.sprintId ?? plannerSprintId;
+          const metadataSprintId = data.metadata.sprintId ?? plannerSprintIdRef.current;
           setWeeklyTasksQueryData(queryClient, project.id, metadataSprintId, data.week.id, data.week.tasks);
           setSelectedWeek(data.week);
           setRoles(data.metadata.roles);
           setWeekStartDay(data.metadata.weekStartDay);
-          setWeekSettings(prev =>
-            prev ? { ...prev, weekStartDay: data.metadata.weekStartDay } : { weekStartDay: data.metadata.weekStartDay },
-          );
           applySprintMetadata(data.metadata);
           setWeeks(prev => {
             const exists = prev.findIndex(week => week.id === data.week.id);
@@ -534,7 +535,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         .catch(err => setSummaryError(err as ErrorResponse))
         .finally(() => setSummaryLoading(false));
     },
-    [applySprintMetadata, plannerSprintId, project.id, queryClient],
+    [applySprintMetadata, project.id, queryClient],
   );
 
   useEffect(() => {
@@ -575,6 +576,18 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
     [onShowToast],
   );
+
+  useEffect(() => {
+    if (selectedWeekId === null) {
+      return;
+    }
+    const exists = weeks.some(week => week.id === selectedWeekId);
+    if (!exists) {
+      setSelectedWeekId(null);
+      setSelectedWeek(null);
+      setSummary(null);
+    }
+  }, [selectedWeekId, weeks]);
 
   const handleBacklogRetry = useCallback(() => {
     if (currentSprintId !== null) {
@@ -789,6 +802,116 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
+  const deleteTaskMutation = useMutation<
+    void,
+    ErrorResponse,
+    { weekId: number; task: WeeklyPlannerTask },
+    {
+      previousSprintTasks: WeeklyPlannerTask[];
+      previousWeek?: WeeklyTasksQueryData;
+      previousBacklog?: WeeklyPlannerTask[];
+    }
+  >({
+    mutationFn: async ({ weekId, task }) => deleteWeeklyTask(project.id, weekId, task.id),
+    onMutate: async ({ weekId, task }) => {
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      await queryClient.cancelQueries({ queryKey: sprintTasksKey });
+      const previousSprintTasks = queryClient.getQueryData<WeeklyPlannerTask[]>(sprintTasksKey) ?? [];
+      queryClient.setQueryData(
+        sprintTasksKey,
+        previousSprintTasks.filter(existing => existing.id !== task.id),
+      );
+
+      let previousBacklog: WeeklyPlannerTask[] | undefined;
+      if (plannerSprintId !== null) {
+        const backlogKey = getBacklogTasksQueryKey(project.id, plannerSprintId);
+        previousBacklog = queryClient.getQueryData<WeeklyPlannerTask[]>(backlogKey) ?? [];
+        setBacklogTasksQueryData(
+          queryClient,
+          project.id,
+          plannerSprintId,
+          previousBacklog.filter(existing => existing.id !== task.id),
+        );
+      }
+
+      const previousWeek = removeWeeklyTask(queryClient, project.id, plannerSprintId, weekId, task.id);
+      setTaskMutationError(null);
+      return { previousSprintTasks, previousWeek, previousBacklog };
+    },
+    onError: (error, variables, context) => {
+      setTaskMutationError(error);
+      if (!context) {
+        return;
+      }
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.setQueryData(sprintTasksKey, context.previousSprintTasks);
+      if (plannerSprintId !== null && context.previousBacklog) {
+        setBacklogTasksQueryData(queryClient, project.id, plannerSprintId, context.previousBacklog);
+      }
+      if (context.previousWeek) {
+        queryClient.setQueryData(
+          getWeeklyTasksQueryKey(project.id, plannerSprintId, variables.weekId),
+          context.previousWeek,
+        );
+      }
+    },
+    onSuccess: (_data, variables) => {
+      if (variables.weekId === selectedWeekId) {
+        fetchWeek(variables.weekId);
+      }
+    },
+    onSettled: (_data, _error, variables) => {
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.invalidateQueries({ queryKey: sprintTasksKey });
+      queryClient.invalidateQueries({
+        queryKey: getWeeklyTasksQueryKey(project.id, plannerSprintId, variables.weekId),
+      });
+    },
+  });
+
+  const deleteWeekMutation = useMutation<void, ErrorResponse, number, DeleteWeekContext>({
+    mutationFn: async (weekId: number) => deleteProjectWeeklyPlannerWeek(project.id, weekId),
+    onMutate: async (weekId: number) => {
+      setDeletingWeekId(weekId);
+      setTaskMutationError(null);
+      const previousWeeks = weeks;
+      const previousSelectedWeek = selectedWeek;
+      const previousSelectedWeekId = selectedWeekId;
+      const previousSummary = summary;
+      setWeeks(prev => prev.filter(week => week.id !== weekId));
+      if (selectedWeekId === weekId) {
+        setSelectedWeek(null);
+        setSelectedWeekId(null);
+        setSummary(null);
+      }
+      return { previousWeeks, previousSelectedWeek, previousSelectedWeekId, previousSummary } satisfies DeleteWeekContext;
+    },
+    onError: (error, _variables, context) => {
+      if (context) {
+        setWeeks(context.previousWeeks);
+        setSelectedWeek(context.previousSelectedWeek);
+        setSelectedWeekId(context.previousSelectedWeekId);
+        setSummary(context.previousSummary);
+      }
+      setTaskMutationError(error);
+      setDeletingWeekId(null);
+    },
+    onSuccess: (_data, weekId) => {
+      setTaskMutationError(null);
+      if (plannerSprintId !== null) {
+        queryClient.removeQueries({ queryKey: getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId) });
+        queryClient.invalidateQueries({ queryKey: getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId) });
+        queryClient.invalidateQueries({ queryKey: getBacklogTasksQueryKey(project.id, plannerSprintId) });
+      }
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      queryClient.invalidateQueries({ queryKey: sprintTasksKey });
+      loadWeeks();
+    },
+    onSettled: () => {
+      setDeletingWeekId(null);
+    },
+  });
+
   const moveTaskMutation = useMutation<WeeklyPlannerTask, ErrorResponse, MoveTaskVariables, MoveTaskContext>({
     mutationFn: async ({ taskId, toWeekId }: MoveTaskVariables) => {
       const destinationWeekId = normaliseDestinationWeekId(toWeekId);
@@ -923,11 +1046,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
   });
 
-  const weekStartOptions = useMemo(
-    () => dayNames.map((name, index) => ({ value: index + 1, label: `${index + 1} – ${name}` })),
-    [],
-  );
-
   const weekSelectOptions = useMemo<WeekSelectOption[]>(() => {
     const options = orderedWeeks.map(week => ({
       id: week.id,
@@ -936,7 +1054,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     return [{ id: null, label: 'Backlog' }, ...options];
   }, [orderedWeeks]);
 
-  const currentWeekStartDay = weekSettings?.weekStartDay ?? weekStartDay;
+  const currentWeekStartDay = weekStartDay;
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
   const hasPmRole = useMemo(
@@ -1034,7 +1152,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       return;
     }
     setSelectedWeekId(value);
-    loadWeeks();
   }
 
   const handleEditTask = useCallback(
@@ -1059,6 +1176,23 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       setIsCreateModalOpen(true);
     },
     [selectedWeekId],
+  );
+
+  const handleDeleteTask = useCallback(
+    (task: WeeklyPlannerTask) => {
+      if (task.weekId === null) {
+        return;
+      }
+      deleteTaskMutation.mutate({ weekId: task.weekId, task });
+    },
+    [deleteTaskMutation],
+  );
+
+  const handleDeleteWeek = useCallback(
+    (weekId: number) => {
+      deleteWeekMutation.mutate(weekId);
+    },
+    [deleteWeekMutation],
   );
 
   const handleTaskFormSubmit = useCallback(
@@ -1154,9 +1288,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         setCloseModalOpen(false);
         setRoles(response.metadata.roles);
         setWeekStartDay(response.metadata.weekStartDay);
-        setWeekSettings(prev =>
-          prev ? { ...prev, weekStartDay: response.metadata.weekStartDay } : { weekStartDay: response.metadata.weekStartDay },
-        );
         const targetWeekStart = response.metadata.currentWeekStart ?? response.week.weekStart;
         const targetWeekId = response.metadata.currentWeekId ?? null;
         const incompleteTasks = response.week.tasks.filter(task => !isIssueClosed(task));
@@ -1187,35 +1318,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       });
   }
 
-  function handleWeekStartDayChange(event: ChangeEvent<HTMLSelectElement>) {
-    const value = Number.parseInt(event.target.value, 10);
-    if (Number.isNaN(value) || value < 1 || value > dayNames.length) {
-      return;
-    }
-    const currentValue = weekSettings?.weekStartDay ?? weekStartDay;
-    if (value === currentValue) {
-      return;
-    }
-    setSettingsSaveError(null);
-    setSettingsSaving(true);
-    updateWeeklyPlannerSettings(project.id, { weekStartDay: value })
-      .then(updatedSettings => {
-        setSettingsSaving(false);
-        setWeekSettings(updatedSettings);
-        setWeekStartDay(updatedSettings.weekStartDay);
-        setSettingsError(null);
-        setSettingsSaveError(null);
-        loadWeeks();
-        if (selectedWeekId !== null) {
-          fetchWeek(selectedWeekId);
-        }
-      })
-      .catch(err => {
-        setSettingsSaving(false);
-        setSettingsSaveError(err as ErrorResponse);
-      });
-  }
-
   function toggleCarryOverSelection(taskId: number) {
     setCarryOverSelection(prev => {
       if (prev.includes(taskId)) {
@@ -1237,20 +1339,11 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setCarryOverSubmitting(true);
     setCarryOverError(null);
     carryOverWeeklyTasks(project.id, carryOverContext.sourceWeek.id, payload)
-      .then(newTasks => {
+      .then(() => {
         setCarryOverSubmitting(false);
         setCarryOverModalOpen(false);
         setCarryOverContext(null);
         setCarryOverSelection([]);
-        if (newTasks.length > 0) {
-          setCarriedAudit(prev => {
-            const updates = { ...prev };
-            for (const task of newTasks) {
-              updates[task.id] = carryOverContext.sourceWeek.weekStart;
-            }
-            return updates;
-          });
-        }
         if (carryOverContext.targetWeekId !== null) {
           fetchWeek(carryOverContext.targetWeekId);
         }
@@ -1265,7 +1358,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const carryOverTasks = carryOverContext?.sourceWeek.tasks.filter(task => !isIssueClosed(task)) ?? [];
   const createTaskDisabled = selectedWeekId === null || isCreateModalOpen || !isSprintOpen;
   const createWeekPending = generateWeekMutation.isPending;
-  const createWeekButtonDisabled = createWeekPending || weeksLoading || settingsLoading || !isSprintOpen;
+  const createWeekButtonDisabled = createWeekPending || weeksLoading || !isSprintOpen;
   const selectedWeekStart = selectedWeek?.weekStart ?? null;
   const handleSprintClosed = useCallback((closedSprint: Sprint) => {
     setSprintMetadata(prev => {
@@ -1497,75 +1590,11 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         </div>
       </header>
 
-      <section className="projectWeeklyPlanner__settings" aria-labelledby="project-week-settings-title">
-        <div className="projectWeeklyPlanner__settingsHeader">
-          <div>
-            <h3 id="project-week-settings-title" className="projectWeeklyPlanner__settingsTitle">
-              Nastavení týdne
-            </h3>
-            <p className="projectWeeklyPlanner__settingsHint">Určete, který den je považován za začátek týdne.</p>
-          </div>
-          {(settingsSaving || settingsLoading) && (
-            <span className="projectWeeklyPlanner__settingsStatus" aria-live="polite">
-              {settingsSaving ? 'Ukládám…' : 'Načítám…'}
-            </span>
-          )}
-        </div>
-        <div className="projectWeeklyPlanner__settingsControls">
-          <div className="projectWeeklyPlanner__settingsRow">
-            <label className="projectWeeklyPlanner__settingsField">
-              <span>První den týdne</span>
-              <select
-                value={String(currentWeekStartDay)}
-                onChange={handleWeekStartDayChange}
-                disabled={settingsLoading || settingsSaving}
-              >
-                {weekStartOptions.map(option => (
-                  <option key={option.value} value={String(option.value)}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="projectWeeklyPlanner__settingsActions">
-              <button
-                type="button"
-                className="projectWeeklyPlanner__createWeekButton"
-                onClick={handleCreateNextWeek}
-                disabled={createWeekButtonDisabled}
-                aria-label="Vytvořit nový týden"
-                title="Vytvořit nový týden"
-                aria-busy={createWeekPending}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          {createWeekError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nový týden se nepodařilo vytvořit. {createWeekError.error?.message ?? ''}
-            </p>
-          )}
-          {settingsError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo načíst. {settingsError.error?.message ?? ''}{' '}
-              <button
-                type="button"
-                className="projectWeeklyPlanner__settingsRetry"
-                onClick={loadSettings}
-                disabled={settingsLoading}
-              >
-                Zkusit znovu
-              </button>
-            </p>
-          )}
-          {settingsSaveError && !settingsError && (
-            <p className="projectWeeklyPlanner__settingsError" role="alert">
-              Nastavení se nepodařilo uložit. {settingsSaveError.error?.message ?? ''}
-            </p>
-          )}
-        </div>
-      </section>
+      {createWeekError && (
+        <p className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error" role="alert">
+          Nový týden se nepodařilo vytvořit. {createWeekError.error?.message ?? ''}
+        </p>
+      )}
 
       <WeeklySummaryPanel
         summary={summary}
@@ -1602,13 +1631,14 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           <WeeklyTaskList
             weeks={orderedWeeks}
             weekTasks={sprintWeekTasks}
-            weekStartDay={currentWeekStartDay}
-            carriedAudit={carriedAudit}
             isLoading={weeksLoading}
             error={boardError}
             errorLabel={boardErrorLabel}
             onRetry={handleWeeksBoardRetry}
             onEditTask={handleEditTask}
+            onDeleteTask={handleDeleteTask}
+            onDeleteWeek={handleDeleteWeek}
+            deletableWeekId={deletableWeekId}
             mutationError={taskMutationError}
             onDismissMutationError={() => setTaskMutationError(null)}
             selectedWeekId={selectedWeekId}
@@ -1617,6 +1647,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             canCreateWeek={currentSprintId !== null}
             isCreateWeekLoading={createWeekPending}
             isInteractionDisabled={!isSprintOpen}
+            deletingWeekId={deletingWeekId}
           />
         }
         emptyState={plannerEmptyState}

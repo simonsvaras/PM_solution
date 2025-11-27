@@ -97,6 +97,12 @@
   color: var(--color-text-secondary, #4a4a4a);
 }
 
+.weekLane__headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .weekLane__tasks {
   list-style: none;
   margin: 0;
@@ -213,6 +219,27 @@
 }
 
 .weeklyTaskList__editButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.weeklyTaskList__deleteButton {
+  border: none;
+  background: transparent;
+  color: #d73346;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.weeklyTaskList__deleteButton:hover:not(:disabled) {
+  background: rgba(215, 51, 70, 0.12);
+}
+
+.weeklyTaskList__deleteButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

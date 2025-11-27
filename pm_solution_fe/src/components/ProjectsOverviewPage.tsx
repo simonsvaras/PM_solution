@@ -10,14 +10,25 @@ type ProjectsOverviewPageProps = {
 export default function ProjectsOverviewPage({ onSelectProject }: ProjectsOverviewPageProps) {
   const [projects, setProjects] = useState<ProjectOverviewDTO[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<ErrorResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     getProjectsOverview()
       .then(data => setProjects(data))
-      .catch(err => setError(err as ErrorResponse))
+      .catch((err: unknown) => {
+        if (err && typeof err === 'object' && 'error' in err) {
+          const apiError = err as ErrorResponse;
+          setError(apiError.error?.message ?? 'Nepodařilo se načíst projekty.');
+          return;
+        }
+        if (err instanceof Error && err.message) {
+          setError(err.message);
+          return;
+        }
+        setError('Nepodařilo se načíst projekty.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -34,7 +45,7 @@ export default function ProjectsOverviewPage({ onSelectProject }: ProjectsOvervi
       <section className="projectsOverview">
         <div className="projectsOverview__error" role="alert">
           <h2>Projekty se nepodařilo načíst.</h2>
-          <p>{error.error.message}</p>
+          <p>{error}</p>
         </div>
       </section>
     );
