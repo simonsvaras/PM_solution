@@ -573,6 +573,18 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     [onShowToast],
   );
 
+  useEffect(() => {
+    if (selectedWeekId === null) {
+      return;
+    }
+    const exists = weeks.some(week => week.id === selectedWeekId);
+    if (!exists) {
+      setSelectedWeekId(null);
+      setSelectedWeek(null);
+      setSummary(null);
+    }
+  }, [selectedWeekId, weeks]);
+
   const handleBacklogRetry = useCallback(() => {
     if (currentSprintId !== null) {
       refetchSprintTasks();
@@ -1136,7 +1148,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       return;
     }
     setSelectedWeekId(value);
-    loadWeeks();
   }
 
   const handleEditTask = useCallback(
