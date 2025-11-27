@@ -239,6 +239,14 @@ public class WeeklyPlannerService {
     public void deleteWeek(long projectId, long projectWeekId) {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
+        if (week.sprintId() == null) {
+            throw ApiException.validation("Týden není přiřazen k žádnému sprintu.", "project_week_sprint_missing");
+        }
+        var lastWeek = repository.findLastWeekInSprint(projectId, week.sprintId())
+                .orElseThrow(() -> ApiException.notFound("Sprint nemá žádné týdny.", "project_week"));
+        if (!Objects.equals(lastWeek.id(), projectWeekId)) {
+            throw ApiException.validation("Smazat lze pouze poslední týden sprintu.", "project_week_not_last");
+        }
         if (!week.tasks().isEmpty()) {
             throw ApiException.validation("Týden nelze smazat, protože obsahuje úkoly.", "project_week_not_empty");
         }

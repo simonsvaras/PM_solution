@@ -298,6 +298,25 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     () => [...weeks].sort((first, second) => getWeekSortValue(first) - getWeekSortValue(second)),
     [weeks],
   );
+  const deletableWeekId = useMemo(() => {
+    if (weeks.length === 0) {
+      return null;
+    }
+    const latest = weeks.reduce<WeeklyPlannerWeek | null>((current, candidate) => {
+      if (current === null) {
+        return candidate;
+      }
+      const diff = getWeekSortValue(candidate) - getWeekSortValue(current);
+      if (diff > 0) {
+        return candidate;
+      }
+      if (diff === 0 && candidate.id > current.id) {
+        return candidate;
+      }
+      return current;
+    }, null);
+    return latest?.id ?? null;
+  }, [weeks]);
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<WeeklyPlannerWeek | null>(null);
   const [weekError, setWeekError] = useState<ErrorResponse | null>(null);
@@ -1604,6 +1623,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
             onDeleteWeek={handleDeleteWeek}
+            deletableWeekId={deletableWeekId}
             mutationError={taskMutationError}
             onDismissMutationError={() => setTaskMutationError(null)}
             selectedWeekId={selectedWeekId}

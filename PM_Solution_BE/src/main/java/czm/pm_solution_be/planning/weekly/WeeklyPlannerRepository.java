@@ -168,6 +168,21 @@ public class WeeklyPlannerRepository {
             ORDER BY s.week_start_date DESC, s.project_week_id DESC, wt.day_of_week ASC, wt.id ASC
             """;
 
+    private static final String SQL_SELECT_LAST_WEEK_BY_SPRINT =
+            """
+            SELECT pw.id         AS id,
+                   pw.project_id,
+                   pw.sprint_id,
+                   pw.week_start_date,
+                   pw.created_at AS project_week_created_at,
+                   pw.updated_at AS project_week_updated_at
+            FROM project_week pw
+            WHERE pw.project_id = ?
+              AND pw.sprint_id = ?
+            ORDER BY pw.week_start_date DESC, pw.id DESC
+            LIMIT 1
+            """;
+
     private static final String SQL_PROJECT_WEEK_EXISTS =
             "SELECT EXISTS (SELECT 1 FROM project_week WHERE project_id = ? AND week_start_date = ?)";
 
@@ -531,6 +546,15 @@ public class WeeklyPlannerRepository {
         } catch (EmptyResultDataAccessException ex) {
             return Optional.empty();
         }
+    }
+
+    public Optional<ProjectWeekMetadataRow> findLastWeekInSprint(long projectId, long sprintId) {
+        List<ProjectWeekMetadataRow> rows = jdbc.query(
+                SQL_SELECT_LAST_WEEK_BY_SPRINT,
+                PROJECT_WEEK_METADATA_MAPPER,
+                projectId,
+                sprintId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
     public int deleteProjectWeek(long projectWeekId) {

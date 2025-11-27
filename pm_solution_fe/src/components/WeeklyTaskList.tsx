@@ -158,6 +158,7 @@ type WeekLaneProps = {
   onEditTask?: (task: WeeklyPlannerTask) => void;
   onDeleteTask?: (task: WeeklyPlannerTask) => void;
   onDeleteWeek?: (weekId: number) => void;
+  canDeleteWeek?: boolean;
   isSelected: boolean;
   onSelectWeek?: (weekId: number) => void;
   isInteractionDisabled?: boolean;
@@ -170,6 +171,7 @@ function WeekLane({
   onEditTask,
   onDeleteTask,
   onDeleteWeek,
+  canDeleteWeek,
   isSelected,
   onSelectWeek,
   isInteractionDisabled,
@@ -195,7 +197,9 @@ function WeekLane({
   }
 
   const deleteDisabled =
-    Boolean(isInteractionDisabled) || tasks.length > 0 || (typeof deletingWeekId === 'number' && deletingWeekId === week.id);
+    Boolean(isInteractionDisabled) ||
+    tasks.length > 0 ||
+    (typeof deletingWeekId === 'number' && deletingWeekId === week.id);
 
   return (
     <section
@@ -217,7 +221,7 @@ function WeekLane({
             <span aria-hidden="true">•</span>
             <span>{closedTasks} uzavřených</span>
           </div>
-          {onDeleteWeek && (
+          {onDeleteWeek && canDeleteWeek && (
             <button
               type="button"
               className="weeklyTaskList__deleteButton"
@@ -322,6 +326,7 @@ export type WeeklyTaskListProps = {
   onEditTask?: (task: WeeklyPlannerTask) => void;
   onDeleteTask?: (task: WeeklyPlannerTask) => void;
   onDeleteWeek?: (weekId: number) => void;
+  deletableWeekId?: number | null;
   mutationError: ErrorResponse | null;
   onDismissMutationError?: () => void;
   selectedWeekId: number | null;
@@ -354,6 +359,7 @@ export default function WeeklyTaskList({
   onEditTask,
   onDeleteTask,
   onDeleteWeek,
+  deletableWeekId,
   mutationError,
   onDismissMutationError,
   selectedWeekId,
@@ -409,6 +415,7 @@ export default function WeeklyTaskList({
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
                 onDeleteWeek={onDeleteWeek}
+                canDeleteWeek={week.id === deletableWeekId}
                 isSelected={selectedWeekId === week.id}
                 onSelectWeek={onSelectWeek}
                 isInteractionDisabled={isInteractionDisabled}
