@@ -11,15 +11,6 @@ const hoursFormatter = new Intl.NumberFormat('cs-CZ', {
   maximumFractionDigits: 1,
 });
 
-export function getDayLabel(dayOfWeek: number | null, weekStartDay = 1): string {
-  if (!dayOfWeek || dayOfWeek < 1 || dayOfWeek > dayNames.length) {
-    return 'Bez dne';
-  }
-  const offset = ((weekStartDay - 1) % dayNames.length + dayNames.length) % dayNames.length;
-  const index = (offset + (dayOfWeek - 1)) % dayNames.length;
-  return dayNames[index];
-}
-
 export function formatDateRange(start: string | null, end: string | null): string {
   if (!start || !end) {
     return '—';

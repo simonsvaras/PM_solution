@@ -33,7 +33,6 @@ public class WeeklyTaskRepository {
                    wt.project_id,
                    wt.project_week_id,
                    wt.sprint_id,
-                   wt.day_of_week,
                    wt.note,
                    wt.planned_hours,
                    wt.intern_id,
@@ -49,20 +48,18 @@ public class WeeklyTaskRepository {
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.project_id = ?
               AND wt.sprint_id = ?
-            ORDER BY wt.day_of_week ASC NULLS LAST, wt.id ASC
+            ORDER BY wt.id ASC
             """;
 
     private static final RowMapper<WeeklyTaskEntity> TASK_ENTITY_MAPPER = new RowMapper<>() {
         @Override
         public WeeklyTaskEntity mapRow(ResultSet rs, int rowNum) throws SQLException {
             Long projectWeekId = rs.getObject("project_week_id") == null ? null : rs.getLong("project_week_id");
-            Integer dayOfWeek = rs.getObject("day_of_week") == null ? null : rs.getInt("day_of_week");
             return new WeeklyTaskEntity(
                     rs.getLong("id"),
                     rs.getLong("project_id"),
                     projectWeekId,
                     rs.getLong("sprint_id"),
-                    dayOfWeek,
                     rs.getString("note"),
                     rs.getBigDecimal("planned_hours"),
                     rs.getObject("intern_id") == null ? null : rs.getLong("intern_id"),
@@ -95,7 +92,6 @@ public class WeeklyTaskRepository {
                                    long projectId,
                                    Long projectWeekId,
                                    long sprintId,
-                                   Integer dayOfWeek,
                                    String note,
                                    BigDecimal plannedHours,
                                    Long internId,

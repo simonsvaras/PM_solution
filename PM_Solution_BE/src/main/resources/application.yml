@@ -8,6 +8,7 @@ spring:
     hikari:
       schema: ${DB_SCHEMA:public}
       maximum-pool-size: 5
+      connection-init-sql: SET search_path TO ${DB_SCHEMA:public}
       data-source-properties:
         currentSchema: ${DB_SCHEMA:public}
   jpa:

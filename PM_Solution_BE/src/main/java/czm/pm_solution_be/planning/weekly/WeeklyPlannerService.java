@@ -226,12 +226,10 @@ public class WeeklyPlannerService {
         }
         Long sprintId = newSprintId;
         Long targetWeekId = newWeekId;
-        boolean keepDayOfWeek = targetWeekId != null;
         WeeklyTaskRow updated = txTemplate.execute(status -> repository.updateTaskAssignment(
                         taskId,
                         targetWeekId,
-                        sprintId,
-                        keepDayOfWeek)
+                        sprintId)
                 .orElseThrow(() -> ApiException.notFound("Úkol nebyl nalezen.", "weekly_task")));
         return mapTask(updated);
     }
@@ -305,7 +303,7 @@ public class WeeklyPlannerService {
                 WeeklyTaskRow inserted = repository.insertTask(projectId,
                         targetSprintId,
                         targetWeek.id(),
-                        new WeeklyTaskMutation(task.internId(), task.issueId(), task.dayOfWeek(), task.note(), task.plannedHours()));
+                        new WeeklyTaskMutation(task.internId(), task.issueId(), task.note(), task.plannedHours()));
                 ids.add(inserted.id());
                 if (task.issueId() != null) {
                     repository.updateIssueDueDate(task.issueId(), targetWeekEnd);
@@ -342,13 +340,10 @@ public class WeeklyPlannerService {
     public WeeklySummary getSummary(long projectId, long projectWeekId) {
         requireWeek(projectId, projectWeekId);
         WeeklyStatisticsRow stats = repository.loadWeeklyStatistics(projectWeekId);
-        List<DailySummary> perDay = stats.perDay().stream()
-                .map(row -> new DailySummary(row.dayOfWeek(), row.taskCount(), row.totalHours()))
-                .toList();
         List<InternSummary> perIntern = stats.perIntern().stream()
                 .map(row -> new InternSummary(row.internId(), row.internName(), row.taskCount(), row.totalHours()))
                 .toList();
-        return new WeeklySummary(stats.projectWeekId(), stats.taskCount(), stats.totalHours(), perDay, perIntern);
+        return new WeeklySummary(stats.projectWeekId(), stats.taskCount(), stats.totalHours(), perIntern);
     }
 
     private ProjectConfigurationRow requireProject(long projectId) {
@@ -388,15 +383,6 @@ public class WeeklyPlannerService {
         if (input == null) {
             throw ApiException.validation("Tělo požadavku je povinné.", "task_body_required");
         }
-        boolean backlog = week == null;
-        Integer dayOfWeek = input.dayOfWeek();
-        if (dayOfWeek == null) {
-            if (!backlog) {
-                throw ApiException.validation("Den v týdnu je povinný.", "day_of_week_required");
-            }
-        } else if (dayOfWeek < 1 || dayOfWeek > 7) {
-            throw ApiException.validation("Den v týdnu musí být v intervalu 1 až 7.", "day_of_week_invalid");
-        }
         if (input.plannedHours() != null) {
             BigDecimal hours = input.plannedHours().setScale(2, RoundingMode.HALF_UP);
             if (hours.compareTo(BigDecimal.ZERO) < 0) {
@@ -434,7 +420,7 @@ public class WeeklyPlannerService {
 
     private WeeklyTaskMutation toMutation(TaskInput input) {
         BigDecimal plannedHours = input.plannedHours() == null ? null : input.plannedHours().setScale(2, RoundingMode.HALF_UP);
-        return new WeeklyTaskMutation(input.internId(), input.issueId(), input.dayOfWeek(), input.note(), plannedHours);
+        return new WeeklyTaskMutation(input.internId(), input.issueId(), input.note(), plannedHours);
     }
 
     private WeekDetail mapWeek(ProjectWeekRow row) {
@@ -498,7 +484,6 @@ public class WeeklyPlannerService {
                 row.projectWeekId(),
                 row.sprintId(),
                 row.projectWeekId() == null,
-                row.dayOfWeek(),
                 row.note(),
                 row.plannedHours(),
                 row.internId(),
@@ -580,7 +565,6 @@ public class WeeklyPlannerService {
                              Long weekId,
                              Long sprintId,
                              boolean isBacklog,
-                             Integer dayOfWeek,
                              String note,
                              BigDecimal plannedHours,
                              Long internId,
@@ -596,11 +580,7 @@ public class WeeklyPlannerService {
     public record WeeklySummary(long projectWeekId,
                                 long taskCount,
                                 BigDecimal totalHours,
-                                List<DailySummary> perDay,
                                 List<InternSummary> perIntern) {
-    }
-
-    public record DailySummary(int dayOfWeek, long taskCount, BigDecimal totalHours) {
     }
 
     public record InternSummary(Long internId, String internName, long taskCount, BigDecimal totalHours) {
@@ -608,7 +588,6 @@ public class WeeklyPlannerService {
 
     public record TaskInput(Long issueId,
                             Long internId,
-                            Integer dayOfWeek,
                             String note,
                             BigDecimal plannedHours,
                             LocalDate deadline) {

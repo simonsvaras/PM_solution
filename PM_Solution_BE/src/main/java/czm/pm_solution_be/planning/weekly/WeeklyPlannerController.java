@@ -176,13 +176,10 @@ public class WeeklyPlannerController {
     @GetMapping("/weeks/{projectWeekId}/summary")
     public WeeklySummaryResponse getSummary(@PathVariable long projectId, @PathVariable long projectWeekId) {
         WeeklySummary summary = service.getSummary(projectId, projectWeekId);
-        List<DailySummaryResponse> perDay = summary.perDay().stream()
-                .map(day -> new DailySummaryResponse(day.dayOfWeek(), day.taskCount(), day.totalHours()))
-                .toList();
         List<InternSummaryResponse> perIntern = summary.perIntern().stream()
                 .map(intern -> new InternSummaryResponse(intern.internId(), intern.internName(), intern.taskCount(), intern.totalHours()))
                 .toList();
-        return new WeeklySummaryResponse(summary.projectWeekId(), summary.taskCount(), summary.totalHours(), perDay, perIntern);
+        return new WeeklySummaryResponse(summary.projectWeekId(), summary.taskCount(), summary.totalHours(), perIntern);
     }
 
     private WeekCollectionResponse toWeekCollectionResponse(WeekCollection weeks) {
@@ -219,7 +216,6 @@ public class WeeklyPlannerController {
                 detail.weekId(),
                 detail.sprintId(),
                 detail.isBacklog(),
-                detail.dayOfWeek(),
                 detail.note(),
                 detail.plannedHours(),
                 detail.internId(),
@@ -236,7 +232,6 @@ public class WeeklyPlannerController {
         return new TaskInput(
                 request.issueId(),
                 request.internId(),
-                request.dayOfWeek(),
                 request.note(),
                 request.plannedHours(),
                 request.deadline());
@@ -250,7 +245,6 @@ public class WeeklyPlannerController {
 
     public record WeeklyTaskRequest(Long issueId,
                                     Long internId,
-                                    Integer dayOfWeek,
                                     String note,
                                     BigDecimal plannedHours,
                                     LocalDate deadline) {
@@ -302,7 +296,6 @@ public class WeeklyPlannerController {
                                      Long weekId,
                                      Long sprintId,
                                      boolean isBacklog,
-                                     Integer dayOfWeek,
                                      String note,
                                      BigDecimal plannedHours,
                                      Long internId,
@@ -318,11 +311,7 @@ public class WeeklyPlannerController {
     public record WeeklySummaryResponse(long projectWeekId,
                                         long taskCount,
                                         BigDecimal totalHours,
-                                        List<DailySummaryResponse> perDay,
                                         List<InternSummaryResponse> perIntern) {
-    }
-
-    public record DailySummaryResponse(int dayOfWeek, long taskCount, BigDecimal totalHours) {
     }
 
     public record InternSummaryResponse(Long internId, String internName, long taskCount, BigDecimal totalHours) {

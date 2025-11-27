@@ -16,7 +16,6 @@ public final class WeeklyTaskDtoMapper {
                 entity.projectId(),
                 entity.projectWeekId(),
                 entity.sprintId(),
-                entity.dayOfWeek(),
                 entity.note(),
                 entity.plannedHours(),
                 entity.internId(),

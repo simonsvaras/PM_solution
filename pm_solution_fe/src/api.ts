@@ -543,7 +543,6 @@ export type WeeklyPlannerTaskDTO = {
   id: number;
   weekId?: number | null;
   isBacklog?: boolean | null;
-  dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | string | null;
   internId: number | null;
@@ -563,7 +562,6 @@ export type WeeklyPlannerTask = {
   id: number;
   weekId: number | null;
   isBacklog: boolean;
-  dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | null;
   internId: number | null;
@@ -636,7 +634,6 @@ export type CreateProjectSprintPayload = {
 export type WeeklyTaskPayload = {
   issueId: number | null;
   internId: number | null;
-  dayOfWeek: number;
   note: string | null;
   plannedHours: number | null;
   deadline: string | null;
@@ -746,7 +743,6 @@ export type SprintSummaryTaskDTO = {
   projectId: number;
   projectWeekId: number | null;
   sprintId: number;
-  dayOfWeek: number | null;
   note: string | null;
   plannedHours: number | string | null;
   internId: number | null;
@@ -1006,7 +1002,6 @@ function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
     id: dto.id,
     weekId,
     isBacklog,
-    dayOfWeek: dto.dayOfWeek ?? null,
     note: dto.note ?? null,
     plannedHours: Number.isNaN(plannedHoursRaw) ? null : plannedHoursRaw,
     internId: dto.internId ?? null,
@@ -1061,7 +1056,6 @@ function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
     id: dto.id,
     weekId: dto.projectWeekId ?? null,
     isBacklog: dto.projectWeekId == null,
-    dayOfWeek: dto.dayOfWeek ?? null,
     note: dto.note ?? null,
     plannedHours: dto.plannedHours ?? null,
     internId: dto.internId ?? null,
@@ -1615,7 +1609,6 @@ function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPaylo
   return {
     issueId: payload.issueId ?? null,
     internId: payload.internId ?? null,
-    dayOfWeek: payload.dayOfWeek ?? 1,
     note: payload.note ?? null,
     plannedHours: payload.plannedHours ?? null,
     deadline: payload.deadline ?? null,
