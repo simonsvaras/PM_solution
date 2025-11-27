@@ -7,11 +7,13 @@ import { formatDate } from './weeklyPlannerUtils';
 export type WeeklyTasksQueryData = {
   weekTasks: WeeklyPlannerTask[];
   unscheduledTasks: WeeklyPlannerTask[];
-  statusCounts: Record<'OPENED' | 'CLOSED', number>;
+  statusCounts: Record<'OPENED' | 'CLOSED' | 'IN_PROGRESS', number>;
 };
 
-function normaliseStatus(status: WeeklyPlannerTask['status']): 'OPENED' | 'CLOSED' {
-  return status === 'CLOSED' ? 'CLOSED' : 'OPENED';
+function normaliseStatus(status: WeeklyPlannerTask['status']): 'OPENED' | 'CLOSED' | 'IN_PROGRESS' {
+  if (status === 'CLOSED') return 'CLOSED';
+  if (status === 'IN_PROGRESS') return 'IN_PROGRESS';
+  return 'OPENED';
 }
 
 function normaliseWeekAssignment(task: WeeklyPlannerTask, fallbackWeekId: number | null): WeeklyPlannerTask {
@@ -31,7 +33,7 @@ function createWeeklyTasksQueryData(
   tasks: WeeklyPlannerTask[],
   options?: { defaultWeekId?: number | null },
 ): WeeklyTasksQueryData {
-  const counts: WeeklyTasksQueryData['statusCounts'] = { OPENED: 0, CLOSED: 0 };
+  const counts: WeeklyTasksQueryData['statusCounts'] = { OPENED: 0, CLOSED: 0, IN_PROGRESS: 0 };
   const weekTasks: WeeklyPlannerTask[] = [];
   const unscheduledTasks: WeeklyPlannerTask[] = [];
   const fallbackWeekId = options?.defaultWeekId ?? null;
@@ -53,7 +55,7 @@ function buildWeeklyTasksQueryData(
   weekTasks: WeeklyPlannerTask[],
   unscheduledTasks: WeeklyPlannerTask[],
 ): WeeklyTasksQueryData {
-  const counts: WeeklyTasksQueryData['statusCounts'] = { OPENED: 0, CLOSED: 0 };
+  const counts: WeeklyTasksQueryData['statusCounts'] = { OPENED: 0, CLOSED: 0, IN_PROGRESS: 0 };
   for (const task of weekTasks) {
     counts[normaliseStatus(task.status)] += 1;
   }
@@ -163,6 +165,7 @@ type WeekLaneProps = {
   onSelectWeek?: (weekId: number) => void;
   isInteractionDisabled?: boolean;
   deletingWeekId?: number | null;
+  onStatusChange?: (task: WeeklyPlannerTask, status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS') => void;
 };
 
 function WeekLane({
@@ -176,6 +179,7 @@ function WeekLane({
   onSelectWeek,
   isInteractionDisabled,
   deletingWeekId,
+  onStatusChange,
 }: WeekLaneProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `week-drop-${week.id}`,
@@ -244,6 +248,7 @@ function WeekLane({
             onDeleteTask={onDeleteTask}
             isClosed={week.isClosed}
             isInteractionDisabled={isInteractionDisabled}
+            onStatusChange={onStatusChange}
           />
         ))}
       </ul>
@@ -258,9 +263,10 @@ type WeekTaskCardProps = {
   onDeleteTask?: (task: WeeklyPlannerTask) => void;
   isClosed: boolean;
   isInteractionDisabled?: boolean;
+  onStatusChange?: (task: WeeklyPlannerTask, status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS') => void;
 };
 
-function WeekTaskCard({ weekId, task, onEditTask, onDeleteTask, isClosed, isInteractionDisabled }: WeekTaskCardProps) {
+function WeekTaskCard({ weekId, task, onEditTask, onDeleteTask, isClosed, isInteractionDisabled, onStatusChange }: WeekTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `week-task-${task.id}`,
     data: { taskId: task.id, weekId },
@@ -287,31 +293,87 @@ function WeekTaskCard({ weekId, task, onEditTask, onDeleteTask, isClosed, isInte
       {...attributes}
     >
       <div className="weekLane__taskHeader">
+        <h4 className="weekLane__taskTitle">{headline}</h4>
         <div className="weekLane__taskActions">
           {onEditTask && (
             <button
               type="button"
-              className="weeklyTaskList__editButton"
+              className="weeklyTaskList__iconButton weeklyTaskList__iconButton--edit"
               onClick={() => onEditTask(task)}
               disabled={isClosed || Boolean(isInteractionDisabled)}
+              aria-label="Upravit úkol"
+              title="Upravit úkol"
             >
-              Upravit
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
             </button>
           )}
           {onDeleteTask && (
             <button
               type="button"
-              className="weeklyTaskList__deleteButton"
+              className="weeklyTaskList__iconButton weeklyTaskList__iconButton--delete"
               onClick={() => onDeleteTask(task)}
               disabled={isClosed || Boolean(isInteractionDisabled)}
+              aria-label="Smazat úkol"
+              title="Smazat úkol"
             >
-              Smazat
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
             </button>
           )}
         </div>
       </div>
-      <h4 className="weekLane__taskTitle">{headline}</h4>
       <p className="weekLane__taskMeta">{task.internName ?? 'Nepřiřazeno'}</p>
+
+      <div className="weekLane__taskStatusSwitcher">
+        <button
+          type="button"
+          className={`weekLane__statusButton ${task.status === 'OPENED' ? 'weekLane__statusButton--active' : ''}`}
+          onClick={() => onStatusChange?.(task, 'OPENED')}
+          disabled={isClosed || Boolean(isInteractionDisabled)}
+        >
+          Open
+        </button>
+        <button
+          type="button"
+          className={`weekLane__statusButton ${task.status === 'IN_PROGRESS' ? 'weekLane__statusButton--active' : ''}`}
+          onClick={() => onStatusChange?.(task, 'IN_PROGRESS')}
+          disabled={isClosed || Boolean(isInteractionDisabled)}
+        >
+          In progress
+        </button>
+        <button
+          type="button"
+          className={`weekLane__statusButton ${task.status === 'CLOSED' ? 'weekLane__statusButton--active' : ''}`}
+          onClick={() => onStatusChange?.(task, 'CLOSED')}
+          disabled={isClosed || Boolean(isInteractionDisabled)}
+        >
+          Done
+        </button>
+      </div>
     </li>
   );
 }
@@ -336,6 +398,7 @@ export type WeeklyTaskListProps = {
   isCreateWeekLoading?: boolean;
   isInteractionDisabled?: boolean;
   deletingWeekId?: number | null;
+  onStatusChange?: (task: WeeklyPlannerTask, status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS') => void;
 };
 
 function AddWeekLane({ disabled, onClick }: { disabled?: boolean; onClick?: () => void }) {
@@ -369,6 +432,7 @@ export default function WeeklyTaskList({
   isCreateWeekLoading = false,
   isInteractionDisabled = false,
   deletingWeekId = null,
+  onStatusChange,
 }: WeeklyTaskListProps) {
   const hasWeeks = weeks.length > 0;
   return (
@@ -420,6 +484,7 @@ export default function WeeklyTaskList({
                 onSelectWeek={onSelectWeek}
                 isInteractionDisabled={isInteractionDisabled}
                 deletingWeekId={deletingWeekId}
+                onStatusChange={onStatusChange}
               />
             ))}
             {canCreateWeek && (

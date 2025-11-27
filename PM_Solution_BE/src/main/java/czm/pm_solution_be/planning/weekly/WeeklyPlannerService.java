@@ -42,8 +42,8 @@ public class WeeklyPlannerService {
     private final SprintService sprintService;
 
     public WeeklyPlannerService(WeeklyPlannerRepository repository,
-                                PlatformTransactionManager transactionManager,
-                                SprintService sprintService) {
+            PlatformTransactionManager transactionManager,
+            SprintService sprintService) {
         this.repository = repository;
         this.sprintService = sprintService;
         this.txTemplate = new TransactionTemplate(transactionManager);
@@ -87,7 +87,9 @@ public class WeeklyPlannerService {
         LocalDate end = alignToWeekStart(to, project.weekStartDay());
         long weeks = ChronoUnit.WEEKS.between(start, end) + 1;
         if (weeks > MAX_GENERATED_WEEKS) {
-            throw ApiException.validation("Rozsah generování může pokrývat maximálně " + MAX_GENERATED_WEEKS + " týdnů.", "week_range_too_large");
+            throw ApiException.validation(
+                    "Rozsah generování může pokrývat maximálně " + MAX_GENERATED_WEEKS + " týdnů.",
+                    "week_range_too_large");
         }
         txTemplate.executeWithoutResult(status -> {
             LocalDate current = start;
@@ -102,7 +104,8 @@ public class WeeklyPlannerService {
         LocalDate current = start;
         while (!current.isAfter(end)) {
             ProjectWeekRow row = repository.findProjectWeek(projectId, current)
-                    .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst vygenerovaný týden.", "week_reload_failed"));
+                    .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst vygenerovaný týden.",
+                            "week_reload_failed"));
             result.add(mapWeek(row));
             current = current.plusWeeks(1);
         }
@@ -148,9 +151,14 @@ public class WeeklyPlannerService {
             if (input.issueId() != null) {
                 LocalDate deadline = resolveDeadline(input.deadline(), weekStart);
                 repository.updateIssueDueDate(input.issueId(), deadline);
+                if (input.status() != null) {
+                    String normalized = normalizeIssueState(input.status());
+                    repository.updateIssueState(input.issueId(), normalized);
+                }
             }
             return repository.findTaskById(created.id())
-                    .orElseThrow(() -> ApiException.internal("Úkol byl vytvořen, ale nepodařilo se jej načíst.", "task_reload_failed"));
+                    .orElseThrow(() -> ApiException.internal("Úkol byl vytvořen, ale nepodařilo se jej načíst.",
+                            "task_reload_failed"));
         });
         return mapTask(inserted);
     }
@@ -166,9 +174,14 @@ public class WeeklyPlannerService {
             if (input.issueId() != null) {
                 LocalDate deadline = resolveDeadline(input.deadline(), week.weekStartDate());
                 repository.updateIssueDueDate(input.issueId(), deadline);
+                if (input.status() != null) {
+                    String normalized = normalizeIssueState(input.status());
+                    repository.updateIssueState(input.issueId(), normalized);
+                }
             }
             return repository.findTaskById(row.id())
-                    .orElseThrow(() -> ApiException.internal("Úkol byl upraven, ale nepodařilo se jej načíst.", "task_reload_failed"));
+                    .orElseThrow(() -> ApiException.internal("Úkol byl upraven, ale nepodařilo se jej načíst.",
+                            "task_reload_failed"));
         });
         return mapTask(updated);
     }
@@ -184,23 +197,27 @@ public class WeeklyPlannerService {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         ProjectWeekRow week = requireWeek(projectId, projectWeekId, sprint.id());
         WeeklyTaskRow task = requireTask(projectId, projectWeekId, taskId);
-        if (task.issueId() == null) {
-            throw ApiException.validation("Úkol není navázán na issue, status nelze změnit.", "issue_required");
-        }
         String normalized = normalizeIssueState(newStatus);
-        IssueMetadataRow issue = repository.findIssueMetadata(task.issueId())
-                .orElseThrow(() -> ApiException.notFound("Issue nebylo nalezeno.", "issue"));
-        if (!repository.issueBelongsToProject(projectId, issue.id())) {
-            throw ApiException.validation("Issue nepatří do vybraného projektu.", "issue_project_mismatch");
-        }
+
         txTemplate.executeWithoutResult(status -> {
-            boolean updated = repository.updateIssueState(issue.id(), normalized);
-            if (!updated) {
-                throw ApiException.internal("Nepodařilo se aktualizovat stav issue.", "issue_update_failed");
+            if (task.issueId() != null) {
+                IssueMetadataRow issue = repository.findIssueMetadata(task.issueId())
+                        .orElseThrow(() -> ApiException.notFound("Issue nebylo nalezeno.", "issue"));
+                if (!repository.issueBelongsToProject(projectId, issue.id())) {
+                    throw ApiException.validation("Issue nepatří do vybraného projektu.", "issue_project_mismatch");
+                }
+                boolean updated = repository.updateIssueState(issue.id(), normalized);
+                if (!updated) {
+                    throw ApiException.internal("Nepodařilo se aktualizovat stav issue.", "issue_update_failed");
+                }
+            } else {
+                repository.updateTaskStatus(taskId, normalized);
             }
         });
+
         WeeklyTaskRow reloaded = repository.findTaskById(task.id())
-                .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst úkol po změně stavu.", "task_reload_failed"));
+                .orElseThrow(
+                        () -> ApiException.internal("Nepodařilo se načíst úkol po změně stavu.", "task_reload_failed"));
         return mapTask(reloaded);
     }
 
@@ -227,9 +244,9 @@ public class WeeklyPlannerService {
         Long sprintId = newSprintId;
         Long targetWeekId = newWeekId;
         WeeklyTaskRow updated = txTemplate.execute(status -> repository.updateTaskAssignment(
-                        taskId,
-                        targetWeekId,
-                        sprintId)
+                taskId,
+                targetWeekId,
+                sprintId)
                 .orElseThrow(() -> ApiException.notFound("Úkol nebyl nalezen.", "weekly_task")));
         return mapTask(updated);
     }
@@ -257,9 +274,9 @@ public class WeeklyPlannerService {
     }
 
     public List<TaskDetail> carryOverTasks(long projectId,
-                                           long sourceProjectWeekId,
-                                           LocalDate targetWeekStart,
-                                           List<Long> taskIds) {
+            long sourceProjectWeekId,
+            LocalDate targetWeekStart,
+            List<Long> taskIds) {
         PlanningSprintEntity sprint = sprintService.requireActiveSprint(projectId);
         ProjectWeekRow source = requireWeek(projectId, sourceProjectWeekId, sprint.id());
         if (targetWeekStart == null) {
@@ -278,7 +295,9 @@ public class WeeklyPlannerService {
             }
         }
         List<WeeklyTaskRow> toCopy = sourceTasks.stream()
-                .filter(task -> filterIds.isEmpty() ? !"closed".equalsIgnoreCase(Optional.ofNullable(task.issueState()).orElse("")) : filterIds.contains(task.id()))
+                .filter(task -> filterIds.isEmpty()
+                        ? !"closed".equalsIgnoreCase(Optional.ofNullable(task.issueState()).orElse(""))
+                        : filterIds.contains(task.id()))
                 .toList();
         if (toCopy.isEmpty()) {
             return List.of();
@@ -288,14 +307,16 @@ public class WeeklyPlannerService {
             ProjectWeekRow targetWeek = repository.findProjectWeek(projectId, alignedTarget)
                     .map(existing -> {
                         if (existing.sprintId() != null && !existing.sprintId().equals(sprint.id())) {
-                            throw ApiException.validation("Týden nepatří do aktuálního sprintu.", "project_week_sprint_mismatch");
+                            throw ApiException.validation("Týden nepatří do aktuálního sprintu.",
+                                    "project_week_sprint_mismatch");
                         }
                         return existing;
                     })
                     .orElseGet(() -> {
                         var inserted = repository.insertProjectWeek(projectId, sprint.id(), alignedTarget);
                         return repository.findProjectWeekById(inserted.id())
-                                .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst cílový týden.", "target_week_reload_failed"));
+                                .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst cílový týden.",
+                                        "target_week_reload_failed"));
                     });
             List<Long> ids = new ArrayList<>();
             Long targetSprintId = targetWeek.sprintId() == null ? sprint.id() : targetWeek.sprintId();
@@ -303,7 +324,8 @@ public class WeeklyPlannerService {
                 WeeklyTaskRow inserted = repository.insertTask(projectId,
                         targetSprintId,
                         targetWeek.id(),
-                        new WeeklyTaskMutation(task.internId(), task.issueId(), task.note(), task.plannedHours()));
+                        new WeeklyTaskMutation(task.internId(), task.issueId(), task.note(), task.plannedHours(),
+                                null));
                 ids.add(inserted.id());
                 if (task.issueId() != null) {
                     repository.updateIssueDueDate(task.issueId(), targetWeekEnd);
@@ -313,7 +335,8 @@ public class WeeklyPlannerService {
         });
         return newTaskIds.stream()
                 .map(id -> repository.findTaskById(id)
-                        .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst přenesený úkol.", "task_reload_failed")))
+                        .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst přenesený úkol.",
+                                "task_reload_failed")))
                 .map(this::mapTask)
                 .toList();
     }
@@ -332,7 +355,8 @@ public class WeeklyPlannerService {
             }
         });
         ProjectWeekRow refreshed = repository.findProjectWeekById(projectWeekId)
-                .orElseThrow(() -> ApiException.internal("Nepodařilo se načíst týden po uzavření.", "week_reload_failed"));
+                .orElseThrow(
+                        () -> ApiException.internal("Nepodařilo se načíst týden po uzavření.", "week_reload_failed"));
         PlannerMetadata metadata = createMetadata(projectId, project, sprint);
         return new WeekWithMetadata(metadata, mapWeek(refreshed));
     }
@@ -389,7 +413,8 @@ public class WeeklyPlannerService {
                 throw ApiException.validation("Počet hodin nesmí být záporný.", "planned_hours_negative");
             }
             if (hours.compareTo(MAX_WEEKLY_HOURS) > 0) {
-                throw ApiException.validation("Počet hodin nesmí překročit " + MAX_WEEKLY_HOURS + ".", "planned_hours_exceeded");
+                throw ApiException.validation("Počet hodin nesmí překročit " + MAX_WEEKLY_HOURS + ".",
+                        "planned_hours_exceeded");
             }
         }
         if (input.issueId() != null) {
@@ -419,8 +444,10 @@ public class WeeklyPlannerService {
     }
 
     private WeeklyTaskMutation toMutation(TaskInput input) {
-        BigDecimal plannedHours = input.plannedHours() == null ? null : input.plannedHours().setScale(2, RoundingMode.HALF_UP);
-        return new WeeklyTaskMutation(input.internId(), input.issueId(), input.note(), plannedHours);
+        BigDecimal plannedHours = input.plannedHours() == null ? null
+                : input.plannedHours().setScale(2, RoundingMode.HALF_UP);
+        String status = input.status() == null ? null : normalizeIssueState(input.status());
+        return new WeeklyTaskMutation(input.internId(), input.issueId(), input.note(), plannedHours, status);
     }
 
     private WeekDetail mapWeek(ProjectWeekRow row) {
@@ -454,8 +481,8 @@ public class WeeklyPlannerService {
     }
 
     private PlannerMetadata createMetadata(long projectId,
-                                           ProjectConfigurationRow project,
-                                           PlanningSprintEntity sprint) {
+            ProjectConfigurationRow project,
+            PlanningSprintEntity sprint) {
         LocalDate today = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate();
         LocalDate currentWeekStart = alignToWeekStart(today, project.weekStartDay());
         LocalDate currentWeekEnd = computeWeekEnd(currentWeekStart);
@@ -479,6 +506,10 @@ public class WeeklyPlannerService {
     }
 
     private TaskDetail mapTask(WeeklyTaskRow row) {
+        String effectiveStatus = row.issueId() != null ? row.issueState() : row.status();
+        if (effectiveStatus != null) {
+            effectiveStatus = effectiveStatus.toUpperCase(Locale.ROOT);
+        }
         return new TaskDetail(
                 row.id(),
                 row.projectWeekId(),
@@ -491,6 +522,7 @@ public class WeeklyPlannerService {
                 row.issueId(),
                 row.issueTitle(),
                 row.issueState(),
+                effectiveStatus,
                 row.issueDueDate(),
                 row.createdAt(),
                 row.updatedAt());
@@ -524,8 +556,9 @@ public class WeeklyPlannerService {
             throw ApiException.validation("Status je povinný.", "issue_status_required");
         }
         String normalised = status.trim().toLowerCase(Locale.ROOT);
-        if (!normalised.equals("opened") && !normalised.equals("closed")) {
-            throw ApiException.validation("Status může být pouze OPENED nebo CLOSED.", "issue_status_invalid");
+        if (!normalised.equals("opened") && !normalised.equals("closed") && !normalised.equals("in_progress")) {
+            throw ApiException.validation("Status může být pouze OPENED, CLOSED nebo IN_PROGRESS.",
+                    "issue_status_invalid");
         }
         return normalised;
     }
@@ -540,56 +573,58 @@ public class WeeklyPlannerService {
     }
 
     public record PlannerMetadata(long projectId,
-                                   int weekStartDay,
-                                   LocalDate today,
-                                   LocalDate currentWeekStart,
-                                   LocalDate currentWeekEnd,
-                                   Long currentWeekId,
-                                   Long sprintId,
-                                   String sprintName,
-                                   SprintStatus sprintStatus,
-                                   LocalDate sprintDeadline) {
+            int weekStartDay,
+            LocalDate today,
+            LocalDate currentWeekStart,
+            LocalDate currentWeekEnd,
+            Long currentWeekId,
+            Long sprintId,
+            String sprintName,
+            SprintStatus sprintStatus,
+            LocalDate sprintDeadline) {
     }
 
     public record WeekDetail(long id,
-                             long projectId,
-                             Long sprintId,
-                             LocalDate weekStart,
-                             LocalDate weekEnd,
-                             OffsetDateTime createdAt,
-                             OffsetDateTime updatedAt,
-                             List<TaskDetail> tasks) {
+            long projectId,
+            Long sprintId,
+            LocalDate weekStart,
+            LocalDate weekEnd,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            List<TaskDetail> tasks) {
     }
 
     public record TaskDetail(long id,
-                             Long weekId,
-                             Long sprintId,
-                             boolean isBacklog,
-                             String note,
-                             BigDecimal plannedHours,
-                             Long internId,
-                             String internName,
-                             Long issueId,
-                             String issueTitle,
-                             String issueState,
-                             LocalDate deadline,
-                             OffsetDateTime createdAt,
-                             OffsetDateTime updatedAt) {
+            Long weekId,
+            Long sprintId,
+            boolean isBacklog,
+            String note,
+            BigDecimal plannedHours,
+            Long internId,
+            String internName,
+            Long issueId,
+            String issueTitle,
+            String issueState,
+            String status,
+            LocalDate deadline,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {
     }
 
     public record WeeklySummary(long projectWeekId,
-                                long taskCount,
-                                BigDecimal totalHours,
-                                List<InternSummary> perIntern) {
+            long taskCount,
+            BigDecimal totalHours,
+            List<InternSummary> perIntern) {
     }
 
     public record InternSummary(Long internId, String internName, long taskCount, BigDecimal totalHours) {
     }
 
     public record TaskInput(Long issueId,
-                            Long internId,
-                            String note,
-                            BigDecimal plannedHours,
-                            LocalDate deadline) {
+            Long internId,
+            String note,
+            BigDecimal plannedHours,
+            LocalDate deadline,
+            String status) {
     }
 }

@@ -569,7 +569,7 @@ export type WeeklyPlannerTask = {
   issueId: number | null;
   issueTitle: string | null;
   issueState: string | null;
-  status: 'OPENED' | 'CLOSED';
+  status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS';
   deadline: string | null;
   createdAt: string;
   updatedAt: string;
@@ -634,9 +634,11 @@ export type CreateProjectSprintPayload = {
 export type WeeklyTaskPayload = {
   issueId: number | null;
   internId: number | null;
+  dayOfWeek: number;
   note: string | null;
   plannedHours: number | null;
   deadline: string | null;
+  status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS' | null;
 };
 
 export type WeeklyPlannerMetadataDTO = {
@@ -1609,9 +1611,11 @@ function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPaylo
   return {
     issueId: payload.issueId ?? null,
     internId: payload.internId ?? null,
+    dayOfWeek: payload.dayOfWeek,
     note: payload.note ?? null,
     plannedHours: payload.plannedHours ?? null,
     deadline: payload.deadline ?? null,
+    status: payload.status ?? null,
   };
 }
 
@@ -1655,6 +1659,23 @@ export async function deleteWeeklyTask(projectId: number, projectWeekId: number,
   await fetchJson<void>(`${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks/${taskId}`, {
     method: "DELETE",
   });
+}
+
+export async function changeWeeklyTaskStatus(
+  projectId: number,
+  projectWeekId: number,
+  taskId: number,
+  status: string,
+): Promise<WeeklyPlannerTask> {
+  const data = await fetchJson<WeeklyPlannerTaskDTO>(
+    `${API_BASE}/api/projects/${projectId}/weekly-planner/weeks/${projectWeekId}/tasks/${taskId}/status`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status }),
+    },
+  );
+  return mapWeeklyPlannerTask(data);
 }
 
 export async function updateWeeklyTaskWeek(
@@ -1897,22 +1918,22 @@ export async function getProjectLongTermReport(
 
   const months = Array.isArray(data.months)
     ? data.months.map(month => ({
-        monthStart: typeof month.monthStart === "string" ? month.monthStart.trim() : "",
-        hours: sanitizeNumber(month.hours),
-        cost: sanitizeNumber(month.cost),
-        cumulativeHours: sanitizeNumber(month.cumulativeHours),
-        cumulativeCost: sanitizeNumber(month.cumulativeCost),
-        burnRatio: sanitizeNullableNumber(month.burnRatio),
-      }))
+      monthStart: typeof month.monthStart === "string" ? month.monthStart.trim() : "",
+      hours: sanitizeNumber(month.hours),
+      cost: sanitizeNumber(month.cost),
+      cumulativeHours: sanitizeNumber(month.cumulativeHours),
+      cumulativeCost: sanitizeNumber(month.cumulativeCost),
+      burnRatio: sanitizeNullableNumber(month.burnRatio),
+    }))
     : [];
 
   const meta = data.meta
     ? {
-        budget: sanitizeNullableNumber(data.meta.budget),
-        budgetFrom: data.meta.budgetFrom ?? null,
-        budgetTo: data.meta.budgetTo ?? null,
-        hourlyRate: sanitizeNullableNumber(data.meta.hourlyRate),
-      }
+      budget: sanitizeNullableNumber(data.meta.budget),
+      budgetFrom: data.meta.budgetFrom ?? null,
+      budgetTo: data.meta.budgetTo ?? null,
+      hourlyRate: sanitizeNullableNumber(data.meta.hourlyRate),
+    }
     : null;
 
   return {

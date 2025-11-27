@@ -15,7 +15,7 @@ export type WeeklyTaskFormMode = 'create' | 'edit';
 export type WeeklyTaskFormValues = {
   title: string;
   description: string;
-  status: 'OPENED' | 'CLOSED';
+  status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS';
   deadline: string | null;
   issueId: number | null;
   assignedInternId: number | null;
@@ -48,6 +48,7 @@ type SubmitError = string | null;
 
 const statusOptions: Array<{ value: WeeklyTaskFormValues['status']; label: string }> = [
   { value: 'OPENED', label: 'Otevřeno' },
+  { value: 'IN_PROGRESS', label: 'V řešení' },
   { value: 'CLOSED', label: 'Uzavřeno' },
 ];
 

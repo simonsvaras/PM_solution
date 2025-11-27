@@ -152,96 +152,58 @@
   align-items: baseline;
 }
 
-.weekLane__taskActions {
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-}
-
-.weekLane__badge {
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(75, 107, 251, 0.1);
-  color: #4b6bfb;
-  font-size: 0.75rem;
+.weekLane__taskHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .weekLane__taskTitle {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-size: 1rem;
   color: var(--color-text-primary, #1a1a1a);
+  flex: 1;
+  word-break: break-word;
 }
 
-.weekLane__taskMeta {
-  margin: 0.25rem 0 0;
+.weekLane__taskActions {
   display: flex;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary, #4a4a4a);
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
-.weekLane__taskNote {
-  margin: 0.35rem 0 0;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary, #4a4a4a);
-}
-
-.weekLane__addButton {
-  min-width: 180px;
-  padding: 1rem;
-  border-radius: 1rem;
-  border: 1px dashed rgba(75, 107, 251, 0.4);
-  background: rgba(75, 107, 251, 0.05);
-  color: #4b6bfb;
-  font-weight: 600;
-  cursor: pointer;
-  align-self: stretch;
-}
-
-.weekLane__addButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.weeklyTaskList__editButton {
+.weeklyTaskList__iconButton {
   border: none;
   background: transparent;
-  color: #4b6bfb;
-  font-weight: 600;
-  font-size: 0.85rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 0.5rem;
+  color: #8a8a8a;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.weeklyTaskList__editButton:hover:not(:disabled) {
+.weeklyTaskList__iconButton:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1a1a1a;
+}
+
+.weeklyTaskList__iconButton--edit:hover:not(:disabled) {
+  color: #4b6bfb;
   background: rgba(75, 107, 251, 0.1);
 }
 
-.weeklyTaskList__editButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.weeklyTaskList__deleteButton {
-  border: none;
-  background: transparent;
+.weeklyTaskList__iconButton--delete:hover:not(:disabled) {
   color: #d73346;
-  font-weight: 600;
-  font-size: 0.85rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  background: rgba(215, 51, 70, 0.1);
 }
 
-.weeklyTaskList__deleteButton:hover:not(:disabled) {
-  background: rgba(215, 51, 70, 0.12);
-}
-
-.weeklyTaskList__deleteButton:disabled {
-  opacity: 0.5;
+.weeklyTaskList__iconButton:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -249,4 +211,44 @@
   margin: 0;
   font-size: 0.9rem;
   color: var(--color-text-tertiary, #6f6f6f);
+}
+
+.weekLane__taskStatusSwitcher {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.weekLane__statusButton {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: white;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.weekLane__statusButton:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.weekLane__statusButton--active {
+  background: #0f172a;
+  color: white;
+  border-color: #0f172a;
+}
+
+.weekLane__statusButton--active:hover:not(:disabled) {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+
+.weekLane__statusButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

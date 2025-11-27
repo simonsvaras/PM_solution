@@ -24,14 +24,17 @@ import java.util.Optional;
 /**
  * Low-level repository encapsulating access to weekly planning tables.
  *
- * <p>The repository mirrors the structure of {@link czm.pm_solution_be.projects.capacity.ProjectCapacityRepository}
- * and exposes convenient CRUD methods with batch helpers and statistics aggregation used by higher layers.</p>
+ * <p>
+ * The repository mirrors the structure of
+ * {@link czm.pm_solution_be.projects.capacity.ProjectCapacityRepository}
+ * and exposes convenient CRUD methods with batch helpers and statistics
+ * aggregation used by higher layers.
+ * </p>
  */
 @Repository
 public class WeeklyPlannerRepository {
 
-    private static final String SQL_SELECT_WEEK_BY_ID =
-            """
+    private static final String SQL_SELECT_WEEK_BY_ID = """
             SELECT pw.id                       AS project_week_id,
                    pw.project_id,
                    pw.sprint_id,
@@ -48,7 +51,8 @@ public class WeeklyPlannerRepository {
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    iss.title                   AS issue_title,
                    iss.state                   AS issue_state,
-                   iss.due_date                AS issue_due_date
+                   iss.due_date                AS issue_due_date,
+                   wt.status                   AS task_status
             FROM project_week pw
             LEFT JOIN weekly_task wt ON wt.project_week_id = pw.id
             LEFT JOIN intern i ON i.id = wt.intern_id
@@ -57,8 +61,7 @@ public class WeeklyPlannerRepository {
             ORDER BY wt.id ASC
             """;
 
-    private static final String SQL_SELECT_WEEK_BY_PROJECT_AND_DATE =
-            """
+    private static final String SQL_SELECT_WEEK_BY_PROJECT_AND_DATE = """
             SELECT pw.id                       AS project_week_id,
                    pw.project_id,
                    pw.sprint_id,
@@ -75,18 +78,18 @@ public class WeeklyPlannerRepository {
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    iss.title                   AS issue_title,
                    iss.state                   AS issue_state,
-                   iss.due_date                AS issue_due_date
+                   iss.due_date                AS issue_due_date,
+                   wt.status                   AS task_status
             FROM project_week pw
             LEFT JOIN weekly_task wt ON wt.project_week_id = pw.id
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE pw.project_id = ?
-              AND pw.week_start_date = ?
+            AND pw.week_start_date = ?
             ORDER BY wt.id ASC
             """;
 
-    private static final String SQL_LIST_WEEKS_BY_PROJECT =
-            """
+    private static final String SQL_LIST_WEEKS_BY_PROJECT = """
             WITH selected AS (
                 SELECT pw.id         AS project_week_id,
                        pw.project_id,
@@ -116,7 +119,8 @@ public class WeeklyPlannerRepository {
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    iss.title     AS issue_title,
                    iss.state     AS issue_state,
-                   iss.due_date  AS issue_due_date
+                   iss.due_date  AS issue_due_date,
+                   wt.status     AS task_status
             FROM selected s
             LEFT JOIN weekly_task wt ON wt.project_week_id = s.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
@@ -124,8 +128,7 @@ public class WeeklyPlannerRepository {
             ORDER BY s.week_start_date DESC, s.project_week_id DESC, wt.id ASC
             """;
 
-    private static final String SQL_LIST_WEEKS_BY_PROJECT_AND_SPRINT =
-            """
+    private static final String SQL_LIST_WEEKS_BY_PROJECT_AND_SPRINT = """
             WITH selected AS (
                 SELECT pw.id         AS project_week_id,
                        pw.project_id,
@@ -156,7 +159,8 @@ public class WeeklyPlannerRepository {
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    iss.title     AS issue_title,
                    iss.state     AS issue_state,
-                   iss.due_date  AS issue_due_date
+                   iss.due_date  AS issue_due_date,
+                   wt.status     AS task_status
             FROM selected s
             LEFT JOIN weekly_task wt ON wt.project_week_id = s.project_week_id
             LEFT JOIN intern i ON i.id = wt.intern_id
@@ -164,8 +168,7 @@ public class WeeklyPlannerRepository {
             ORDER BY s.week_start_date DESC, s.project_week_id DESC, wt.id ASC
             """;
 
-    private static final String SQL_SELECT_LAST_WEEK_BY_SPRINT =
-            """
+    private static final String SQL_SELECT_LAST_WEEK_BY_SPRINT = """
             SELECT pw.id         AS id,
                    pw.project_id,
                    pw.sprint_id,
@@ -179,11 +182,9 @@ public class WeeklyPlannerRepository {
             LIMIT 1
             """;
 
-    private static final String SQL_PROJECT_WEEK_EXISTS =
-            "SELECT EXISTS (SELECT 1 FROM project_week WHERE project_id = ? AND week_start_date = ?)";
+    private static final String SQL_PROJECT_WEEK_EXISTS = "SELECT EXISTS (SELECT 1 FROM project_week WHERE project_id = ? AND week_start_date = ?)";
 
-    private static final String SQL_INSERT_PROJECT_WEEK =
-            """
+    private static final String SQL_INSERT_PROJECT_WEEK = """
             INSERT INTO project_week (project_id, sprint_id, week_start_date)
             VALUES (?, ?, ?)
             RETURNING id,
@@ -194,8 +195,7 @@ public class WeeklyPlannerRepository {
                       updated_at AS project_week_updated_at
             """;
 
-    private static final String SQL_UPDATE_PROJECT_WEEK =
-            """
+    private static final String SQL_UPDATE_PROJECT_WEEK = """
             UPDATE project_week
             SET week_start_date = ?,
                 updated_at      = NOW()
@@ -210,8 +210,7 @@ public class WeeklyPlannerRepository {
 
     private static final String SQL_DELETE_PROJECT_WEEK = "DELETE FROM project_week WHERE id = ?";
 
-    private static final String SQL_SELECT_TASK_BY_ID =
-            """
+    private static final String SQL_SELECT_TASK_BY_ID = """
             SELECT wt.id,
                    wt.project_id,
                    wt.project_week_id,
@@ -225,15 +224,15 @@ public class WeeklyPlannerRepository {
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    iss.title AS issue_title,
                    iss.state AS issue_state,
-                   iss.due_date AS issue_due_date
+                   iss.due_date AS issue_due_date,
+                   wt.status AS task_status
             FROM weekly_task wt
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.id = ?
             """;
 
-    private static final String SQL_LIST_TASKS_BY_WEEK =
-            """
+    private static final String SQL_LIST_TASKS_BY_WEEK = """
             SELECT wt.id,
                    wt.project_id,
                    wt.project_week_id,
@@ -247,7 +246,8 @@ public class WeeklyPlannerRepository {
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    iss.title AS issue_title,
                    iss.state AS issue_state,
-                   iss.due_date AS issue_due_date
+                   iss.due_date AS issue_due_date,
+                   wt.status AS task_status
             FROM weekly_task wt
             LEFT JOIN intern i ON i.id = wt.intern_id
             LEFT JOIN issue iss ON iss.id = wt.issue_id
@@ -255,20 +255,19 @@ public class WeeklyPlannerRepository {
             ORDER BY wt.id ASC
             """;
 
-    private static final String SQL_INSERT_WEEKLY_TASK =
-            """
-            INSERT INTO weekly_task (project_id, sprint_id, project_week_id, intern_id, issue_id, note, planned_hours)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+    private static final String SQL_INSERT_WEEKLY_TASK = """
+            INSERT INTO weekly_task (project_id, sprint_id, project_week_id, intern_id, issue_id, note, planned_hours, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             """;
 
-    private static final String SQL_UPDATE_WEEKLY_TASK =
-            """
+    private static final String SQL_UPDATE_WEEKLY_TASK = """
             UPDATE weekly_task
             SET intern_id     = ?,
                 issue_id      = ?,
                 note          = ?,
                 planned_hours = ?,
+                status        = ?,
                 updated_at    = NOW()
             WHERE id = ?
             RETURNING id
@@ -276,11 +275,9 @@ public class WeeklyPlannerRepository {
 
     private static final String SQL_DELETE_WEEKLY_TASK = "DELETE FROM weekly_task WHERE id = ?";
 
-    private static final String SQL_BATCH_INSERT_TASK =
-            "INSERT INTO weekly_task (project_id, sprint_id, project_week_id, intern_id, issue_id, note, planned_hours) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    private static final String SQL_BATCH_INSERT_TASK = "INSERT INTO weekly_task (project_id, sprint_id, project_week_id, intern_id, issue_id, note, planned_hours, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-    private static final String SQL_UPDATE_TASK_ASSIGNMENT =
-            """
+    private static final String SQL_UPDATE_TASK_ASSIGNMENT = """
             UPDATE weekly_task
             SET project_week_id = ?,
                 sprint_id       = ?,
@@ -291,14 +288,11 @@ public class WeeklyPlannerRepository {
 
     private static final String SQL_BATCH_DELETE_TASK = "DELETE FROM weekly_task WHERE id = ?";
 
-    private static final String SQL_SELECT_PROJECT_CONFIGURATION =
-            "SELECT p.id, p.week_start_day FROM project p WHERE p.id = ?";
+    private static final String SQL_SELECT_PROJECT_CONFIGURATION = "SELECT p.id, p.week_start_day FROM project p WHERE p.id = ?";
 
-    private static final String SQL_UPDATE_PROJECT_WEEK_START_DAY =
-            "UPDATE project SET week_start_day = ? WHERE id = ?";
+    private static final String SQL_UPDATE_PROJECT_WEEK_START_DAY = "UPDATE project SET week_start_day = ? WHERE id = ?";
 
-    private static final String SQL_CHECK_ISSUE_BELONGS_TO_PROJECT =
-            """
+    private static final String SQL_CHECK_ISSUE_BELONGS_TO_PROJECT = """
             SELECT EXISTS (
                 SELECT 1
                 FROM issue iss
@@ -308,28 +302,22 @@ public class WeeklyPlannerRepository {
             )
             """;
 
-    private static final String SQL_CHECK_INTERN_ASSIGNED_TO_PROJECT =
-            "SELECT EXISTS (SELECT 1 FROM intern_project ip WHERE ip.project_id = ? AND ip.intern_id = ?)";
+    private static final String SQL_CHECK_INTERN_ASSIGNED_TO_PROJECT = "SELECT EXISTS (SELECT 1 FROM intern_project ip WHERE ip.project_id = ? AND ip.intern_id = ?)";
 
-    private static final String SQL_SELECT_ISSUE_METADATA =
-            "SELECT id, state, due_date FROM issue WHERE id = ?";
+    private static final String SQL_SELECT_ISSUE_METADATA = "SELECT id, state, due_date FROM issue WHERE id = ?";
 
-    private static final String SQL_UPDATE_ISSUE_STATE =
-            "UPDATE issue SET state = ?, updated_at = NOW() WHERE id = ?";
+    private static final String SQL_UPDATE_ISSUE_STATE = "UPDATE issue SET state = ?, updated_at = NOW() WHERE id = ?";
 
-    private static final String SQL_UPDATE_ISSUE_DUE_DATE =
-            "UPDATE issue SET due_date = ? WHERE id = ?";
+    private static final String SQL_UPDATE_ISSUE_DUE_DATE = "UPDATE issue SET due_date = ? WHERE id = ?";
 
-    private static final String SQL_STATS_TOTAL =
-            """
+    private static final String SQL_STATS_TOTAL = """
             SELECT COUNT(*)                    AS task_count,
                    COALESCE(SUM(planned_hours), 0) AS total_hours
             FROM weekly_task
             WHERE project_week_id = ?
             """;
 
-    private static final String SQL_STATS_BY_INTERN =
-            """
+    private static final String SQL_STATS_BY_INTERN = """
             SELECT wt.intern_id,
                    concat_ws(' ', i.first_name, i.last_name) AS intern_name,
                    COUNT(*)                    AS task_count,
@@ -377,6 +365,7 @@ public class WeeklyPlannerRepository {
                     rs.getString("issue_title"),
                     rs.getString("issue_state"),
                     issueDueDate,
+                    rs.getString("task_status"),
                     taskCreated,
                     taskUpdated);
         }
@@ -420,6 +409,7 @@ public class WeeklyPlannerRepository {
                     rs.getString("issue_title"),
                     rs.getString("issue_state"),
                     issueDueDate,
+                    rs.getString("task_status"),
                     createdAt,
                     updatedAt);
         }
@@ -447,11 +437,11 @@ public class WeeklyPlannerRepository {
         }
     };
 
-    private static final RowMapper<ProjectConfigurationRow> PROJECT_CONFIGURATION_MAPPER = (rs, rn) ->
-            new ProjectConfigurationRow(rs.getLong("id"), rs.getInt("week_start_day"));
+    private static final RowMapper<ProjectConfigurationRow> PROJECT_CONFIGURATION_MAPPER = (rs,
+            rn) -> new ProjectConfigurationRow(rs.getLong("id"), rs.getInt("week_start_day"));
 
-    private static final RowMapper<IssueMetadataRow> ISSUE_METADATA_MAPPER = (rs, rn) ->
-            new IssueMetadataRow(rs.getLong("id"), rs.getString("state"), rs.getObject("due_date", LocalDate.class));
+    private static final RowMapper<IssueMetadataRow> ISSUE_METADATA_MAPPER = (rs, rn) -> new IssueMetadataRow(
+            rs.getLong("id"), rs.getString("state"), rs.getObject("due_date", LocalDate.class));
 
     public Optional<ProjectWeekRow> findProjectWeekById(long projectWeekId) {
         List<ProjectWeekRawRow> rows = jdbc.query(SQL_SELECT_WEEK_BY_ID, PROJECT_WEEK_RAW_MAPPER, projectWeekId);
@@ -461,7 +451,8 @@ public class WeeklyPlannerRepository {
 
     public Optional<ProjectWeekRow> findProjectWeek(long projectId, LocalDate weekStartDate) {
         Objects.requireNonNull(weekStartDate, "weekStartDate");
-        List<ProjectWeekRawRow> rows = jdbc.query(SQL_SELECT_WEEK_BY_PROJECT_AND_DATE, PROJECT_WEEK_RAW_MAPPER, projectId, weekStartDate);
+        List<ProjectWeekRawRow> rows = jdbc.query(SQL_SELECT_WEEK_BY_PROJECT_AND_DATE, PROJECT_WEEK_RAW_MAPPER,
+                projectId, weekStartDate);
         List<ProjectWeekRow> aggregated = aggregateWeeks(rows);
         return aggregated.isEmpty() ? Optional.empty() : Optional.of(aggregated.get(0));
     }
@@ -474,7 +465,8 @@ public class WeeklyPlannerRepository {
         if (sprintId == null) {
             rows = jdbc.query(SQL_LIST_WEEKS_BY_PROJECT, PROJECT_WEEK_RAW_MAPPER, projectId, limit, offset);
         } else {
-            rows = jdbc.query(SQL_LIST_WEEKS_BY_PROJECT_AND_SPRINT, PROJECT_WEEK_RAW_MAPPER, projectId, sprintId, limit, offset);
+            rows = jdbc.query(SQL_LIST_WEEKS_BY_PROJECT_AND_SPRINT, PROJECT_WEEK_RAW_MAPPER, projectId, sprintId, limit,
+                    offset);
         }
         return aggregateWeeks(rows);
     }
@@ -486,7 +478,8 @@ public class WeeklyPlannerRepository {
     }
 
     public Optional<ProjectConfigurationRow> findProjectConfiguration(long projectId) {
-        List<ProjectConfigurationRow> rows = jdbc.query(SQL_SELECT_PROJECT_CONFIGURATION, PROJECT_CONFIGURATION_MAPPER, projectId);
+        List<ProjectConfigurationRow> rows = jdbc.query(SQL_SELECT_PROJECT_CONFIGURATION, PROJECT_CONFIGURATION_MAPPER,
+                projectId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
@@ -507,7 +500,8 @@ public class WeeklyPlannerRepository {
     public Optional<ProjectWeekMetadataRow> updateProjectWeek(long projectWeekId, LocalDate newWeekStartDate) {
         Objects.requireNonNull(newWeekStartDate, "newWeekStartDate");
         try {
-            ProjectWeekMetadataRow updated = jdbc.queryForObject(SQL_UPDATE_PROJECT_WEEK, PROJECT_WEEK_METADATA_MAPPER, newWeekStartDate, projectWeekId);
+            ProjectWeekMetadataRow updated = jdbc.queryForObject(SQL_UPDATE_PROJECT_WEEK, PROJECT_WEEK_METADATA_MAPPER,
+                    newWeekStartDate, projectWeekId);
             return Optional.ofNullable(updated);
         } catch (EmptyResultDataAccessException ex) {
             return Optional.empty();
@@ -547,13 +541,26 @@ public class WeeklyPlannerRepository {
             setNullableLong(ps, 5, mutation.issueId());
             setNullableString(ps, 6, mutation.note());
             setNullableBigDecimal(ps, 7, mutation.plannedHours());
+            setNullableString(ps, 8, mutation.status());
             return ps;
         }, singleLongExtractor());
         if (taskId == null) {
             throw new IllegalStateException("Databáze při vkládání weekly_task nevrátila žádné ID.");
         }
-        return findTaskById(taskId).orElseThrow(() ->
-                new IllegalStateException("Vložený weekly_task s ID " + taskId + " nebyl nalezen."));
+        return findTaskById(taskId)
+                .orElseThrow(() -> new IllegalStateException("Vložený weekly_task s ID " + taskId + " nebyl nalezen."));
+    }
+
+    private static final String SQL_UPDATE_TASK_STATUS = """
+            UPDATE weekly_task
+            SET status = ?,
+                updated_at = NOW()
+            WHERE id = ?
+            """;
+
+    public boolean updateTaskStatus(long taskId, String status) {
+        int updated = jdbc.update(SQL_UPDATE_TASK_STATUS, status, taskId);
+        return updated > 0;
     }
 
     public Optional<WeeklyTaskRow> updateTask(long taskId, WeeklyTaskMutation mutation) {
@@ -565,7 +572,8 @@ public class WeeklyPlannerRepository {
                 setNullableLong(ps, 2, mutation.issueId());
                 setNullableString(ps, 3, mutation.note());
                 setNullableBigDecimal(ps, 4, mutation.plannedHours());
-                ps.setLong(5, taskId);
+                setNullableString(ps, 5, mutation.status());
+                ps.setLong(6, taskId);
                 return ps;
             }, singleLongExtractor());
             if (updatedId == null) {
@@ -596,6 +604,7 @@ public class WeeklyPlannerRepository {
                 setNullableLong(ps, 5, mutation.issueId());
                 setNullableString(ps, 6, mutation.note());
                 setNullableBigDecimal(ps, 7, mutation.plannedHours());
+                setNullableString(ps, 8, mutation.status());
             }
 
             @Override
@@ -606,8 +615,8 @@ public class WeeklyPlannerRepository {
     }
 
     public Optional<WeeklyTaskRow> updateTaskAssignment(long taskId,
-                                                        Long projectWeekId,
-                                                        long sprintId) {
+            Long projectWeekId,
+            long sprintId) {
         try {
             Long updatedId = jdbc.query(con -> {
                 PreparedStatement ps = con.prepareStatement(SQL_UPDATE_TASK_ASSIGNMENT);
@@ -690,8 +699,9 @@ public class WeeklyPlannerRepository {
         }
         Map<Long, ProjectWeekAggregation> aggregated = new LinkedHashMap<>();
         for (ProjectWeekRawRow row : rows) {
-            ProjectWeekAggregation aggregation = aggregated.computeIfAbsent(row.projectWeekId(), id ->
-                    new ProjectWeekAggregation(row.projectWeekId(), row.projectId(), row.sprintId(), row.weekStartDate(), row.projectWeekCreatedAt(), row.projectWeekUpdatedAt()));
+            ProjectWeekAggregation aggregation = aggregated.computeIfAbsent(row.projectWeekId(),
+                    id -> new ProjectWeekAggregation(row.projectWeekId(), row.projectId(), row.sprintId(),
+                            row.weekStartDate(), row.projectWeekCreatedAt(), row.projectWeekUpdatedAt()));
             if (row.taskId() != null) {
                 aggregation.addTask(new WeeklyTaskRow(
                         row.taskId(),
@@ -706,6 +716,7 @@ public class WeeklyPlannerRepository {
                         row.issueTitle(),
                         row.issueState(),
                         row.issueDueDate(),
+                        row.status(),
                         row.taskCreatedAt(),
                         row.taskUpdatedAt()));
             }
@@ -736,7 +747,8 @@ public class WeeklyPlannerRepository {
         }
     }
 
-    private static void setNullableBigDecimal(PreparedStatement ps, int parameterIndex, BigDecimal value) throws SQLException {
+    private static void setNullableBigDecimal(PreparedStatement ps, int parameterIndex, BigDecimal value)
+            throws SQLException {
         if (value == null) {
             ps.setNull(parameterIndex, Types.NUMERIC);
         } else {
@@ -755,73 +767,76 @@ public class WeeklyPlannerRepository {
     }
 
     private record ProjectWeekRawRow(long projectWeekId,
-                                     long projectId,
-                                     Long sprintId,
-                                     LocalDate weekStartDate,
-                                     OffsetDateTime projectWeekCreatedAt,
-                                     OffsetDateTime projectWeekUpdatedAt,
-                                     Long taskId,
-                                     String note,
-                                     BigDecimal plannedHours,
-                                     Long internId,
-                                     String internName,
-                                     Long issueId,
-                                     String issueTitle,
-                                     String issueState,
-                                     LocalDate issueDueDate,
-                                     OffsetDateTime taskCreatedAt,
-                                     OffsetDateTime taskUpdatedAt) {
+            long projectId,
+            Long sprintId,
+            LocalDate weekStartDate,
+            OffsetDateTime projectWeekCreatedAt,
+            OffsetDateTime projectWeekUpdatedAt,
+            Long taskId,
+            String note,
+            BigDecimal plannedHours,
+            Long internId,
+            String internName,
+            Long issueId,
+            String issueTitle,
+            String issueState,
+            LocalDate issueDueDate,
+            String status,
+            OffsetDateTime taskCreatedAt,
+            OffsetDateTime taskUpdatedAt) {
     }
 
     public record ProjectWeekRow(long id,
-                                 long projectId,
-                                 Long sprintId,
-                                 LocalDate weekStartDate,
-                                 OffsetDateTime createdAt,
-                                 OffsetDateTime updatedAt,
-                                 List<WeeklyTaskRow> tasks) {
+            long projectId,
+            Long sprintId,
+            LocalDate weekStartDate,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            List<WeeklyTaskRow> tasks) {
     }
 
     public record ProjectWeekMetadataRow(long id,
-                                         long projectId,
-                                         Long sprintId,
-                                         LocalDate weekStartDate,
-                                         OffsetDateTime createdAt,
-                                         OffsetDateTime updatedAt) {
+            long projectId,
+            Long sprintId,
+            LocalDate weekStartDate,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {
     }
 
     public record WeeklyTaskRow(long id,
-                                Long projectWeekId,
-                                long projectId,
-                                Long sprintId,
-                                String note,
-                                BigDecimal plannedHours,
-                                Long internId,
-                                String internName,
-                                Long issueId,
-                                String issueTitle,
-                                String issueState,
-                                LocalDate issueDueDate,
-                                OffsetDateTime createdAt,
-                                OffsetDateTime updatedAt) {
+            Long projectWeekId,
+            long projectId,
+            Long sprintId,
+            String note,
+            BigDecimal plannedHours,
+            Long internId,
+            String internName,
+            Long issueId,
+            String issueTitle,
+            String issueState,
+            LocalDate issueDueDate,
+            String status,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {
     }
 
     public record WeeklyTaskMutation(Long internId,
-                                     Long issueId,
-                                     String note,
-                                     BigDecimal plannedHours) {
+            Long issueId,
+            String note,
+            BigDecimal plannedHours,
+            String status) {
     }
 
     public record InternStatisticsRow(Long internId,
-                                      String internName,
-                                      long taskCount,
-                                      BigDecimal totalHours) {
+            String internName,
+            long taskCount,
+            BigDecimal totalHours) {
     }
 
     public record WeeklyStatisticsRow(long projectWeekId,
-                                      long taskCount,
-                                      BigDecimal totalHours,
-                                      List<InternStatisticsRow> perIntern) {
+            long taskCount,
+            BigDecimal totalHours,
+            List<InternStatisticsRow> perIntern) {
     }
 
     private record WeeklyTotalsRow(long taskCount, BigDecimal totalHours) {
@@ -843,11 +858,11 @@ public class WeeklyPlannerRepository {
         private final List<WeeklyTaskRow> tasks = new ArrayList<>();
 
         private ProjectWeekAggregation(long projectWeekId,
-                                       long projectId,
-                                       Long sprintId,
-                                       LocalDate weekStartDate,
-                                       OffsetDateTime createdAt,
-                                       OffsetDateTime updatedAt) {
+                long projectId,
+                Long sprintId,
+                LocalDate weekStartDate,
+                OffsetDateTime createdAt,
+                OffsetDateTime updatedAt) {
             this.projectWeekId = projectWeekId;
             this.projectId = projectId;
             this.sprintId = sprintId;
@@ -861,7 +876,8 @@ public class WeeklyPlannerRepository {
         }
 
         private ProjectWeekRow toRow() {
-            return new ProjectWeekRow(projectWeekId, projectId, sprintId, weekStartDate, createdAt, updatedAt, List.copyOf(tasks));
+            return new ProjectWeekRow(projectWeekId, projectId, sprintId, weekStartDate, createdAt, updatedAt,
+                    List.copyOf(tasks));
         }
     }
 }
