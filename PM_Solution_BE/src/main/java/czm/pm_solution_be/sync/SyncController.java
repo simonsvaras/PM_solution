@@ -75,9 +75,12 @@ public class SyncController {
     }
 
     @PostMapping("/projects/{projectId}/issues")
-    public SyncSummary syncIssues(@PathVariable long projectId, @RequestParam(defaultValue = "false") boolean full) {
+    public SyncSummary syncIssues(@PathVariable long projectId,
+                                  @RequestParam(defaultValue = "false") boolean full,
+                                  @RequestParam(required = false)
+                                  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since) {
         long start = System.currentTimeMillis();
-        SyncSummary s = issueSyncService.syncProjectIssues(projectId, full);
+        SyncSummary s = issueSyncService.syncProjectIssues(projectId, full, since);
         s.durationMs = System.currentTimeMillis() - start;
         return s;
     }
@@ -204,7 +207,7 @@ public class SyncController {
         StepAggregate issues = new StepAggregate();
         long st = System.currentTimeMillis();
         try {
-            SyncSummary s = issueSyncService.syncProjectIssues(projectId, full);
+            SyncSummary s = issueSyncService.syncProjectIssues(projectId, full, null);
             issues.status = "OK";
             issues.fetched = s.fetched;
             issues.inserted = s.inserted;

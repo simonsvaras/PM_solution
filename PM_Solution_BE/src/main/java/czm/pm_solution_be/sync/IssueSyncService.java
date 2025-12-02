@@ -28,6 +28,10 @@ public class IssueSyncService {
     }
 
     public SyncSummary syncProjectIssues(long gitlabProjectId, boolean full) {
+        return syncProjectIssues(gitlabProjectId, full, null);
+    }
+
+    public SyncSummary syncProjectIssues(long gitlabProjectId, boolean full, OffsetDateTime manualSince) {
         // Ensure repository exists locally
         Long repositoryId = dao.findRepositoryIdByGitLabRepoId(gitlabProjectId).orElse(null);
         if (repositoryId == null) {
@@ -41,7 +45,9 @@ public class IssueSyncService {
 
         log.info("Starting issues sync repo={} full={}", gitlabProjectId, full);
         OffsetDateTime updatedAfter = null;
-        if (!full) {
+        if (manualSince != null) {
+            updatedAfter = manualSince;
+        } else if (!full) {
             updatedAfter = dao.getRepoCursor(repositoryId, "issues").orElse(null);
         }
 
@@ -86,9 +92,7 @@ public class IssueSyncService {
             if (pageRes.nextPage == null || pageRes.nextPage.isEmpty()) break;
             page = Integer.parseInt(pageRes.nextPage);
         }
-        if (!full) {
-            dao.upsertRepoCursor(repositoryId, "issues", OffsetDateTime.now());
-        }
+        dao.upsertRepoCursor(repositoryId, "issues", OffsetDateTime.now());
         log.info("Issues sync done: repo={} fetched={} pages={}", gitlabProjectId, summary.fetched, summary.pages);
         return summary;
     }
@@ -112,7 +116,7 @@ public class IssueSyncService {
         SyncSummary total = new SyncSummary();
         int processed = 0;
         for (Long gitlabRepoId : repoIds) {
-            SyncSummary s = syncProjectIssues(gitlabRepoId, full);
+            SyncSummary s = syncProjectIssues(gitlabRepoId, full, null);
             total.addFetched(s.fetched);
             total.addInserted(s.inserted);
             total.addUpdated(s.updated);

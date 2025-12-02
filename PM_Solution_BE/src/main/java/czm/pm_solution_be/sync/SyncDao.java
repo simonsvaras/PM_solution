@@ -1031,8 +1031,6 @@ public class SyncDao {
                     WHERE ptr.project_id = ?
                       AND r.spent_at >= ?
                       AND r.spent_at < ?
-                      AND (p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
-                      AND (p.budget_to IS NULL OR r.spent_at::date <= p.budget_to)
                     GROUP BY 1
                 )
                 SELECT ms.month_start,

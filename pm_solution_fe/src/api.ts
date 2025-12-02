@@ -17,6 +17,11 @@ export type ProjectReportSyncPayload = {
   to?: string;
 };
 
+export type ProjectIssueSyncPayload = {
+  sinceLast: boolean;
+  since?: string;
+};
+
 export type GlobalReportSyncPayload = {
   sinceLast?: boolean;
   from?: string;
@@ -1802,6 +1807,39 @@ export async function syncProjectReports(projectId: number, payload: ProjectRepo
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await parseJson<ErrorResponse>(res);
+  return parseJson<SyncSummary>(res);
+}
+
+export async function syncProjectReportsAsync(
+  projectId: number,
+  payload: ProjectReportSyncPayload,
+  onProgress?: (processed: number, total: number) => void,
+): Promise<SyncSummary> {
+  const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/reports/async`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (res.status !== 202 && !res.ok) throw await parseJson<ErrorResponse>(res);
+  const started = await parseJson<StartJobResponse>(res);
+  return waitForJob(started.jobId, 2000, 60 * 60 * 1000, onProgress);
+}
+
+export async function syncProjectIssues(
+  projectId: number,
+  payload: ProjectIssueSyncPayload,
+): Promise<SyncSummary> {
+  const params = new URLSearchParams();
+  const sinceLast = payload.sinceLast !== false;
+  const since = payload.since ?? undefined;
+  params.set("full", String(!sinceLast));
+  if (since && since.length > 0) {
+    params.set("since", since);
+  }
+  const res = await fetch(`${API_BASE}/api/sync/projects/${projectId}/issues?${params.toString()}`, {
+    method: "POST",
   });
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<SyncSummary>(res);

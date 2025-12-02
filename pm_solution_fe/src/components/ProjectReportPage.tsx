@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import './ProjectReportPage.css';
 import TeamReportTable from './TeamReportTable';
 import type { ProjectOverviewDTO, SyncSummary, TeamReportTeam, ErrorResponse, ProjectCapacityReport } from '../api';
-import { getProjectCapacity, getReportTeams, syncProjectReports, syncProjectMilestones } from '../api';
+import { getProjectCapacity, getReportTeams, syncProjectReportsAsync, syncProjectMilestones, syncProjectIssues } from '../api';
 import BudgetBurnIndicator from './BudgetBurnIndicator';
 import ProjectSettingsModal from './ProjectSettingsModal';
 
@@ -31,6 +31,12 @@ export default function ProjectReportPage({
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [syncProgress, setSyncProgress] = useState<{ processed: number; total: number } | null>(null);
+  const [issueSinceLast, setIssueSinceLast] = useState(true);
+  const [issueSinceValue, setIssueSinceValue] = useState('');
+  const [issueSyncing, setIssueSyncing] = useState(false);
+  const [issueSyncError, setIssueSyncError] = useState<string | null>(null);
+  const [issueSyncSummary, setIssueSyncSummary] = useState<SyncSummary | null>(null);
   const [team, setTeam] = useState<TeamReportTeam | null>(null);
   const [teamStatus, setTeamStatus] = useState<'idle' | 'loading' | 'loaded'>('idle');
   const [teamError, setTeamError] = useState<ErrorResponse | null>(null);
@@ -185,6 +191,7 @@ export default function ProjectReportPage({
   async function handleSync() {
     setSyncError(null);
     setSyncSummary(null);
+    setSyncProgress(null);
     if (!sinceLast && !fromValue) {
       setSyncError('Vyplňte datum "Od" nebo synchronizujte od poslední synchronizace.');
       return;
@@ -205,14 +212,45 @@ export default function ProjectReportPage({
         from: sinceLast ? undefined : toIsoOrUndefined(fromValue),
         to: sinceLast ? undefined : toIsoOrUndefined(toValue),
       };
-      const result = await syncProjectReports(project.id, payload);
+      const result = await syncProjectReportsAsync(project.id, payload, (processed, total) => {
+        setSyncProgress({ processed, total });
+      });
       setSyncSummary(result);
     } catch (err) {
       const error = err as ErrorResponse;
       const message = error?.error?.message || 'Synchronizaci se nepodařilo dokončit.';
       setSyncError(message);
     } finally {
+      setSyncProgress(null);
       setSyncing(false);
+    }
+  }
+
+  async function handleIssueSync() {
+    setIssueSyncError(null);
+    setIssueSyncSummary(null);
+    if (!issueSinceLast && !issueSinceValue) {
+      setIssueSyncError('Vyplňte datum "Od" pro synchronizaci issues.');
+      return;
+    }
+    const sinceIso = issueSinceLast ? undefined : toIsoOrUndefined(issueSinceValue);
+    if (!issueSinceLast && !sinceIso) {
+      setIssueSyncError('Datum "Od" musí být ve správném formátu.');
+      return;
+    }
+    setIssueSyncing(true);
+    try {
+      const summary = await syncProjectIssues(project.id, {
+        sinceLast: issueSinceLast,
+        since: sinceIso,
+      });
+      setIssueSyncSummary(summary);
+    } catch (err) {
+      const error = err as ErrorResponse;
+      const message = error?.error?.message ?? 'Synchronizaci issues se nepodařilo dokončit.';
+      setIssueSyncError(message);
+    } finally {
+      setIssueSyncing(false);
     }
   }
 
@@ -223,6 +261,14 @@ export default function ProjectReportPage({
     if (checked) {
       setFromValue('');
       setToValue('');
+    }
+  }
+
+  function handleToggleIssueSinceLast(event: ChangeEvent<HTMLInputElement>) {
+    const checked = event.target.checked;
+    setIssueSinceLast(checked);
+    if (checked) {
+      setIssueSinceValue('');
     }
   }
 
@@ -299,7 +345,43 @@ export default function ProjectReportPage({
               {milestoneSyncing ? 'Synchronizuji…' : 'Sync Milestones'}
             </button>
           </section>
-        </div>
+           <section className="projectReport__card projectReport__issuesCard" aria-label="Synchronizace issues">
+            <h2>Issues</h2>
+            <p className="projectReport__issueDescription">
+              Sputť synchronizaci, která z GitLabu načte aktuální stav issues pro všechny repozitáře projektu.
+            </p>
+            <label className="projectReport__checkbox">
+              <input type="checkbox" checked={issueSinceLast} onChange={handleToggleIssueSinceLast} />
+              Synchronizovat jen issues změněné od poslední synchronizace
+            </label>
+            <div className="projectReport__range projectReport__range--single" aria-disabled={issueSinceLast}>
+              <label>
+                <span>Od</span>
+                <input
+                  type="datetime-local"
+                  value={issueSinceValue}
+                  onChange={event => setIssueSinceValue(event.target.value)}
+                  disabled={issueSinceLast}
+                />
+              </label>
+            </div>
+            {issueSyncError ? <p className="projectReport__status projectReport__status--error">{issueSyncError}</p> : null}
+            {issueSyncSummary ? (
+              <p className="projectReport__status projectReport__status--success">
+                Načteno {issueSyncSummary.fetched} issues, vloženo {issueSyncSummary.inserted}, aktualizováno{' '}
+                {issueSyncSummary.updated}.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="projectReport__syncButton"
+              onClick={handleIssueSync}
+              disabled={issueSyncing}
+            >
+              {issueSyncing ? 'Synchronizuji?' : 'Synchronizovat issues'}
+            </button>
+          </section>
+       </div>
         <section className="projectReport" aria-label={`Report projektu ${currentProject.name}`}>
           <div className="projectReport__card projectReport__overviewCard">
             <div className="projectReport__overviewHeader">
@@ -345,6 +427,11 @@ export default function ProjectReportPage({
               </label>
             </div>
             {syncError ? <p className="projectReport__status projectReport__status--error">{syncError}</p> : null}
+            {syncing && syncProgress && syncProgress.total > 0 ? (
+              <p className="projectReport__status projectReport__status--info">
+                Synchronizuji repozit??e: {syncProgress.processed}/{syncProgress.total}
+              </p>
+            ) : null}
             {syncSummary ? (
               <p className="projectReport__status projectReport__status--success">
                 Načteno {syncSummary.fetched} záznamů, vloženo {syncSummary.inserted}, přeskočeno {syncSummary.skipped}. Trvalo{' '}

@@ -210,8 +210,11 @@ export default function InternLevelHistoryModal({
                 <div className="field">
                   <label htmlFor="history-from">Datum od</label>
                   {lockedValidFrom ? (
-                    <div className="intern-level-history__value" id="history-from">
-                      {lockedValidFrom}
+                    <div>
+                      <div className="intern-level-history__value" id="history-from">
+                        {lockedValidFrom}
+                      </div>
+                      <p className="intern-level-history__autofillHint">Automaticky navazuje na předchozí období.</p>
                     </div>
                   ) : (
                     <input

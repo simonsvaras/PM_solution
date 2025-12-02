@@ -83,6 +83,28 @@ const modules: Module[] = [
   },
 ];
 
+const HelpIcon = ({ text }: { text: string }) => (
+  <span
+    className="on-demand-helpIcon"
+    role="img"
+    aria-label={text}
+    tabIndex={0}
+    data-tooltip={text}
+    onClick={event => {
+      event.preventDefault();
+      event.stopPropagation();
+    }}
+    onKeyDown={event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }}
+  >
+    !
+  </span>
+);
+
 type ReportDetailView =
   | 'summary'
   | 'detail'
@@ -974,44 +996,65 @@ function App() {
                   <div className="on-demand-layout">
                     <div className="on-demand-layout__filters">
                       <h2 className="on-demand-layout__title">Nastavení synchronizace</h2>
-                      <div className="on-demand-layout__toggles">
-                        <label className="checkbox">
-                          <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
-                          <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
-                        </label>
-                        <label className="checkbox">
-                          <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
-                          <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
-                        </label>
+
+                      <div className="on-demand-layout__group">
+                        <h3 className="on-demand-layout__subtitle">Nastavení issues</h3>
+                        <div className="on-demand-layout__toggles">
+                          <label className="checkbox">
+                            <input type="checkbox" checked={deltaOnly} onChange={e => setDeltaOnly(e.target.checked)} />
+                            <span>Synchronizovat jen issues změněné od poslední synchronizace</span>
+                            <HelpIcon text="Stáhne pouze issues, které se změnily od posledního běhu. Zrychlí synchronizaci, ale ignoruje starší změny." />
+                          </label>
+                          <label className="checkbox">
+                            <input type="checkbox" checked={assignedOnly} onChange={e => setAssignedOnly(e.target.checked)} />
+                            <span>Sync issues jen pro repozitáře přiřazené k projektu</span>
+                            <HelpIcon text="Omezí synchronizaci jen na repozitáře napojené na projekty. Hodí se, pokud nechcete stahovat všechna data." />
+                          </label>
+                        </div>
+                        <div className="on-demand-layout__fields on-demand-layout__fields--issues">
+                          <label className="on-demand-layout__field">
+                            <span className="on-demand-layout__label">
+                              <span>Since</span>
+                              <HelpIcon text="Volitelné ruční datum/čas odkdy se mají issues znovu načítat. Nechte prázdné, pokud chcete použít poslední známý stav." />
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="YYYY-MM-DDTHH:mm:ssZ"
+                              value={since}
+                              onChange={e => setSince(e.target.value)}
+                            />
+                          </label>
+                        </div>
                       </div>
-                      <div className="on-demand-layout__fields">
-                        <label className="on-demand-layout__field">
-                          <span>Since</span>
-                          <input
-                            type="text"
-                            placeholder="YYYY-MM-DDTHH:mm:ssZ"
-                            value={since}
-                            onChange={e => setSince(e.target.value)}
-                          />
-                        </label>
-                        <label className="on-demand-layout__field on-demand-layout__field--reports-range">
-                          <span>Reporty od</span>
-                          <input
-                            type="datetime-local"
-                            value={reportsFrom}
-                            onChange={e => setReportsFrom(e.target.value)}
-                          />
-                        </label>
-                        <label className="on-demand-layout__field on-demand-layout__field--reports-range">
-                          <span>Reporty do</span>
-                          <input
-                            type="datetime-local"
-                            value={reportsTo}
-                            onChange={e => setReportsTo(e.target.value)}
-                          />
-                        </label>
+
+                      <div className="on-demand-layout__group">
+                        <h3 className="on-demand-layout__subtitle">Nastavení reportů</h3>
+                        <div className="on-demand-layout__fields">
+                          <label className="on-demand-layout__field on-demand-layout__field--reports-range">
+                            <span className="on-demand-layout__label">
+                              <span>Reporty od</span>
+                              <HelpIcon text="Spodní hranice časového intervalu pro synchronizaci reportů." />
+                            </span>
+                            <input
+                              type="datetime-local"
+                              value={reportsFrom}
+                              onChange={e => setReportsFrom(e.target.value)}
+                            />
+                          </label>
+                          <label className="on-demand-layout__field on-demand-layout__field--reports-range">
+                            <span className="on-demand-layout__label">
+                              <span>Reporty do</span>
+                              <HelpIcon text="Horní hranice intervalu. Musí být stejná nebo novější než pole „Reporty od“." />
+                            </span>
+                            <input
+                              type="datetime-local"
+                              value={reportsTo}
+                              onChange={e => setReportsTo(e.target.value)}
+                            />
+                          </label>
+                        </div>
+                        <p className={reportRangeHintClassName}>{reportRangeMessage}</p>
                       </div>
-                      <p className={reportRangeHintClassName}>{reportRangeMessage}</p>
                     </div>
 
                     <div className="on-demand-layout__actions">

@@ -106,7 +106,7 @@
 .errorText { color: #b91c1c; font-size: 0.9rem; }
 
 .modal--wide {
-  width: min(840px, 96vw);
+  width: min(60%, 70vw);
 }
 
 .modal__body--repos {

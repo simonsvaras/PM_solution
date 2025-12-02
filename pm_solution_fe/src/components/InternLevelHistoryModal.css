@@ -48,6 +48,12 @@
   color: #666;
 }
 
+.intern-level-history__autofillHint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #666;
+}
+
 .intern-level-history__list table {
   width: 100%;
   border-collapse: collapse;

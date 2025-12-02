@@ -29,45 +29,12 @@ type StatusMessage = {
   text: string;
 };
 
-function formatDateInput(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getCurrentYearRange(): { from: string; to: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 1);
-  const end = new Date(now.getFullYear(), 11, 31);
-  return {
-    from: formatDateInput(start),
-    to: formatDateInput(end),
-  };
-}
-
-function parseDateInput(value: string): Date | null {
-  if (!value) return null;
-  const [yearStr, monthStr, dayStr] = value.split('-');
-  const year = Number.parseInt(yearStr, 10);
-  const month = Number.parseInt(monthStr, 10);
-  const day = Number.parseInt(dayStr, 10);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  return date;
-}
-
 function formatMonthKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatYearDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function normalizeMonthKey(value: string): string | null {
@@ -162,11 +129,18 @@ function getMonthKeyFromMonthStart(value: string): string | null {
  * dependencies to keep the bundle size small.
  */
 export default function ProjectReportLongTermPage({ project }: ProjectReportLongTermPageProps) {
-  const defaultRange = useMemo(() => getCurrentYearRange(), []);
-  const [fromValue, setFromValue] = useState(defaultRange.from);
-  const [toValue, setToValue] = useState(defaultRange.to);
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const availableYears = useMemo(() => {
+    const years: number[] = [];
+    for (let offset = 0; offset < 5; offset += 1) {
+      years.push(currentYear - offset);
+    }
+    return years;
+  }, [currentYear]);
+  const [selectedYear, setSelectedYear] = useState<number>(availableYears[0]);
+  const fromValue = useMemo(() => formatYearDate(selectedYear, 1, 1), [selectedYear]);
+  const toValue = useMemo(() => formatYearDate(selectedYear, 12, 31), [selectedYear]);
   const [loading, setLoading] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
   const [error, setError] = useState<ErrorResponse | null>(null);
   const [reportMonths, setReportMonths] = useState<ProjectLongTermReportMonth[]>([]);
   const [reportMeta, setReportMeta] = useState<ProjectLongTermReportMeta | null>(null);
@@ -187,102 +161,66 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   // Reset the local state whenever the project changes so that the date range and derived caches
   // always reflect the newly selected project without carrying over previous data.
   useEffect(() => {
-    setFromValue(defaultRange.from);
-    setToValue(defaultRange.to);
+    setSelectedYear(availableYears[0]);
     setReportMonths([]);
     setReportMeta(null);
     setTotalHours(0);
     setTotalCost(0);
-    setValidationError(null);
     setError(null);
     setMilestoneCosts([]);
     setSelectedMilestoneIds([]);
     setMilestoneCostError(null);
-  }, [project.id, defaultRange.from, defaultRange.to]);
+  }, [project.id, availableYears]);
 
-  // Fetch the long-term project report for the currently selected date interval. Validation happens
-  // on the client before issuing the request to provide immediate feedback.
+  // Fetch the long-term project report for the currently selected year.
   useEffect(() => {
-    const parsedFrom = parseDateInput(fromValue);
-    const parsedTo = parseDateInput(toValue);
-
-    if (!fromValue || !toValue) {
-      setValidationError('Zadejte období od a do.');
-      setError(null);
-      setLoading(false);
-      setReportMonths([]);
-      setReportMeta(null);
-      setTotalHours(0);
-      setTotalCost(0);
-      return;
-    }
-
-    if (!parsedFrom || !parsedTo) {
-      setValidationError('Datum musí být ve formátu RRRR-MM-DD.');
-      setError(null);
-      setLoading(false);
-      setReportMonths([]);
-      setReportMeta(null);
-      setTotalHours(0);
-      setTotalCost(0);
-      return;
-    }
-
-    if (parsedFrom > parsedTo) {
-      setValidationError('Datum "Od" nesmí být později než datum "Do".');
-      setError(null);
-      setLoading(false);
-      setReportMonths([]);
-      setReportMeta(null);
-      setTotalHours(0);
-      setTotalCost(0);
-      return;
-    }
-
-    setValidationError(null);
     setLoading(true);
     setError(null);
+    setReportMonths([]);
+    setReportMeta(null);
+    setTotalHours(0);
+    setTotalCost(0);
 
     let ignore = false;
     getProjectLongTermReport(projectId, { from: fromValue, to: toValue })
-      .then((response: ProjectLongTermReportResponse) => {
-        if (ignore) {
-          return;
-        }
-        setReportMeta(response.meta ?? null);
-        setReportMonths(Array.isArray(response.months) ? response.months : []);
-        setTotalHours(typeof response.totalHours === 'number' ? response.totalHours : 0);
-        setTotalCost(typeof response.totalCost === 'number' ? response.totalCost : 0);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (ignore) {
-          return;
-        }
-        const fallbackError: ErrorResponse = {
-          error: {
-            code: 'unknown',
-            message: 'Nepodařilo se načíst dlouhodobý report.',
-            httpStatus: 0,
-          },
-        };
-        if (err && typeof err === 'object' && 'error' in err) {
-          setError(err as ErrorResponse);
-        } else {
-          setError(fallbackError);
-        }
-        setReportMonths([]);
-        setReportMeta(null);
-        setTotalHours(0);
-        setTotalCost(0);
-        setLoading(false);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [projectId, fromValue, toValue]);
-
+      .then((response: ProjectLongTermReportResponse) => {
+        if (ignore) {
+          return;
+        }
+        setReportMeta(response.meta ?? null);
+        setReportMonths(Array.isArray(response.months) ? response.months : []);
+        setTotalHours(typeof response.totalHours === 'number' ? response.totalHours : 0);
+        setTotalCost(typeof response.totalCost === 'number' ? response.totalCost : 0);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (ignore) {
+          return;
+        }
+        const fallbackError: ErrorResponse = {
+          error: {
+            code: 'unknown',
+            message: 'Nepoda?ilo se na??st dlouhodob? report.',
+            httpStatus: 0,
+          },
+        };
+        if (err && typeof err === 'object' && 'error' in err) {
+          setError(err as ErrorResponse);
+        } else {
+          setError(fallbackError);
+        }
+        setReportMonths([]);
+        setReportMeta(null);
+        setTotalHours(0);
+        setTotalCost(0);
+        setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [projectId, fromValue, toValue]);
+
   // Keep the milestone cost dataset in sync with the project selection and preserve any previously
   // selected milestone IDs when they are still present in the refreshed payload.
   useEffect(() => {
@@ -334,32 +272,18 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   }, [projectId]);
 
   const monthRange = useMemo(() => {
-    const start = parseDateInput(fromValue);
-    const end = parseDateInput(toValue);
-    if (!start || !end) {
-      return [];
-    }
-    const months: string[] = [];
-    const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
-    const lastMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
-    while (cursor <= lastMonth) {
-      months.push(formatMonthKey(cursor));
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-    }
-    return months;
-  }, [fromValue, toValue]);
+    return Array.from({ length: 12 }, (_, index) =>
+      formatMonthKey(new Date(Date.UTC(selectedYear, index, 1))),
+    );
+  }, [selectedYear]);
 
   const resolvedBudget = useMemo(() => {
     const metaBudget = reportMeta?.budget;
     if (typeof metaBudget === 'number' && Number.isFinite(metaBudget) && metaBudget > 0) {
       return metaBudget;
     }
-    const projectBudget = project?.budget;
-    if (typeof projectBudget === 'number' && Number.isFinite(projectBudget) && projectBudget > 0) {
-      return projectBudget;
-    }
     return null;
-  }, [reportMeta?.budget, project?.budget]);
+  }, [reportMeta?.budget]);
 
   const chartPoints = useMemo<ChartPoint[]>(() => {
     if (monthRange.length === 0) {
@@ -411,9 +335,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   );
   const hasChartData = (hasHoursData || hasBurnoutData) && chartPoints.length > 0;
 
-  const statusMessage: StatusMessage | null = validationError
-    ? { tone: 'error', text: validationError }
-    : error
+  const statusMessage: StatusMessage | null = error
     ? { tone: 'error', text: error.error?.message ?? 'Nepodařilo se načíst dlouhodobý report.' }
     : loading
     ? { tone: 'muted', text: 'Načítám data…' }
@@ -486,6 +408,13 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     const allowed = new Set(selectedMilestoneIds);
     return milestoneCosts.filter(item => allowed.has(item.milestoneId));
   }, [milestoneCosts, selectedMilestoneIds]);
+
+  const handleYearChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const parsed = Number(event.target.value);
+    if (Number.isFinite(parsed)) {
+      setSelectedYear(parsed);
+    }
+  };
 
   // Calculate the maximum cost to scale the comparison bars even when the API returns numeric
   // strings (e.g. from JSON serialisation of decimals).
@@ -560,7 +489,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     setSelectedMilestoneIds(values);
   };
 
-  const emptyState = !loading && !error && !validationError && !hasChartData && chartPoints.length > 0;
+  const emptyState = !loading && !error && !hasChartData && chartPoints.length > 0;
 
   const statusClassName = statusMessage
     ? [
@@ -576,23 +505,15 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     <div className="projectLongTerm" data-testid="project-long-term-page">
       <section className="projectLongTerm__controls" aria-label="Filtry dlouhodobého reportu">
         <div className="projectLongTerm__filters">
-          <label>
-            <span>Období od</span>
-            <input
-              type="date"
-              value={fromValue}
-              max={toValue || undefined}
-              onChange={event => setFromValue(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Období do</span>
-            <input
-              type="date"
-              value={toValue}
-              min={fromValue || undefined}
-              onChange={event => setToValue(event.target.value)}
-            />
+          <label className="projectLongTerm__yearSelect">
+            <span>Rok</span>
+            <select value={selectedYear} onChange={handleYearChange}>
+              {availableYears.map(year => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <div className="projectLongTerm__summary" aria-live="polite">
@@ -650,7 +571,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
             >
               <title id={chartTitleId}>{`Dlouhodobý report projektu ${project.name}`}</title>
               <desc id={chartDescId}>
-                Sloupce zobrazují měsíční součty hodin, linie vyjadřuje kumulativní vyčerpání rozpočtu.
+                Sloupce zobrazují měsíční součty hodin za rok {selectedYear}, linie vyjadřuje kumulativní vyčerpání rozpočtu.
               </desc>
               <line
                 x1={paddingX}
@@ -775,7 +696,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
           ) : (
             <p className="projectLongTerm__empty" role="status">
               {emptyState
-                ? 'Za zvolené období nejsou dostupná data.'
+                ? `Za rok ${selectedYear} nejsou dostupná data.`
                 : 'Žádná data k zobrazení.'}
             </p>
           )}

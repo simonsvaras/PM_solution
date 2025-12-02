@@ -30,6 +30,11 @@ public class ReportSyncService {
         this.graphQlClient = graphQlClient;
     }
 
+    public interface ProgressListener {
+        void onStart(int totalRepositories);
+        void onRepositoryFinished(int processedRepositories, SyncDao.ProjectRepositoryLink repository);
+    }
+
     /**
      * Synchronises all timelog entries for the repositories attached to the
      * provided project.
@@ -41,28 +46,45 @@ public class ReportSyncService {
      * @return aggregated sync statistics propagated back to the controller and the frontend.
      */
     public SyncSummary syncProjectReports(long projectId, OffsetDateTime from, OffsetDateTime to, boolean sinceLast) {
+        return syncProjectReports(projectId, from, to, sinceLast, null);
+    }
+
+    public SyncSummary syncProjectReports(long projectId,
+                                          OffsetDateTime from,
+                                          OffsetDateTime to,
+                                          boolean sinceLast,
+                                          ProgressListener listener) {
         List<SyncDao.ProjectRepositoryLink> repositories = syncDao.listProjectRepositories(projectId);
         if (repositories.isEmpty()) {
-            throw new IllegalArgumentException("Projekt nemá přiřazené žádné repozitáře");
+            throw new IllegalArgumentException("Projekt nem? p?i?azen? ??dn? repozit??e");
         }
-        return syncReportsAcrossRepositories(repositories, from, to, sinceLast);
+        return syncReportsAcrossRepositories(repositories, from, to, sinceLast, listener);
     }
 
     public SyncSummary syncAllReports(OffsetDateTime from, OffsetDateTime to, boolean sinceLast) {
+        return syncAllReports(from, to, sinceLast, null);
+    }
+
+    public SyncSummary syncAllReports(OffsetDateTime from, OffsetDateTime to, boolean sinceLast, ProgressListener listener) {
         List<SyncDao.ProjectRepositoryLink> repositories = syncDao.listAllRepositoriesForSync();
         if (repositories.isEmpty()) {
             return new SyncSummary();
         }
-        return syncReportsAcrossRepositories(repositories, from, to, sinceLast);
+        return syncReportsAcrossRepositories(repositories, from, to, sinceLast, listener);
     }
 
     private SyncSummary syncReportsAcrossRepositories(List<SyncDao.ProjectRepositoryLink> repositories,
                                                       OffsetDateTime from,
                                                       OffsetDateTime to,
-                                                      boolean sinceLast) {
+                                                      boolean sinceLast,
+                                                      ProgressListener listener) {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime effectiveTo = to != null ? to : now;
         SyncSummary summary = new SyncSummary();
+        if (listener != null) {
+            listener.onStart(repositories.size());
+        }
+        int processed = 0;
 
         for (SyncDao.ProjectRepositoryLink repo : repositories) {
             if (repo.gitlabRepoId() == null) {
@@ -143,6 +165,11 @@ public class ReportSyncService {
                 hasNext = pageInfo != null && pageInfo.hasNextPage();
                 cursor = hasNext ? pageInfo.endCursor() : null;
             } while (hasNext && cursor != null);
+
+            processed++;
+            if (listener != null) {
+                listener.onRepositoryFinished(processed, repo);
+            }
         }
 
         return summary;
