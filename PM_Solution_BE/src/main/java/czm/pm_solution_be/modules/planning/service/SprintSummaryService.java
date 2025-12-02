@@ -41,6 +41,10 @@ public class SprintSummaryService {
     }
 
     private boolean isTaskClosed(WeeklyTaskEntity task) {
+        String status = task.taskStatus();
+        if (status != null && "closed".equalsIgnoreCase(status.trim())) {
+            return true;
+        }
         String state = task.issueState();
         return state != null && "closed".equalsIgnoreCase(state.trim());
     }

@@ -18,6 +18,7 @@ public record WeeklyTaskDto(long id,
                             Long issueId,
                             String issueTitle,
                             String issueState,
+                            String status,
                             LocalDate deadline,
                             OffsetDateTime createdAt,
                             OffsetDateTime updatedAt) {

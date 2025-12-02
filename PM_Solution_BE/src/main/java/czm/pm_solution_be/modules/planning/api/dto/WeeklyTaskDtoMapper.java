@@ -23,6 +23,7 @@ public final class WeeklyTaskDtoMapper {
                 entity.issueId(),
                 entity.issueTitle(),
                 entity.issueState(),
+                entity.taskStatus(),
                 entity.issueDueDate(),
                 entity.createdAt(),
                 entity.updatedAt());

@@ -4,6 +4,70 @@
   gap: 1rem;
 }
 
+.weeklyTaskList__lanesWrapper {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.weeklyTaskList__lanes {
+  display: inline-flex;
+  flex-direction: row;
+  gap: 1rem;
+  min-width: 100%;
+  align-items: flex-start;
+}
+
+.weekLane {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(26, 26, 26, 0.06);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weekLane--active {
+  border-color: rgba(75, 107, 251, 0.6);
+  box-shadow: 0 10px 26px rgba(75, 107, 251, 0.15);
+}
+
+.weekLane--dropActive {
+  border-color: rgba(75, 107, 251, 0.9);
+  box-shadow: 0 12px 30px rgba(75, 107, 251, 0.25);
+}
+
+.weekLane__addButton {
+  flex: 0 0 220px;
+  min-height: 120px;
+  border-radius: 1rem;
+  border: 1px dashed var(--color-border, #d7d7d7);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--color-text-secondary, #4a4a4a);
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.weekLane__addButton:hover:not(:disabled) {
+  background: #f5f7ff;
+  border-color: rgba(75, 107, 251, 0.6);
+}
+
+.weekLane__addButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .weeklyTaskList__statusMessage {
   display: flex;
   align-items: center;
@@ -16,49 +80,6 @@
   border: none;
   background: transparent;
   color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0;
-}
-
-.weeklyTaskList__dismissButton:hover {
-  text-decoration: none;
-}
-
-.weeklyTaskList__lanesWrapper {
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-}
-
-.weeklyTaskList__lanes {
-  display: flex;
-  gap: 1rem;
-  min-height: 320px;
-}
-
-.weekLane {
-  min-width: 280px;
-  max-width: 340px;
-  background: #fff;
-  border-radius: 1rem;
-  border: 1px solid rgba(26, 26, 26, 0.08);
-  padding: 1rem;
-  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.weekLane--active {
-  border-color: rgba(75, 107, 251, 0.35);
-  box-shadow: 0 12px 32px rgba(75, 107, 251, 0.18);
-}
-
-.weekLane--dropActive {
-  outline: 2px dashed rgba(75, 107, 251, 0.4);
-  outline-offset: 4px;
 }
 
 .weekLane__header {
@@ -251,4 +272,16 @@
 .weekLane__statusButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .weeklyTaskList__lanes {
+    flex-direction: column;
+  }
+
+  .weekLane,
+  .weekLane__addButton {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }

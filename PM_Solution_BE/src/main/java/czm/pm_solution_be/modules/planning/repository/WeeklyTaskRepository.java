@@ -24,7 +24,7 @@ public class WeeklyTaskRepository {
             LEFT JOIN issue iss ON iss.id = wt.issue_id
             WHERE wt.project_id = ?
               AND wt.sprint_id = ?
-              AND (iss.state IS NULL OR LOWER(iss.state) <> 'closed')
+              AND COALESCE(UPPER(wt.status), UPPER(iss.state), 'OPENED') <> 'CLOSED'
             """;
 
     private static final String SQL_SELECT_TASKS_BY_SPRINT =
@@ -41,6 +41,7 @@ public class WeeklyTaskRepository {
                    iss.title AS issue_title,
                    iss.state AS issue_state,
                    iss.due_date AS issue_due_date,
+                   wt.status AS task_status,
                    wt.created_at,
                    wt.updated_at
             FROM weekly_task wt
@@ -67,6 +68,7 @@ public class WeeklyTaskRepository {
                     rs.getObject("issue_id") == null ? null : rs.getLong("issue_id"),
                     rs.getString("issue_title"),
                     rs.getString("issue_state"),
+                    rs.getString("task_status"),
                     rs.getObject("issue_due_date", LocalDate.class),
                     rs.getObject("created_at", OffsetDateTime.class),
                     rs.getObject("updated_at", OffsetDateTime.class));
@@ -99,6 +101,7 @@ public class WeeklyTaskRepository {
                                    Long issueId,
                                    String issueTitle,
                                    String issueState,
+                                   String taskStatus,
                                    LocalDate issueDueDate,
                                    OffsetDateTime createdAt,
                                    OffsetDateTime updatedAt) {

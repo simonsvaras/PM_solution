@@ -752,6 +752,7 @@ export type SprintSummaryTaskDTO = {
   issueId: number | null;
   issueTitle: string | null;
   issueState: string | null;
+  status?: string | null;
   deadline: string | null;
   createdAt: string;
   updatedAt: string;
@@ -990,9 +991,15 @@ function mapInternDetail(dto: InternDetailDTO): InternDetail {
   };
 }
 
-function normaliseWeeklyTaskStatus(status: string | null | undefined): 'OPENED' | 'CLOSED' {
+function normaliseWeeklyTaskStatus(status: string | null | undefined): 'OPENED' | 'CLOSED' | 'IN_PROGRESS' {
   const normalized = typeof status === 'string' ? status.trim().toUpperCase() : '';
-  return normalized === 'CLOSED' ? 'CLOSED' : 'OPENED';
+  if (normalized === 'CLOSED') {
+    return 'CLOSED';
+  }
+  if (normalized === 'IN_PROGRESS') {
+    return 'IN_PROGRESS';
+  }
+  return 'OPENED';
 }
 
 function mapWeeklyPlannerTask(dto: WeeklyPlannerTaskDTO): WeeklyPlannerTask {
@@ -1054,6 +1061,7 @@ function mapSprintTaskSummary(dto: SprintTaskSummaryDTO | null | undefined): Spr
 }
 
 function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
+  const resolvedStatus = dto.status ?? dto.issueState ?? 'OPENED';
   const baseTask = mapWeeklyPlannerTask({
     id: dto.id,
     weekId: dto.projectWeekId ?? null,
@@ -1065,7 +1073,7 @@ function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
     issueId: dto.issueId ?? null,
     issueTitle: dto.issueTitle ?? null,
     issueState: dto.issueState ?? null,
-    status: dto.issueState ?? null,
+    status: resolvedStatus,
     deadline: dto.deadline ?? null,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
@@ -1077,6 +1085,7 @@ function mapSprintSummaryTask(dto: SprintSummaryTaskDTO): SprintSummaryTask {
     projectId: dto.projectId,
     projectWeekId: dto.projectWeekId,
     sprintId: dto.sprintId,
+    status: resolvedStatus as 'OPENED' | 'CLOSED' | 'IN_PROGRESS',
   };
 }
 

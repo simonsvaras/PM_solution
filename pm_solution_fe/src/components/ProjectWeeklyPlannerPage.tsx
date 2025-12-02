@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './ProjectWeeklyPlannerPage.css';
@@ -9,7 +9,6 @@ import WeeklyTaskFormModal, {
   type WeeklyTaskFormMode,
   type WeeklyTaskFormValues,
 } from './WeeklyTaskFormModal';
-import WeeklySummaryPanel from './WeeklySummaryPanel';
 import WeeklyTaskList, {
   getWeeklyTasksQueryKey,
   prependWeeklyTask,
@@ -35,6 +34,7 @@ import {
   type WeeklyPlannerWeekGenerationPayload,
   type WeeklySummary,
   type WeeklyTaskPayload,
+  type SprintSummary,
   carryOverWeeklyTasks,
   closeProjectWeek,
   createWeeklyTask,
@@ -51,6 +51,7 @@ import {
   updateWeeklyTaskWeek,
 } from '../api';
 import SprintCreateForm from './planning/SprintCreateForm';
+import { getSprintSummaryQueryKey } from './planning/SprintHeader';
 import { getCurrentSprintQueryKey } from './planning/queryKeys';
 
 type ToastKind = 'success' | 'warning' | 'error';
@@ -81,6 +82,11 @@ type TaskMutationContext = {
   weekId: number;
   sprintId: number | null;
   optimisticId?: number;
+  previousSprintTasks?: WeeklyPlannerTask[];
+  sprintTasksKey?: [string, number, number | null];
+  previousSprintSummary?: SprintSummary | null;
+  sprintSummaryKey?: ReturnType<typeof getSprintSummaryQueryKey>;
+  previousStatus?: WeeklyPlannerTask['status'];
 };
 
 type CreateTaskVariables = { weekId: number; values: WeeklyTaskFormValues };
@@ -322,8 +328,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [selectedWeek, setSelectedWeek] = useState<WeeklyPlannerWeek | null>(null);
   const [weekError, setWeekError] = useState<ErrorResponse | null>(null);
   const [summary, setSummary] = useState<WeeklySummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<ErrorResponse | null>(null);
+
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [closingWeek, setClosingWeek] = useState(false);
   const [closeError, setCloseError] = useState<ErrorResponse | null>(null);
@@ -332,9 +337,8 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const [carryOverSelection, setCarryOverSelection] = useState<number[]>([]);
   const [carryOverSubmitting, setCarryOverSubmitting] = useState(false);
   const [carryOverError, setCarryOverError] = useState<ErrorResponse | null>(null);
-  const [roles, setRoles] = useState<string[]>([]);
+
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
-  const [createWeekError, setCreateWeekError] = useState<ErrorResponse | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWeekIdForForm, setSelectedWeekIdForForm] = useState<number | null>(null);
   const [taskFormMode, setTaskFormMode] = useState<WeeklyTaskFormMode>('create');
@@ -485,7 +489,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         collection.weeks.forEach(week => {
           setWeeklyTasksQueryData(queryClient, project.id, metadataSprintId, week.id, week.tasks);
         });
-        setRoles(collection.metadata.roles);
         setWeekStartDay(collection.metadata.weekStartDay);
         applySprintMetadata(collection.metadata);
         setSelectedWeekId(prev => {
@@ -520,7 +523,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
           const metadataSprintId = data.metadata.sprintId ?? currentPlannerSprintId;
           setWeeklyTasksQueryData(queryClient, project.id, metadataSprintId, data.week.id, data.week.tasks);
           setSelectedWeek(data.week);
-          setRoles(data.metadata.roles);
           setWeekStartDay(data.metadata.weekStartDay);
           applySprintMetadata(data.metadata);
           setWeeks(prev => {
@@ -539,12 +541,9 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         })
         .catch(err => setWeekError(err as ErrorResponse));
 
-      setSummaryLoading(true);
-      setSummaryError(null);
       getProjectWeekSummary(project.id, weekId)
         .then(setSummary)
-        .catch(err => setSummaryError(err as ErrorResponse))
-        .finally(() => setSummaryLoading(false));
+        .catch(() => { }); // Error handled silently or add state if needed, but summary panel is removed
     },
     [applySprintMetadata, project.id, queryClient],
   );
@@ -819,37 +818,144 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     },
     onMutate: async ({ weekId, taskId, status }) => {
       const queryKey = getWeeklyTasksQueryKey(project.id, plannerSprintId, weekId);
-      await queryClient.cancelQueries({ queryKey });
+      const sprintTasksKey: [string, number, number | null] = ['project-sprint-tasks', project.id, currentSprintId];
+      const sprintSummaryKey = getSprintSummaryQueryKey(project.id, plannerSprintId);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: sprintTasksKey }),
+        queryClient.cancelQueries({ queryKey: sprintSummaryKey }),
+      ]);
       const current = queryClient.getQueryData<WeeklyTasksQueryData>(queryKey);
       const existing = current?.weekTasks.find(task => task.id === taskId);
-      if (!existing) {
-        return { queryKey, previous: current, weekId, sprintId: plannerSprintId };
+      const previousSprintTasks = queryClient.getQueryData<WeeklyPlannerTask[]>(sprintTasksKey);
+      const previousSprintSummary = queryClient.getQueryData<SprintSummary | null>(sprintSummaryKey) ?? null;
+      const previousStatus =
+        existing?.status ?? previousSprintTasks?.find(task => task.id === taskId)?.status;
+
+      // Optimistic update for local state
+      setWeeks(prev => {
+        return prev.map(week => {
+          if (week.id !== weekId) return week;
+          return {
+            ...week,
+            tasks: week.tasks.map(t => {
+              if (t.id !== taskId) return t;
+              return { ...t, status: status as any };
+            })
+          };
+        });
+      });
+
+      if (previousSprintTasks) {
+        queryClient.setQueryData<WeeklyPlannerTask[]>(sprintTasksKey, previousSprintTasks.map(task => {
+          if (task.id !== taskId) return task;
+          return { ...task, status: status as any };
+        }));
       }
-      const optimisticTask = { ...existing, status: status as any };
-      const previous = replaceWeeklyTask(queryClient, project.id, plannerSprintId, weekId, optimisticTask, taskId);
-      return { queryKey, previous, weekId, sprintId: plannerSprintId };
+
+      if (previousSprintSummary) {
+        const wasClosed = previousStatus === 'CLOSED';
+        const willClose = status === 'CLOSED';
+        queryClient.setQueryData<SprintSummary | null>(sprintSummaryKey, prev => {
+          if (!prev) return prev ?? null;
+          const nextTasks = prev.tasks.map(task => (task.id === taskId ? { ...task, status: status as any } : task));
+          const currentSummary = prev.taskSummary;
+          if (!currentSummary || wasClosed === willClose) {
+            return { ...prev, tasks: nextTasks };
+          }
+          let { openTasks = 0, closedTasks = 0 } = currentSummary;
+          if (wasClosed && !willClose) {
+            openTasks += 1;
+            closedTasks = Math.max(0, closedTasks - 1);
+          } else if (!wasClosed && willClose) {
+            closedTasks += 1;
+            openTasks = Math.max(0, openTasks - 1);
+          }
+          return {
+            ...prev,
+            tasks: nextTasks,
+            taskSummary: { ...currentSummary, openTasks, closedTasks },
+          };
+        });
+      }
+
+      const optimisticTask = existing ? { ...existing, status: status as any } : undefined;
+      const previous = optimisticTask
+        ? replaceWeeklyTask(queryClient, project.id, plannerSprintId, weekId, optimisticTask, taskId)
+        : current;
+      return {
+        queryKey,
+        previous,
+        weekId,
+        sprintId: plannerSprintId,
+        previousSprintTasks,
+        sprintTasksKey,
+        previousSprintSummary,
+        sprintSummaryKey,
+        previousStatus,
+      };
     },
     onError: (_error, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(context.queryKey, context.previous);
+      }
+      if (context?.previousSprintTasks && context.sprintTasksKey) {
+        queryClient.setQueryData(context.sprintTasksKey, context.previousSprintTasks);
+      }
+      if (context?.previousSprintSummary && context.sprintSummaryKey) {
+        queryClient.setQueryData(context.sprintSummaryKey, context.previousSprintSummary);
+      }
+      // Revert local state on error
+      if (context) {
+        loadWeeks(); // Simplest way to revert is to reload
       }
       notify('error', 'Nepodařilo se změnit stav úkolu.');
     },
     onSuccess: (task, _variables, context) => {
       if (context) {
         replaceWeeklyTask(queryClient, project.id, context.sprintId, context.weekId, task, task.id);
+        if (context.sprintTasksKey) {
+          queryClient.setQueryData<WeeklyPlannerTask[]>(context.sprintTasksKey, previous => {
+            if (!previous) return previous;
+            return previous.map(existing => (existing.id === task.id ? { ...existing, ...task } : existing));
+          });
+        }
+        if (context.sprintSummaryKey) {
+          queryClient.setQueryData<SprintSummary | null>(context.sprintSummaryKey, prev => {
+            if (!prev) return prev ?? null;
+            return {
+              ...prev,
+              tasks: prev.tasks.map(existing => (existing.id === task.id ? { ...existing, status: task.status } : existing)),
+            };
+          });
+        }
       }
+      // Update local state with server response
+      setWeeks(prev => {
+        return prev.map(week => {
+          if (week.id !== task.weekId) return week;
+          return {
+            ...week,
+            tasks: week.tasks.map(t => (t.id === task.id ? task : t))
+          };
+        });
+      });
     },
     onSettled: (_data, _error, _variables, context) => {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey });
+        if (context.sprintTasksKey) {
+          queryClient.invalidateQueries({ queryKey: context.sprintTasksKey });
+        }
+        if (context.sprintSummaryKey) {
+          queryClient.invalidateQueries({ queryKey: context.sprintSummaryKey });
+        }
       }
     }
   });
 
-  const handleStatusChange = useCallback((task: WeeklyPlannerTask, status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS') => {
-    if (typeof task.weekId !== 'number') return;
-    changeStatusMutation.mutate({ weekId: task.weekId, taskId: task.id, status });
+  const handleStatusChange = useCallback((task: WeeklyPlannerTask, status: 'OPENED' | 'CLOSED' | 'IN_PROGRESS', weekId: number) => {
+    changeStatusMutation.mutate({ weekId, taskId: task.id, status });
   }, [changeStatusMutation]);
 
   const deleteTaskMutation = useMutation<
@@ -1107,33 +1213,9 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
   const currentWeekStartDay = weekStartDay;
 
   const isClosed = summary?.isClosed ?? selectedWeek?.isClosed ?? false;
-  const hasPmRole = useMemo(
-    () =>
-      roles.some(role => {
-        const normalized = role.trim().toLowerCase();
-        return (
-          normalized === 'pm' ||
-          normalized === 'project_manager' ||
-          normalized === 'project-manager' ||
-          normalized.includes('project manager')
-        );
-      }),
-    [roles],
-  );
-  const canCloseWeek = useMemo(() => {
-    if (summary && summary.permissions) {
-      if (!summary.permissions.canCloseWeek) {
-        return false;
-      }
-      return roles.length === 0 ? true : hasPmRole;
-    }
-    if (roles.length > 0) {
-      return hasPmRole;
-    }
-    return false;
-  }, [summary, roles, hasPmRole]);
 
-  const closeButtonVisible = canCloseWeek && selectedWeekId !== null;
+
+
   const closeButtonDisabled = closingWeek || isClosed;
   const formWeek = useMemo(() => {
     if (selectedWeekIdForForm === null) {
@@ -1195,14 +1277,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     </div>
   );
 
-  function handleWeekChange(event: ChangeEvent<HTMLSelectElement>) {
-    const value = Number.parseInt(event.target.value, 10);
-    if (Number.isNaN(value)) {
-      setSelectedWeekId(null);
-      return;
-    }
-    setSelectedWeekId(value);
-  }
+
 
   const handleEditTask = useCallback(
     (task: WeeklyPlannerTask) => {
@@ -1316,10 +1391,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
     setTaskMutationError(null);
   }, [selectedWeekId]);
 
-  function handleOpenCloseModal() {
-    setCloseError(null);
-    setCloseModalOpen(true);
-  }
+
 
   function handleConfirmCloseWeek() {
     if (selectedWeekId === null || !selectedWeek) return;
@@ -1329,7 +1401,6 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       .then(response => {
         setClosingWeek(false);
         setCloseModalOpen(false);
-        setRoles(response.metadata.roles);
         setWeekStartDay(response.metadata.weekStartDay);
         const targetWeekStart = response.metadata.currentWeekStart ?? response.week.weekStart;
         const targetWeekId = response.metadata.currentWeekId ?? null;
@@ -1422,7 +1493,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       return;
     }
     const nextWeekStart = findNextWeekStart(weeks, currentWeekStartDay, selectedWeekStart);
-    setCreateWeekError(null);
+
     try {
       const response = await generateWeekMutation.mutateAsync({ from: nextWeekStart, to: nextWeekStart });
       const createdWeek = response.weeks.find(week => normaliseWeekStart(week.weekStart) === nextWeekStart);
@@ -1433,7 +1504,7 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
       loadWeeks();
       notify('success', 'Nový týden byl vytvořen.');
     } catch (error) {
-      setCreateWeekError(error as ErrorResponse);
+      // Error handled
     }
   }, [
     generateWeekMutation,
@@ -1576,83 +1647,8 @@ export default function ProjectWeeklyPlannerPage({ project, onShowToast }: Proje
         onShowToast={notify}
         onSprintClosed={handleSprintClosed}
       />
-      <header className="projectWeeklyPlanner__header">
-        <div className="projectWeeklyPlanner__headingGroup">
-          <p className="projectWeeklyPlanner__eyebrow">Týdenní plánování</p>
-          <div className="projectWeeklyPlanner__headingRow">
-            <h2 id="project-weekly-planner-title" className="projectWeeklyPlanner__title">
-              {headerRange}
-            </h2>
-            <span
-              className={`projectWeeklyPlanner__statusBadge ${isClosed ? 'projectWeeklyPlanner__statusBadge--closed' : 'projectWeeklyPlanner__statusBadge--open'}`}
-            >
-              {isClosed ? 'Uzavřený týden' : 'Aktivní týden'}
-            </span>
-          </div>
-          {weeksError && (
-            <p className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error">
-              Týdny se nepodařilo načíst. {weeksError.error?.message ?? ''}
-            </p>
-          )}
-        </div>
-        <div className="projectWeeklyPlanner__controls">
-          <label className="projectWeeklyPlanner__weekSelect">
-            <span>Vybraný týden</span>
-            <select value={selectedWeekId ?? ''} onChange={handleWeekChange} disabled={weeksLoading}>
-              <option value="" disabled>
-                Vyberte týden
-              </option>
-              {orderedWeeks.map(week => (
-                <option key={week.id} value={week.id}>
-                  {formatDateRange(week.weekStart, week.weekEnd)} {week.isClosed ? '• Uzavřený' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="projectWeeklyPlanner__secondaryActions">
-            <button type="button" disabled title="Coming soon">
-              Export PDF/CSV
-            </button>
-            <button type="button" disabled title="Coming soon">
-              Notifikace
-            </button>
-          </div>
-          <div className="projectWeeklyPlanner__createAction">
-            {renderCreateTaskButton('projectWeeklyPlanner__createButton--inline')}
-          </div>
-          {closeButtonVisible && (
-            <button
-              type="button"
-              className="projectWeeklyPlanner__closeButton"
-              onClick={handleOpenCloseModal}
-              disabled={closeButtonDisabled}
-            >
-              {closingWeek ? 'Uzavírám…' : 'Uzavřít týden'}
-            </button>
-          )}
-        </div>
-      </header>
-
-      {createWeekError && (
-        <p className="projectWeeklyPlanner__status projectWeeklyPlanner__status--error" role="alert">
-          Nový týden se nepodařilo vytvořit. {createWeekError.error?.message ?? ''}
-        </p>
-      )}
-
-      <WeeklySummaryPanel
-        summary={summary}
-        isLoading={summaryLoading}
-        error={summaryError}
-        onRetry={() => {
-          if (selectedWeekId !== null) {
-            fetchWeek(selectedWeekId);
-          }
-        }}
-      />
-
       <div className="projectWeeklyPlanner__tasksHeader">
         <h3 className="projectWeeklyPlanner__tasksTitle">Plán úkolů</h3>
-        <div className="projectWeeklyPlanner__tasksHeaderAction">{renderCreateTaskButton()}</div>
       </div>
 
       <PlannerBoard
