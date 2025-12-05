@@ -134,26 +134,75 @@
   color: var(--color-text-primary);
 }
 
-.projectLongTerm__milestoneSelect {
+.projectLongTerm__milestoneChecklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-height: 180px;
+  max-height: 320px;
   padding: 12px;
   border-radius: 18px;
   border: 1px solid var(--color-border);
   background: rgba(15, 23, 42, 0.02);
-  font-size: 0.95rem;
-  color: var(--color-text-primary);
-  resize: vertical;
+  overflow-y: auto;
 }
 
-.projectLongTerm__milestoneSelect:disabled {
+.projectLongTerm__milestoneChecklist[data-disabled='true'] {
   background: rgba(15, 23, 42, 0.04);
+}
+
+.projectLongTerm__milestoneOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+
+.projectLongTerm__milestoneOption input {
+  margin-top: 2px;
+}
+
+.projectLongTerm__milestoneOption input:disabled + span {
   color: var(--color-text-muted);
+}
+
+.projectLongTerm__milestoneOption span {
+  line-height: 1.35;
 }
 
 .projectLongTerm__milestoneSelectHint {
   font-size: 0.85rem;
   color: var(--color-text-muted);
   margin: 0;
+}
+
+.projectLongTerm__milestoneActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.projectLongTerm__milestoneClearButton {
+  margin-top: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-primary);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.projectLongTerm__milestoneClearButton:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.projectLongTerm__milestoneClearButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .projectLongTerm__chartHeader {
@@ -224,6 +273,12 @@
   font-weight: 600;
   fill: var(--color-text-primary);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.75);
+}
+
+.projectLongTerm__chartValue--cost {
+  font-size: 0.7rem;
+  font-weight: 500;
+  fill: var(--color-text-muted);
 }
 
 .projectLongTerm__axisLabel {

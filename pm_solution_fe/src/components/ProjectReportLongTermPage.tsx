@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './ProjectReportLongTermPage.css';
 import type {
@@ -154,7 +154,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const chartDescId = `${chartTitleId}-desc`;
   const milestoneChartTitleId = useId();
   const milestoneChartDescId = `${milestoneChartTitleId}-desc`;
-  const milestoneSelectId = useId();
+  const milestoneSelectLabelId = useId();
+  const milestoneChecklistId = useId();
   const milestoneSelectHintId = useId();
   const projectId = project.id;
 
@@ -243,7 +244,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
               return preserved;
             }
           }
-          return normalized.map(item => item.milestoneId);
+          return [];
         });
         setLoadingMilestoneCosts(false);
       })
@@ -354,6 +355,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const barWidth = chartPoints.length > 1 ? Math.min(36, step * 0.6) : Math.min(60, nominalPlotWidth * 0.4);
 
   const maxHours = chartPoints.reduce((max, point) => Math.max(max, point.hours), 0);
+  const hoursScaleMax = maxHours > 0 ? maxHours * 1.1 : 1;
   const maxBurnout = chartPoints.reduce((max, point) => {
     if (point.burnoutPercent === null || Number.isNaN(point.burnoutPercent)) {
       return max;
@@ -465,29 +467,47 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         .join(' ')
     : '';
 
-  const milestoneStatusId = milestoneStatusMessage ? `${milestoneSelectId}-status` : undefined;
+  const milestoneStatusId = milestoneStatusMessage ? `${milestoneChecklistId}-status` : undefined;
   const milestoneSelectDescribedBy = [milestoneSelectHintId, milestoneStatusId]
     .filter(Boolean)
     .join(' ') || undefined;
-
+  const milestoneChecklistDisabled = loadingMilestoneCosts || milestoneCosts.length === 0;
   const milestoneSelectionEmpty = !loadingMilestoneCosts && milestoneCosts.length > 0 && selectedMilestoneIds.length === 0;
   const milestoneChartHasData = selectedMilestoneSummaries.length > 0 && hasMilestoneCostData;
   const milestoneChartEmptyState =
     !loadingMilestoneCosts && selectedMilestoneSummaries.length > 0 && !hasMilestoneCostData;
 
-  // Size the multi-select depending on available milestones while keeping the control manageable.
-  const milestoneSelectSize = Math.min(10, Math.max(4, milestoneCosts.length || 4));
-
   /**
-   * Updates the selected milestone ID list from the multi-select element while ignoring empty or
-   * unparsable values. The component state stores numeric IDs for easier comparisons later on.
+   * Toggles a milestone ID inside the comparison selection list while preserving the ordering from
+   * the API response to keep the comparison chart predictable.
    */
-  const handleMilestoneSelectionChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const values = Array.from(event.target.selectedOptions)
-      .map(option => Number.parseInt(option.value, 10))
-      .filter(id => Number.isFinite(id));
-    setSelectedMilestoneIds(values);
-  };
+  const handleMilestoneToggle = useCallback(
+    (milestoneId: number) => {
+      setSelectedMilestoneIds(prev => {
+        if (prev.includes(milestoneId)) {
+          return prev.filter(id => id !== milestoneId);
+        }
+        const next = [...prev, milestoneId];
+        if (milestoneCosts.length === 0) {
+          return next;
+        }
+        const orderMap = new Map<number, number>();
+        milestoneCosts.forEach((item, index) => {
+          orderMap.set(item.milestoneId, index);
+        });
+        return next.sort((first, second) => {
+          const firstIndex = orderMap.get(first) ?? Number.POSITIVE_INFINITY;
+          const secondIndex = orderMap.get(second) ?? Number.POSITIVE_INFINITY;
+          return firstIndex - secondIndex;
+        });
+      });
+    },
+    [milestoneCosts],
+  );
+
+  const handleClearMilestoneSelection = useCallback(() => {
+    setSelectedMilestoneIds([]);
+  }, []);
 
   const emptyState = !loading && !error && !hasChartData && chartPoints.length > 0;
 
@@ -598,10 +618,11 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
               })}
               {chartPoints.map((point, index) => {
                 const xCenter = getPointX(index);
-                const heightRatio = maxHours > 0 ? point.hours / maxHours : 0;
+              const heightRatio = hoursScaleMax > 0 ? point.hours / hoursScaleMax : 0;
                 const barHeight = heightRatio * plotHeight;
                 const y = paddingY + (plotHeight - barHeight);
-                const labelY = Math.max(paddingY + 12, y - 8);
+                const hoursLabelY = Math.max(paddingY + 12, y - 8);
+                const costLabelY = Math.max(paddingY + 12, hoursLabelY - 14);
                 return (
                   <g key={`bar-${point.monthKey}`}>
                     <rect
@@ -617,7 +638,15 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                     </rect>
                     <text
                       x={xCenter}
-                      y={labelY}
+                      y={costLabelY}
+                      textAnchor="middle"
+                      className="projectLongTerm__chartValue projectLongTerm__chartValue--cost"
+                    >
+                      {formatCurrency(point.cost)}
+                    </text>
+                    <text
+                      x={xCenter}
+                      y={hoursLabelY}
                       textAnchor="middle"
                       className="projectLongTerm__chartValue"
                     >
@@ -714,35 +743,52 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         </header>
         <div className="projectLongTerm__comparisonControls">
           <div className="projectLongTerm__milestoneSelectGroup">
-            <label className="projectLongTerm__milestoneSelectLabel" htmlFor={milestoneSelectId}>
+            <p id={milestoneSelectLabelId} className="projectLongTerm__milestoneSelectLabel">
               Vyberte milníky
-            </label>
-            <select
-              id={milestoneSelectId}
-              multiple
-              size={milestoneSelectSize}
-              value={selectedMilestoneIds.map(String)}
-              onChange={handleMilestoneSelectionChange}
-              disabled={loadingMilestoneCosts || milestoneCosts.length === 0}
-              className="projectLongTerm__milestoneSelect"
+            </p>
+            <div
+              id={milestoneChecklistId}
+              className="projectLongTerm__milestoneChecklist"
+              role="group"
+              aria-labelledby={milestoneSelectLabelId}
               aria-describedby={milestoneSelectDescribedBy}
+              aria-disabled={milestoneChecklistDisabled}
+              data-disabled={milestoneChecklistDisabled ? 'true' : undefined}
             >
               {milestoneCosts.map(milestone => {
                 const optionLabel = formatMilestoneOptionLabel(milestone);
+                const checked = selectedMilestoneIds.includes(milestone.milestoneId);
                 return (
-                  <option
+                  <label
                     key={milestone.milestoneId}
-                    value={milestone.milestoneId}
+                    className="projectLongTerm__milestoneOption"
                     title={optionLabel}
                   >
-                    {optionLabel}
-                  </option>
+                    <input
+                      type="checkbox"
+                      value={milestone.milestoneId}
+                      checked={checked}
+                      onChange={() => handleMilestoneToggle(milestone.milestoneId)}
+                      disabled={milestoneChecklistDisabled}
+                    />
+                    <span>{optionLabel}</span>
+                  </label>
                 );
               })}
-            </select>
+            </div>
             <p id={milestoneSelectHintId} className="projectLongTerm__milestoneSelectHint">
-              Podržte Ctrl (Command na Macu) pro výběr více milníků.
+              Zaškrtněte milníky, které chcete porovnat.
             </p>
+            <div className="projectLongTerm__milestoneActions">
+              <button
+                type="button"
+                className="projectLongTerm__milestoneClearButton"
+                onClick={handleClearMilestoneSelection}
+                disabled={selectedMilestoneIds.length === 0 || milestoneChecklistDisabled}
+              >
+                Zrušit výběr
+              </button>
+            </div>
           </div>
           {milestoneStatusMessage ? (
             <p
