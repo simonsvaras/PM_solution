@@ -10,8 +10,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 
+/**
+ * Coordinates synchronisation of GitLab issues into the local database.
+ */
 @Service
 public class IssueSyncService {
     private static final Logger log = LoggerFactory.getLogger(IssueSyncService.class);
@@ -27,10 +31,47 @@ public class IssueSyncService {
         this.txTemplate = new TransactionTemplate(tm);
     }
 
+    /**
+     * Runs issue synchronisation for a single GitLab repository.
+     */
     public SyncSummary syncProjectIssues(long gitlabProjectId, boolean full) {
         return syncProjectIssues(gitlabProjectId, full, null);
     }
 
+    /**
+     * Synchronises issues for every repository linked to an internal project.
+     */
+    public SyncSummary syncIssuesForProject(long projectId, boolean full, OffsetDateTime manualSince) {
+        var links = dao.listProjectRepositories(projectId);
+        if (links.isEmpty()) {
+            throw new IllegalArgumentException("Projekt nemá přiřazené žádné repozitáře pro synchronizaci issues.");
+        }
+        LinkedHashSet<Long> gitlabRepoIds = new LinkedHashSet<>();
+        for (SyncDao.ProjectRepositoryLink link : links) {
+            Long gitlabRepoId = link.gitlabRepoId();
+            if (gitlabRepoId != null) {
+                gitlabRepoIds.add(gitlabRepoId);
+            }
+        }
+        if (gitlabRepoIds.isEmpty()) {
+            throw new IllegalArgumentException("Žádný přiřazený repozitář nemá dostupné GitLab ID pro synchronizaci issues.");
+        }
+        SyncSummary total = new SyncSummary();
+        for (Long gitlabRepoId : gitlabRepoIds) {
+            SyncSummary repoSummary = syncProjectIssues(gitlabRepoId, full, manualSince);
+            total.addFetched(repoSummary.fetched);
+            total.addInserted(repoSummary.inserted);
+            total.addUpdated(repoSummary.updated);
+            total.addSkipped(repoSummary.skipped);
+            total.pages += repoSummary.pages;
+            total.addMissingUsernames(repoSummary.missingUsernames);
+        }
+        return total;
+    }
+
+    /**
+     * Downloads issues from GitLab and upserts them into the local store.
+     */
     public SyncSummary syncProjectIssues(long gitlabProjectId, boolean full, OffsetDateTime manualSince) {
         // Ensure repository exists locally
         Long repositoryId = dao.findRepositoryIdByGitLabRepoId(gitlabProjectId).orElse(null);
@@ -97,15 +138,30 @@ public class IssueSyncService {
         return summary;
     }
 
+    /**
+     * Listener for reporting progress of multi-repository sync runs.
+     */
     public interface ProgressListener {
+        /**
+         * Called before the first repository is processed.
+         */
         void onStart(int totalRepos);
+        /**
+         * Called whenever a repository sync completes.
+         */
         void onRepoDone(int processedRepos, long gitlabRepoId, SyncSummary repoSummary);
     }
 
+    /**
+     * Synchronises issues across all repositories, optionally only those assigned to interns.
+     */
     public SyncSummary syncAllIssues(boolean full, boolean assignedOnly) {
         return syncAllIssues(full, assignedOnly, null);
     }
 
+    /**
+     * Synchronises issues across all repositories and reports progress via the listener.
+     */
     public SyncSummary syncAllIssues(boolean full, boolean assignedOnly, ProgressListener progress) {
         // Refresh repositories from the configured CZM group
         repoSyncService.syncAllRepositories();

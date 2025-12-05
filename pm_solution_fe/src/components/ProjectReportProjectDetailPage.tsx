@@ -170,12 +170,13 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     key: 'time' | 'cost';
     direction: 'asc' | 'desc';
   } | null>(null);
+  const [showClosedMilestones, setShowClosedMilestones] = useState(false);
 
   useEffect(() => {
     let ignore = false;
     setLoadingMilestones(true);
     setMilestoneError(null);
-    getProjectActiveMilestones(project.id)
+    getProjectActiveMilestones(project.id, showClosedMilestones)
       .then(data => {
         if (!ignore) {
           setMilestones(data);
@@ -195,7 +196,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     return () => {
       ignore = true;
     };
-  }, [project.id]);
+  }, [project.id, showClosedMilestones]);
 
   useEffect(() => {
     if (milestones.length === 0) {
@@ -431,7 +432,14 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
       <header className="projectReportProjectDetail__header">
         <div className="projectReportProjectDetail__headline">
           <h2>Aktivní milníky</h2>
-          <p>Vyberte aktivní milník pro zobrazení jeho detailního přehledu.</p>
+          <label className="projectReportProjectDetail__closedToggle">
+            <input
+              type="checkbox"
+              checked={showClosedMilestones}
+              onChange={event => setShowClosedMilestones(event.target.checked)}
+            />
+            Zobrazit i uzavřené milníky
+          </label>
         </div>
         {loadingMilestones ? (
           <p className="projectReportProjectDetail__status">Načítám milníky…</p>
@@ -484,7 +492,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
         <>
           <div className="projectReportProjectDetail__infoCards">
             <InfoCard title="Progres práce" value={progressInfo.value} description={progressInfo.description} />
-            <InfoCard title="Časový průběh" value={deadlineInfo.value} description={deadlineInfo.description} />
+            <InfoCard title="Deadline" value={deadlineInfo.value} description={deadlineInfo.description} />
             <InfoCard title="Náklady" value={costInfo.value} description={costInfo.description} />
           </div>
 

@@ -556,7 +556,7 @@ function App() {
     } else if (reportView === 'detail-intern') {
       headerTitle = 'Detail stážisty';
     } else if (reportView === 'detail-project') {
-      headerTitle = 'Detail projektu';
+      headerTitle = 'Detail milníků';
     } else if (reportView === 'detail-planning') {
       headerTitle = 'Planning';
     }
@@ -620,7 +620,7 @@ function App() {
     { view: 'detail-capacity', label: 'Report stavů' },
     { view: 'detail', label: 'Obecný report' },
     { view: 'detail-intern', label: 'Detail stážisty' },
-    { view: 'detail-project', label: 'Detail projektu' },
+    { view: 'detail-project', label: 'Detail milníků' },
     { view: 'detail-long-term', label: 'Dlouhodobý report' },
     { view: 'detail-planning', label: 'Planning' },
   ];

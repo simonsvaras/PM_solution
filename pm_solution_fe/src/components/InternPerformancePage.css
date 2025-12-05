@@ -5,7 +5,9 @@
 }
 
 .internPerformance__controlsCard,
-.internPerformance__chartCard {
+.internPerformance__chartCard,
+.internPerformance__legendCard,
+.internPerformance__tableCard {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -292,6 +294,58 @@
   height: 12px;
   border-radius: 3px;
   display: inline-block;
+}
+
+.internPerformance__tableWrapper {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+
+.internPerformance__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.internPerformance__table th,
+.internPerformance__table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  font-size: 0.95rem;
+  color: #1f2937;
+}
+
+.internPerformance__table thead th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #111827;
+}
+
+.internPerformance__table tbody tr:last-child th,
+.internPerformance__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.internPerformance__tableName {
+  display: block;
+  font-weight: 600;
+}
+
+.internPerformance__tableUsername {
+  display: block;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.internPerformance__tableCell--number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.internPerformance__tableCell--total {
+  font-weight: 600;
+  color: #111827;
 }
 
 @media (max-width: 720px) {

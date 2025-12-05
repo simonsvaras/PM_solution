@@ -231,28 +231,14 @@ function findNextWeekStart(
   return candidateIso;
 }
 
-const WEEK_DAYS_COUNT = dayNames.length;
 
-function normaliseTaskDayOfWeek(value: number | null | undefined): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 1;
-  }
-  const rounded = Math.trunc(value);
-  if (rounded < 1) {
-    return 1;
-  }
-  if (rounded > WEEK_DAYS_COUNT) {
-    return WEEK_DAYS_COUNT;
-  }
-  return rounded;
-}
 
-function mapFormValuesToPayload(values: WeeklyTaskFormValues, options?: { dayOfWeek?: number | null }): WeeklyTaskPayload {
+
+
+function mapFormValuesToPayload(values: WeeklyTaskFormValues): WeeklyTaskPayload {
   const trimmedTitle = values.title.trim();
   const trimmedDescription = values.description.trim();
-  const dayOfWeek = normaliseTaskDayOfWeek(options?.dayOfWeek ?? null);
   return {
-    dayOfWeek,
     deadline: values.deadline ?? null,
     issueId: values.issueId ?? null,
     internId: values.assignedInternId ?? null,

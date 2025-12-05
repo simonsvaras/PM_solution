@@ -34,6 +34,7 @@ export default function ProjectReportPage({
   const [syncProgress, setSyncProgress] = useState<{ processed: number; total: number } | null>(null);
   const [issueSinceLast, setIssueSinceLast] = useState(true);
   const [issueSinceValue, setIssueSinceValue] = useState('');
+  const [issueFullHistory, setIssueFullHistory] = useState(false);
   const [issueSyncing, setIssueSyncing] = useState(false);
   const [issueSyncError, setIssueSyncError] = useState<string | null>(null);
   const [issueSyncSummary, setIssueSyncSummary] = useState<SyncSummary | null>(null);
@@ -229,20 +230,23 @@ export default function ProjectReportPage({
   async function handleIssueSync() {
     setIssueSyncError(null);
     setIssueSyncSummary(null);
-    if (!issueSinceLast && !issueSinceValue) {
-      setIssueSyncError('Vyplňte datum "Od" pro synchronizaci issues.');
-      return;
-    }
-    const sinceIso = issueSinceLast ? undefined : toIsoOrUndefined(issueSinceValue);
-    if (!issueSinceLast && !sinceIso) {
-      setIssueSyncError('Datum "Od" musí být ve správném formátu.');
-      return;
+    let sinceIso: string | undefined;
+    if (!issueFullHistory) {
+      if (!issueSinceLast && !issueSinceValue) {
+        setIssueSyncError('Vyplňte datum "Od" pro synchronizaci issues.');
+        return;
+      }
+      sinceIso = issueSinceLast ? undefined : toIsoOrUndefined(issueSinceValue);
+      if (!issueSinceLast && !sinceIso) {
+        setIssueSyncError('Datum "Od" musí být ve správném formátu.');
+        return;
+      }
     }
     setIssueSyncing(true);
     try {
       const summary = await syncProjectIssues(project.id, {
-        sinceLast: issueSinceLast,
-        since: sinceIso,
+        sinceLast: issueFullHistory ? false : issueSinceLast,
+        since: issueFullHistory ? undefined : sinceIso,
       });
       setIssueSyncSummary(summary);
     } catch (err) {
@@ -269,6 +273,15 @@ export default function ProjectReportPage({
     setIssueSinceLast(checked);
     if (checked) {
       setIssueSinceValue('');
+    }
+  }
+
+  function handleToggleIssueFullHistory(event: ChangeEvent<HTMLInputElement>) {
+    const checked = event.target.checked;
+    setIssueFullHistory(checked);
+    if (checked) {
+      setIssueSinceValue('');
+      setIssueSinceLast(false);
     }
   }
 
@@ -342,45 +355,99 @@ export default function ProjectReportPage({
               onClick={handleMilestoneSync}
               disabled={milestoneSyncing || namespaceId == null}
             >
-              {milestoneSyncing ? 'Synchronizuji…' : 'Sync Milestones'}
+              {milestoneSyncing ? 'Synchronizuji…' : 'Synchronizovat milníky'}
             </button>
           </section>
-           <section className="projectReport__card projectReport__issuesCard" aria-label="Synchronizace issues">
-            <h2>Issues</h2>
-            <p className="projectReport__issueDescription">
-              Sputť synchronizaci, která z GitLabu načte aktuální stav issues pro všechny repozitáře projektu.
-            </p>
-            <label className="projectReport__checkbox">
-              <input type="checkbox" checked={issueSinceLast} onChange={handleToggleIssueSinceLast} />
-              Synchronizovat jen issues změněné od poslední synchronizace
-            </label>
-            <div className="projectReport__range projectReport__range--single" aria-disabled={issueSinceLast}>
-              <label>
-                <span>Od</span>
-                <input
-                  type="datetime-local"
-                  value={issueSinceValue}
-                  onChange={event => setIssueSinceValue(event.target.value)}
-                  disabled={issueSinceLast}
-                />
-              </label>
-            </div>
-            {issueSyncError ? <p className="projectReport__status projectReport__status--error">{issueSyncError}</p> : null}
-            {issueSyncSummary ? (
-              <p className="projectReport__status projectReport__status--success">
-                Načteno {issueSyncSummary.fetched} issues, vloženo {issueSyncSummary.inserted}, aktualizováno{' '}
-                {issueSyncSummary.updated}.
-              </p>
-            ) : null}
-            <button
-              type="button"
-              className="projectReport__syncButton"
-              onClick={handleIssueSync}
-              disabled={issueSyncing}
-            >
-              {issueSyncing ? 'Synchronizuji?' : 'Synchronizovat issues'}
-            </button>
-          </section>
+           <section className="projectReport__card projectReport__issuesCard" aria-label="Synchronizace issues">
+
+            <h2>Issues</h2>
+
+            <p className="projectReport__issueDescription">
+
+              Sputť synchronizaci, která z GitLabu načte aktuální stav issues pro všechny repozitáře projektu.
+
+            </p>
+
+            <label className="projectReport__checkbox">
+
+              <input type="checkbox" checked={issueFullHistory} onChange={handleToggleIssueFullHistory} />
+
+              Synchronizovat veškerou historii
+
+            </label>
+
+            <label className="projectReport__checkbox">
+
+              <input
+
+                type="checkbox"
+
+                checked={issueSinceLast}
+
+                onChange={handleToggleIssueSinceLast}
+
+                disabled={issueFullHistory}
+
+              />
+
+              Synchronizovat jen issues změněně od poslední synchronizace
+
+            </label>
+
+            <div className="projectReport__range projectReport__range--single" aria-disabled={issueSinceLast || issueFullHistory}>
+
+              <label>
+
+                <span>Od</span>
+
+                <input
+
+                  type="datetime-local"
+
+                  value={issueSinceValue}
+
+                  onChange={event => setIssueSinceValue(event.target.value)}
+
+                  disabled={issueSinceLast || issueFullHistory}
+
+                />
+
+              </label>
+
+            </div>
+
+            {issueSyncError ? <p className="projectReport__status projectReport__status--error">{issueSyncError}</p> : null}
+
+            {issueSyncSummary ? (
+
+              <p className="projectReport__status projectReport__status--success">
+
+                Načteno {issueSyncSummary.fetched} issues, vloženo {issueSyncSummary.inserted}, aktualizováno{' '}
+
+                {issueSyncSummary.updated}.
+
+              </p>
+
+            ) : null}
+
+            <button
+
+              type="button"
+
+              className="projectReport__syncButton"
+
+              onClick={handleIssueSync}
+
+              disabled={issueSyncing}
+
+            >
+
+              {issueSyncing ? 'Synchronizuji?' : 'Synchronizovat issues'}
+
+            </button>
+
+          </section>
+
        </div>
         <section className="projectReport" aria-label={`Report projektu ${currentProject.name}`}>
           <div className="projectReport__card projectReport__overviewCard">

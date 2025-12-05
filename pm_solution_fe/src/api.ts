@@ -639,7 +639,6 @@ export type CreateProjectSprintPayload = {
 export type WeeklyTaskPayload = {
   issueId: number | null;
   internId: number | null;
-  dayOfWeek: number;
   note: string | null;
   plannedHours: number | null;
   deadline: string | null;
@@ -1625,7 +1624,6 @@ function normaliseWeeklyTaskPayload(payload: WeeklyTaskPayload): WeeklyTaskPaylo
   return {
     issueId: payload.issueId ?? null,
     internId: payload.internId ?? null,
-    dayOfWeek: payload.dayOfWeek,
     note: payload.note ?? null,
     plannedHours: payload.plannedHours ?? null,
     deadline: payload.deadline ?? null,
@@ -1734,8 +1732,9 @@ export async function carryOverWeeklyTasks(
   return (data ?? []).map(mapWeeklyPlannerTask);
 }
 
-export async function getProjectActiveMilestones(projectId: number): Promise<ProjectMilestoneSummary[]> {
-  const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/active`);
+export async function getProjectActiveMilestones(projectId: number, includeClosed = false): Promise<ProjectMilestoneSummary[]> {
+  const query = includeClosed ? '?includeClosed=true' : '';
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/milestones/active${query}`);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   return parseJson<ProjectMilestoneSummary[]>(res);
 }

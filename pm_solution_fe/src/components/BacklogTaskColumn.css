@@ -6,6 +6,8 @@
   border-radius: 1rem;
   background: #fff;
   box-shadow: 0 6px 18px rgba(26, 26, 26, 0.05);
+  width: 320px;
+  flex: 0 0 320px;
 }
 
 .backlogTaskColumn--disabled {

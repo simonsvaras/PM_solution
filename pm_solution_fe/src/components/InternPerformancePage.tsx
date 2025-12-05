@@ -264,6 +264,36 @@ export default function InternPerformancePage() {
     return performance.interns.some(intern => intern.hours.some(value => value > 0));
   }, [performance]);
 
+  const tableBuckets = useMemo(
+    () =>
+      performance?.buckets.map((bucket, index) => ({
+        key: `period${index}__total`,
+        label: bucket.label,
+      })) ?? [],
+    [performance],
+  );
+
+  const tableRows = useMemo(() => {
+    if (!performance || chartData.length === 0) {
+      return [];
+    }
+    return performance.interns.map((intern, index) => {
+      const chartEntry = chartData[index];
+      const bucketValues = tableBuckets.map(bucket => {
+        const raw = chartEntry?.[bucket.key as keyof ChartDatum];
+        const numeric = typeof raw === 'number' ? raw : Number(raw ?? 0);
+        return Number.isFinite(numeric) ? numeric : 0;
+      });
+      const total = bucketValues.reduce((sum, value) => sum + value, 0);
+      return {
+        username: intern.username,
+        label: buildInternLabel(intern.firstName, intern.lastName, intern.username),
+        buckets: bucketValues,
+        total,
+      };
+    });
+  }, [performance, chartData, tableBuckets]);
+
   const controlsDisabled = referenceLoading;
   const groupFilterActive = selectedGroupIds.size > 0;
   const internSelectionCount = selectAllInterns ? groupFilteredInterns.length : selectedInternIds.size;
@@ -610,7 +640,16 @@ export default function InternPerformancePage() {
             Stážisti nemají v posledních {periods} {periodLabel} vykázané žádné hodiny.
           </p>
         )}
-        {performance && projectDescriptors.length > 0 ? (
+      </section>
+
+      {performance && projectDescriptors.length > 0 ? (
+        <section className="internPerformance__legendCard">
+          <header className="internPerformance__sectionHeader">
+            <div>
+              <h2 className="internPerformance__title">Legend</h2>
+              <p className="internPerformance__subtitle">Barvy odpovídají projektům zahrnutým v grafu.</p>
+            </div>
+          </header>
           <ul className="internPerformance__bucketList">
             {projectDescriptors.map(project => (
               <li key={project.key}>
@@ -619,8 +658,52 @@ export default function InternPerformancePage() {
               </li>
             ))}
           </ul>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
+
+      {tableRows.length > 0 ? (
+        <section className="internPerformance__tableCard">
+          <header className="internPerformance__sectionHeader">
+            <div>
+              <h2 className="internPerformance__title">Tabulka výkonu</h2>
+              <p className="internPerformance__subtitle">Stejná data jako v grafu, přehledně v tabulce.</p>
+            </div>
+          </header>
+          <div className="internPerformance__tableWrapper">
+            <table className="internPerformance__table">
+              <thead>
+                <tr>
+                  <th scope="col">Stážista</th>
+                  {tableBuckets.map(bucket => (
+                    <th key={bucket.key} scope="col">
+                      {bucket.label}
+                    </th>
+                  ))}
+                  <th scope="col">Celkem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map(row => (
+                  <tr key={row.username}>
+                    <th scope="row">
+                      <span className="internPerformance__tableName">{row.label}</span>
+                      <span className="internPerformance__tableUsername">@{row.username}</span>
+                    </th>
+                    {row.buckets.map((value, bucketIndex) => (
+                      <td key={`${row.username}-${bucketIndex}`} className="internPerformance__tableCell--number">
+                        {formatHours(value)}
+                      </td>
+                    ))}
+                    <td className="internPerformance__tableCell--number internPerformance__tableCell--total">
+                      {formatHours(row.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

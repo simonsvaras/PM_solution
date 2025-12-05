@@ -162,13 +162,15 @@ export default function InternLevelHistoryModal({
     onClose();
   }
 
-  const footer = (
-    <div className="intern-level-history__footer">
-      <button type="button" className="btn btn-secondary" onClick={handleDone}>
-        Hotovo
-      </button>
-    </div>
-  );
+  const footer = isFormVisible
+    ? null
+    : (
+      <div className="intern-level-history__footer">
+        <button type="button" className="btn btn-secondary" onClick={handleDone}>
+          Hotovo
+        </button>
+      </div>
+    );
 
   return (
     <Modal isOpen={isOpen} onClose={handleDone} title="Historie úrovní" footer={footer} className="intern-level-history-modal">

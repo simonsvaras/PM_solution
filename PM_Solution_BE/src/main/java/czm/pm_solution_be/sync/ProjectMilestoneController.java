@@ -29,8 +29,9 @@ public class ProjectMilestoneController {
      * @return immutable list of active milestone summaries ordered by due date
      */
     @GetMapping("/{projectId}/milestones/active")
-    public List<SyncDao.ActiveMilestoneRow> listActiveMilestones(@PathVariable long projectId) {
-        return dao.listActiveMilestones(projectId);
+    public List<SyncDao.ActiveMilestoneRow> listActiveMilestones(@PathVariable long projectId,
+                                                                 @RequestParam(name = "includeClosed", defaultValue = "false") boolean includeClosed) {
+        return dao.listActiveMilestones(projectId, includeClosed);
     }
 
     /**

@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+/**
+ * REST endpoints for triggering synchronisation jobs.
+ */
 @RestController
 @RequestMapping("/api/sync")
 public class SyncController {
@@ -58,6 +61,9 @@ public class SyncController {
         throw unsupported();
     }
 
+    /**
+     * Triggers a full repository catalogue refresh.
+     */
     @PostMapping("/repositories")
     public SyncSummary syncRepositoriesAll() {
         long start = System.currentTimeMillis();
@@ -66,6 +72,9 @@ public class SyncController {
         return s;
     }
 
+    /**
+     * Refreshes repositories linked to a single GitLab project.
+     */
     @PostMapping("/projects/{projectId}/repositories")
     public SyncSummary syncRepositories(@PathVariable long projectId) {
         long start = System.currentTimeMillis();
@@ -74,17 +83,23 @@ public class SyncController {
         return s;
     }
 
+    /**
+     * Synchronises issues for every repository assigned to the given project.
+     */
     @PostMapping("/projects/{projectId}/issues")
     public SyncSummary syncIssues(@PathVariable long projectId,
                                   @RequestParam(defaultValue = "false") boolean full,
                                   @RequestParam(required = false)
                                   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since) {
         long start = System.currentTimeMillis();
-        SyncSummary s = issueSyncService.syncProjectIssues(projectId, full, since);
+        SyncSummary s = issueSyncService.syncIssuesForProject(projectId, full, since);
         s.durationMs = System.currentTimeMillis() - start;
         return s;
     }
 
+    /**
+     * Synchronises milestones for the specified namespace.
+     */
     @PostMapping("/projects/{namespaceId}/milestones")
     public SyncSummary syncMilestones(@PathVariable long namespaceId) {
         long start = System.currentTimeMillis();
@@ -122,6 +137,9 @@ public class SyncController {
             @ApiResponse(responseCode = "400", description = "Projekt nemá přiřazené repozitáře nebo vstup neprošel validací."),
             @ApiResponse(responseCode = "500", description = "Neočekávaná chyba při komunikaci s GitLabem."),
     })
+    /**
+     * Synchronises timelog reports for a project with optional time range filters.
+     */
     @PostMapping("/projects/{projectId}/reports")
     public SyncSummary syncProjectReports(@Parameter(description = "ID projektu v aplikaci.") @PathVariable long projectId,
                                           @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -152,6 +170,9 @@ public class SyncController {
             @ApiResponse(responseCode = "400", description = "Vstupní parametry neprošly validací."),
             @ApiResponse(responseCode = "500", description = "Neočekávaná chyba při komunikaci s GitLabem."),
     })
+    /**
+     * Runs global report synchronisation across all repositories.
+     */
     @PostMapping("/reports")
     public SyncSummary syncAllReports(@io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = false,
@@ -191,6 +212,9 @@ public class SyncController {
         public int deleted;
     }
 
+    /**
+     * Aggregated sync endpoint for issues belonging to the selected project.
+     */
     @PostMapping("/projects/{projectId}/all")
     public AllResult syncAll(@PathVariable long projectId,
                              @RequestParam(defaultValue = "false") boolean full,
@@ -207,7 +231,7 @@ public class SyncController {
         StepAggregate issues = new StepAggregate();
         long st = System.currentTimeMillis();
         try {
-            SyncSummary s = issueSyncService.syncProjectIssues(projectId, full, null);
+            SyncSummary s = issueSyncService.syncIssuesForProject(projectId, full, null);
             issues.status = "OK";
             issues.fetched = s.fetched;
             issues.inserted = s.inserted;
@@ -225,6 +249,9 @@ public class SyncController {
         return ar;
     }
 
+    /**
+     * Deletes report rows either globally or for the selected projects.
+     */
     @DeleteMapping("/reports")
     public DeleteReportsResponse deleteReports(@RequestParam(name = "projectId", required = false) List<Long> projectIds) {
         DeleteReportsResponse response = new DeleteReportsResponse();
@@ -237,6 +264,9 @@ public class SyncController {
     }
 
     // New global Issues sync (no project selection)
+    /**
+     * Starts a global issues synchronisation optionally limited to assigned repositories.
+     */
     @PostMapping("/issues")
     public SyncSummary syncIssuesAll(@RequestParam(defaultValue = "false") boolean full,
                                      @RequestParam(defaultValue = "false") boolean assignedOnly) {
@@ -247,6 +277,9 @@ public class SyncController {
     }
 
     // Aggregated ALL for global run (currently only issues)
+    /**
+     * Aggregated global sync entry point (currently only issues).
+     */
     @PostMapping("/all")
     public AllResult syncAllGlobal(@RequestParam(defaultValue = "false") boolean full,
                                    @RequestParam(defaultValue = "false") boolean assignedOnly,

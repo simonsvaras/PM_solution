@@ -4,6 +4,10 @@ WORKDIR /app
 COPY PM_Solution_BE/ /app/
 RUN gradle clean bootJar -x test --no-daemon
 
+# Wrapper
+RUN chmod +x ./gradlew
+RUN ./gradlew clean bootJar -x test --no-daemon
+
 ## Runtime stage
 FROM eclipse-temurin:21-jre
 ENV JAVA_OPTS=""

@@ -1364,8 +1364,9 @@ public class SyncDao {
         ), projectId);
     }
 
-    public List<ActiveMilestoneRow> listActiveMilestones(long projectId) {
-        String sql = """
+    public List<ActiveMilestoneRow> listActiveMilestones(long projectId, boolean includeClosed) {
+        String stateCondition = includeClosed ? "AND m.state IN ('active','closed')" : "AND m.state = 'active'";
+        String sql = ("""
                 SELECT m.milestone_id,
                        m.milestone_iid,
                        m.title,
@@ -1381,10 +1382,10 @@ public class SyncDao {
                       AND iss.milestone_title = m.title
                 LEFT JOIN milestone_report_cost mrc ON mrc.milestone_id = m.milestone_id
                 WHERE m.project_id = ?
-                  AND m.state = 'active'
+                  %s
                 GROUP BY m.milestone_id, m.milestone_iid, m.title, m.state, m.due_date, mrc.total_cost
                 ORDER BY m.due_date NULLS LAST, LOWER(m.title)
-                """;
+                """).formatted(stateCondition);
         return jdbc.query(sql, (rs, rn) -> new ActiveMilestoneRow(
                 rs.getLong("milestone_id"),
                 rs.getLong("milestone_iid"),
