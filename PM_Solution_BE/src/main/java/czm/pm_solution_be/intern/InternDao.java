@@ -32,67 +32,96 @@ public class InternDao {
     private final JdbcTemplate jdbc;
 
     public record InternRow(long id,
-                            String firstName,
-                            String lastName,
-                            String username,
-                            long levelId,
-                            String levelLabel,
-                            String statusCode,
-                            String statusLabel,
-                            int statusSeverity) {}
+            String firstName,
+            String lastName,
+            String username,
+            long levelId,
+            String levelLabel,
+            String statusCode,
+            String statusLabel,
+            int statusSeverity) {
+    }
+
     public record InternAssignmentRow(long id,
-                                      String firstName,
-                                      String lastName,
-                                      String username,
-                                      long levelId,
-                                      String levelCode,
-                                      String levelLabel,
-                                      BigDecimal workloadHours,
-                                      boolean includeInReportedCost,
-                                      boolean assigned) {}
+            String firstName,
+            String lastName,
+            String username,
+            long levelId,
+            String levelCode,
+            String levelLabel,
+            BigDecimal workloadHours,
+            boolean includeInReportedCost,
+            boolean assigned) {
+    }
+
     public record InternOverviewRow(long id,
-                                    String firstName,
-                                    String lastName,
-                                    String username,
-                                    long levelId,
-                                    String levelLabel,
-                                    String statusCode,
-                                    String statusLabel,
-                                    int statusSeverity,
-                                    long totalSeconds) {}
+            String firstName,
+            String lastName,
+            String username,
+            long levelId,
+            String levelLabel,
+            String statusCode,
+            String statusLabel,
+            int statusSeverity,
+            long totalSeconds) {
+    }
+
     public record InternProjectRow(long projectId,
-                                   String projectName,
-                                   BigDecimal workloadHours,
-                                   boolean includeInReportedCost) {}
-    public record GroupRow(long id, int code, String label) {}
-    public record LevelRow(long id, String code, String label) {}
+            String projectName,
+            BigDecimal workloadHours,
+            boolean includeInReportedCost) {
+    }
+
+    public record GroupRow(long id, int code, String label) {
+    }
+
+    public record LevelRow(long id, String code, String label) {
+    }
+
     public record LevelHistoryRow(long id, long levelId, String levelCode, String levelLabel, LocalDate validFrom,
-                                  LocalDate validTo) {}
-    public record LevelHistoryInput(long levelId, LocalDate validFrom, LocalDate validTo) {}
-    public record StatusRow(String code, String label, int severity) {}
+            LocalDate validTo) {
+    }
+
+    public record LevelHistoryInput(long levelId, LocalDate validFrom, LocalDate validTo) {
+    }
+
+    public record StatusRow(String code, String label, int severity) {
+    }
+
     public record StatusHistoryRow(long id,
-                                   String statusCode,
-                                   String statusLabel,
-                                   int statusSeverity,
-                                   LocalDate validFrom,
-                                   LocalDate validTo) {}
-    public record SortOrder(String column, boolean ascending) {}
-    public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {}
-    public record PageResult(List<InternRow> rows, long totalElements) {}
+            String statusCode,
+            String statusLabel,
+            int statusSeverity,
+            LocalDate validFrom,
+            LocalDate validTo) {
+    }
+
+    public record SortOrder(String column, boolean ascending) {
+    }
+
+    public record InternQuery(String q, String username, int page, int size, List<SortOrder> orders) {
+    }
+
+    public record PageResult(List<InternRow> rows, long totalElements) {
+    }
+
     public record ProjectInternAllocation(long internId,
-                                          BigDecimal workloadHours,
-                                          boolean includeInReportedCost) {}
+            BigDecimal workloadHours,
+            boolean includeInReportedCost) {
+    }
+
     public record ProjectTeamRow(long projectId,
-                                 String projectName,
-                                 long internId,
-                                 String firstName,
-                                 String lastName,
-                                 String username,
-                                 long levelId,
-                                 String levelCode,
-                                 String levelLabel,
-                                 BigDecimal workloadHours,
-                                 boolean includeInReportedCost) {}
+            String projectName,
+            long internId,
+            String firstName,
+            String lastName,
+            String username,
+            long levelId,
+            String levelCode,
+            String levelLabel,
+            BigDecimal workloadHours,
+            boolean includeInReportedCost) {
+    }
 
     private static final RowMapper<InternRow> INTERN_MAPPER = new RowMapper<>() {
         @Override
@@ -220,18 +249,18 @@ public class InternDao {
     public InternRow insert(String firstName, String lastName, String username, long levelId, String statusCode) {
         InternRow inserted = jdbc.queryForObject(
                 """
-                INSERT INTO intern (first_name, last_name, username, level_id, status_code)
-                VALUES (?, ?, ?, ?, ?)
-                RETURNING id,
-                          first_name,
-                          last_name,
-                          username,
-                          level_id,
-                          (SELECT label FROM level WHERE id = level_id) AS level_label,
-                          status_code,
-                          (SELECT label FROM intern_status WHERE code = status_code) AS status_label,
-                          (SELECT severity FROM intern_status WHERE code = status_code) AS status_severity
-                """,
+                        INSERT INTO intern (first_name, last_name, username, level_id, status_code)
+                        VALUES (?, ?, ?, ?, ?)
+                        RETURNING id,
+                                  first_name,
+                                  last_name,
+                                  username,
+                                  level_id,
+                                  (SELECT label FROM level WHERE id = level_id) AS level_label,
+                                  status_code,
+                                  (SELECT label FROM intern_status WHERE code = status_code) AS status_label,
+                                  (SELECT severity FROM intern_status WHERE code = status_code) AS status_severity
+                        """,
                 INTERN_MAPPER,
                 firstName,
                 lastName,
@@ -250,19 +279,19 @@ public class InternDao {
     public InternRow update(long id, String firstName, String lastName, String username, long levelId) {
         InternRow updated = jdbc.queryForObject(
                 """
-                UPDATE intern
-                SET first_name = ?, last_name = ?, username = ?, level_id = ?
-                WHERE id = ?
-                RETURNING id,
-                          first_name,
-                          last_name,
-                          username,
-                          level_id,
-                          (SELECT label FROM level WHERE id = level_id) AS level_label,
-                          status_code,
-                          (SELECT label FROM intern_status WHERE code = status_code) AS status_label,
-                          (SELECT severity FROM intern_status WHERE code = status_code) AS status_severity
-                """,
+                        UPDATE intern
+                        SET first_name = ?, last_name = ?, username = ?, level_id = ?
+                        WHERE id = ?
+                        RETURNING id,
+                                  first_name,
+                                  last_name,
+                                  username,
+                                  level_id,
+                                  (SELECT label FROM level WHERE id = level_id) AS level_label,
+                                  status_code,
+                                  (SELECT label FROM intern_status WHERE code = status_code) AS status_label,
+                                  (SELECT severity FROM intern_status WHERE code = status_code) AS status_severity
+                        """,
                 INTERN_MAPPER,
                 firstName,
                 lastName,
@@ -316,16 +345,16 @@ public class InternDao {
 
         List<InternRow> rows = jdbc.query(
                 """
-                SELECT i.id,
-                       i.first_name,
-                       i.last_name,
-                       i.username,
-                       i.level_id,
-                       l.label AS level_label,
-                       i.status_code,
-                       s.label AS status_label,
-                       s.severity AS status_severity
-                """ + sql + orderClause + " LIMIT ? OFFSET ?",
+                        SELECT i.id,
+                               i.first_name,
+                               i.last_name,
+                               i.username,
+                               i.level_id,
+                               l.label AS level_label,
+                               i.status_code,
+                               s.label AS status_label,
+                               s.severity AS status_severity
+                        """ + sql + orderClause + " LIMIT ? OFFSET ?",
                 INTERN_MAPPER,
                 listParams.toArray());
 
@@ -417,14 +446,17 @@ public class InternDao {
         String inClause = levelIds.stream().map(id -> "?").reduce((a, b) -> a + "," + b).orElse("?");
         List<Object> params = new ArrayList<>();
         params.addAll(levelIds);
-        return jdbc.query("SELECT id, code, label FROM level WHERE id IN (" + inClause + ")", LEVEL_MAPPER, params.toArray());
+        return jdbc.query("SELECT id, code, label FROM level WHERE id IN (" + inClause + ")", LEVEL_MAPPER,
+                params.toArray());
     }
 
     /**
-     * Returns the reference list of intern statuses ordered by severity for deterministic FE rendering.
+     * Returns the reference list of intern statuses ordered by severity for
+     * deterministic FE rendering.
      */
     public List<StatusRow> listStatuses() {
-        return jdbc.query("SELECT code, label, severity FROM intern_status ORDER BY severity DESC, label ASC", STATUS_MAPPER);
+        return jdbc.query("SELECT code, label, severity FROM intern_status ORDER BY severity DESC, label ASC",
+                STATUS_MAPPER);
     }
 
     /**
@@ -458,7 +490,8 @@ public class InternDao {
         String inClause = groupIds.stream().map(id -> "?").reduce((a, b) -> a + "," + b).orElse("?");
         List<Object> params = new ArrayList<>();
         params.addAll(groupIds);
-        return jdbc.query("SELECT id, code, label FROM \"group\" WHERE id IN (" + inClause + ")", GROUP_MAPPER, params.toArray());
+        return jdbc.query("SELECT id, code, label FROM \"group\" WHERE id IN (" + inClause + ")", GROUP_MAPPER,
+                params.toArray());
     }
 
     /**
@@ -494,13 +527,14 @@ public class InternDao {
         if (groupIds == null || groupIds.isEmpty()) {
             return;
         }
-        jdbc.batchUpdate("INSERT INTO intern_group (intern_id, group_id) VALUES (?, ?)", groupIds, groupIds.size(), (ps, groupId) -> {
-            ps.setLong(1, internId);
-            ps.setLong(2, groupId);
-        });
+        jdbc.batchUpdate("INSERT INTO intern_group (intern_id, group_id) VALUES (?, ?)", groupIds, groupIds.size(),
+                (ps, groupId) -> {
+                    ps.setLong(1, internId);
+                    ps.setLong(2, groupId);
+                });
     }
 
-    public List<InternAssignmentRow> listInternsWithAssignment(long projectId, String search) {
+    public List<InternAssignmentRow> listInternsWithAssignment(long projectId, String search, boolean onlyAssigned) {
         StringBuilder sql = new StringBuilder("""
                 SELECT i.id,
                        i.first_name,
@@ -515,12 +549,18 @@ public class InternDao {
                 FROM intern i
                 JOIN level l ON l.id = i.level_id
                 LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = ?
+                WHERE 1=1
                 """);
         List<Object> params = new ArrayList<>();
         params.add(projectId);
+
+        if (onlyAssigned) {
+            sql.append(" AND ip.project_id IS NOT NULL");
+        }
+
         if (search != null && !search.isBlank()) {
             String like = "%" + search.toLowerCase(Locale.ROOT) + "%";
-            sql.append(" WHERE LOWER(i.first_name) LIKE ? OR LOWER(i.last_name) LIKE ? OR LOWER(i.username) LIKE ?");
+            sql.append(" AND (LOWER(i.first_name) LIKE ? OR LOWER(i.last_name) LIKE ? OR LOWER(i.username) LIKE ?)");
             params.add(like);
             params.add(like);
             params.add(like);
@@ -578,7 +618,9 @@ public class InternDao {
         if (assignments == null || assignments.isEmpty()) {
             return;
         }
-        jdbc.batchUpdate("INSERT INTO intern_project (project_id, intern_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)", assignments, assignments.size(),
+        jdbc.batchUpdate(
+                "INSERT INTO intern_project (project_id, intern_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)",
+                assignments, assignments.size(),
                 (ps, assignment) -> {
                     ps.setLong(1, projectId);
                     ps.setLong(2, assignment.internId());
@@ -612,8 +654,7 @@ public class InternDao {
                     } else {
                         ps.setObject(4, entry.validTo());
                     }
-                }
-        );
+                });
     }
 
     /**
@@ -633,10 +674,10 @@ public class InternDao {
     public void closeOpenLevelHistory(long internId, LocalDate newLevelStart) {
         jdbc.update(
                 """
-                UPDATE intern_level_history
-                SET valid_to = CASE WHEN valid_from >= ? THEN ? ELSE ? END
-                WHERE intern_id = ? AND valid_to IS NULL
-                """,
+                        UPDATE intern_level_history
+                        SET valid_to = CASE WHEN valid_from >= ? THEN ? ELSE ? END
+                        WHERE intern_id = ? AND valid_to IS NULL
+                        """,
                 newLevelStart,
                 newLevelStart,
                 newLevelStart.minusDays(1),
@@ -651,7 +692,8 @@ public class InternDao {
     }
 
     /**
-     * Inserts a new status history row representing the active status from the supplied date onwards.
+     * Inserts a new status history row representing the active status from the
+     * supplied date onwards.
      */
     public void insertStatusHistory(long internId, String statusCode, LocalDate fromDate) {
         jdbc.update(
@@ -662,15 +704,16 @@ public class InternDao {
     }
 
     /**
-     * Closes the currently open status history record when a new status becomes effective.
+     * Closes the currently open status history record when a new status becomes
+     * effective.
      */
     public void closeOpenStatusHistory(long internId, LocalDate newStatusStart) {
         jdbc.update(
                 """
-                UPDATE intern_status_history
-                SET valid_to = CASE WHEN valid_from >= ? THEN ? ELSE ? END
-                WHERE intern_id = ? AND valid_to IS NULL
-                """,
+                        UPDATE intern_status_history
+                        SET valid_to = CASE WHEN valid_from >= ? THEN ? ELSE ? END
+                        WHERE intern_id = ? AND valid_to IS NULL
+                        """,
                 newStatusStart,
                 newStatusStart,
                 newStatusStart.minusDays(1),
@@ -678,22 +721,23 @@ public class InternDao {
     }
 
     /**
-     * Loads status history for the given intern with resolved labels for auditing on the FE.
+     * Loads status history for the given intern with resolved labels for auditing
+     * on the FE.
      */
     public List<StatusHistoryRow> findStatusHistory(long internId) {
         return jdbc.query(
                 """
-                SELECT ish.id,
-                       ish.status_code,
-                       s.label AS status_label,
-                       s.severity AS status_severity,
-                       ish.valid_from,
-                       ish.valid_to
-                FROM intern_status_history ish
-                JOIN intern_status s ON s.code = ish.status_code
-                WHERE ish.intern_id = ?
-                ORDER BY ish.valid_from ASC, ish.id ASC
-                """,
+                        SELECT ish.id,
+                               ish.status_code,
+                               s.label AS status_label,
+                               s.severity AS status_severity,
+                               ish.valid_from,
+                               ish.valid_to
+                        FROM intern_status_history ish
+                        JOIN intern_status s ON s.code = ish.status_code
+                        WHERE ish.intern_id = ?
+                        ORDER BY ish.valid_from ASC, ish.id ASC
+                        """,
                 STATUS_HISTORY_MAPPER,
                 internId);
     }
@@ -704,20 +748,19 @@ public class InternDao {
     public List<LevelHistoryRow> findLevelHistory(long internId) {
         return jdbc.query(
                 """
-                SELECT ilh.id,
-                       ilh.level_id,
-                       l.code   AS level_code,
-                       l.label  AS level_label,
-                       ilh.valid_from,
-                       ilh.valid_to
-                FROM intern_level_history ilh
-                JOIN level l ON l.id = ilh.level_id
-                WHERE ilh.intern_id = ?
-                ORDER BY ilh.valid_from ASC, ilh.id ASC
-                """,
+                        SELECT ilh.id,
+                               ilh.level_id,
+                               l.code   AS level_code,
+                               l.label  AS level_label,
+                               ilh.valid_from,
+                               ilh.valid_to
+                        FROM intern_level_history ilh
+                        JOIN level l ON l.id = ilh.level_id
+                        WHERE ilh.intern_id = ?
+                        ORDER BY ilh.valid_from ASC, ilh.id ASC
+                        """,
                 LEVEL_HISTORY_MAPPER,
-                internId
-        );
+                internId);
     }
 
     private static String buildOrderClause(List<SortOrder> orders) {
@@ -735,4 +778,3 @@ public class InternDao {
         return sb.toString();
     }
 }
-

@@ -342,17 +342,23 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     ? { tone: 'muted', text: 'Načítám data…' }
     : null;
 
-  const chartHeight = 320;
+  const chartHeight = 360;
   const paddingX = 56;
-  const paddingY = 40;
-  const plotHeight = chartHeight - paddingY * 2;
-  const nominalPlotWidth = Math.max(chartPoints.length * 72, 320);
-  const chartWidth = nominalPlotWidth + paddingX * 2;
-  const step = chartPoints.length > 1 ? nominalPlotWidth / (chartPoints.length - 1) : 0;
+  const paddingTop = 80;
+  const paddingBottom = 56;
+  const plotHeight = chartHeight - paddingTop - paddingBottom;
+  const plotWidth = Math.max(chartPoints.length * 72, 320);
+  const chartWidth = plotWidth + paddingX * 2;
+  const barWidth =
+    chartPoints.length > 1 ? Math.min(36, (plotWidth / chartPoints.length) * 0.6) : Math.min(60, plotWidth * 0.4);
+  const usableWidth = chartPoints.length > 1 ? Math.max(plotWidth - barWidth, 1) : 0;
 
-  const getPointX = (index: number) =>
-    chartPoints.length === 1 ? paddingX + nominalPlotWidth / 2 : paddingX + step * index;
-  const barWidth = chartPoints.length > 1 ? Math.min(36, step * 0.6) : Math.min(60, nominalPlotWidth * 0.4);
+  const getPointX = (index: number) => {
+    if (chartPoints.length === 1) {
+      return paddingX + plotWidth / 2;
+    }
+    return paddingX + barWidth / 2 + (usableWidth * index) / (chartPoints.length - 1);
+  };
 
   const maxHours = chartPoints.reduce((max, point) => Math.max(max, point.hours), 0);
   const hoursScaleMax = maxHours > 0 ? maxHours * 1.1 : 1;
@@ -381,7 +387,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
           const percent = point.burnoutPercent ?? 0;
           const boundedPercent = Math.max(0, Math.min(percent, burnoutScaleMax));
           const x = getPointX(index);
-          const y = paddingY + (plotHeight - (boundedPercent / burnoutScaleMax) * plotHeight);
+          const y = paddingTop + (plotHeight - (boundedPercent / burnoutScaleMax) * plotHeight);
           const command = index === 0 ? 'M' : 'L';
           return `${command}${x.toFixed(2)} ${y.toFixed(2)}`;
         })
@@ -565,17 +571,6 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
       <section className="projectLongTerm__chartCard">
         <header className="projectLongTerm__chartHeader">
           <h2>Dlouhodobý vývoj</h2>
-          <ul className="projectLongTerm__legend" aria-label="Legenda grafu">
-            {legendItems.map(item => (
-              <li key={item.key} className="projectLongTerm__legendItem">
-                <span
-                  className={`projectLongTerm__legendSwatch projectLongTerm__legendSwatch--${item.key}`}
-                  aria-hidden="true"
-                />
-                <span>{item.label}</span>
-              </li>
-            ))}
-          </ul>
         </header>
         <div className="projectLongTerm__chartWrapper">
           {hasChartData ? (
@@ -596,14 +591,14 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
               <line
                 x1={paddingX}
                 x2={chartWidth - paddingX}
-                y1={chartHeight - paddingY}
-                y2={chartHeight - paddingY}
+                y1={chartHeight - paddingBottom}
+                y2={chartHeight - paddingBottom}
                 stroke="var(--color-border)"
                 strokeWidth={1}
               />
               {Array.from({ length: 4 }, (_, index) => {
                 const fraction = (index + 1) / 4;
-                const y = paddingY + plotHeight * (1 - fraction);
+                const y = paddingTop + plotHeight * (1 - fraction);
                 return (
                   <line
                     key={`grid-${index}`}
@@ -618,11 +613,13 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
               })}
               {chartPoints.map((point, index) => {
                 const xCenter = getPointX(index);
-              const heightRatio = hoursScaleMax > 0 ? point.hours / hoursScaleMax : 0;
+                const heightRatio = hoursScaleMax > 0 ? point.hours / hoursScaleMax : 0;
                 const barHeight = heightRatio * plotHeight;
-                const y = paddingY + (plotHeight - barHeight);
-                const hoursLabelY = Math.max(paddingY + 12, y - 8);
-                const costLabelY = Math.max(paddingY + 12, hoursLabelY - 14);
+                const y = paddingTop + (plotHeight - barHeight);
+                const hoursLabelMinY = paddingTop + 24;
+                const costLabelMinY = paddingTop + 8;
+                const hoursLabelY = Math.max(hoursLabelMinY, y - 8);
+                const costLabelY = Math.max(costLabelMinY, hoursLabelY - 16);
                 return (
                   <g key={`bar-${point.monthKey}`}>
                     <rect
@@ -654,7 +651,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                     </text>
                     <text
                       x={xCenter}
-                      y={chartHeight - paddingY + 24}
+                      y={chartHeight - paddingBottom + 24}
                       textAnchor="middle"
                       className="projectLongTerm__chartLabel"
                     >
@@ -676,14 +673,14 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                   <line
                     x1={chartWidth - paddingX}
                     x2={chartWidth - paddingX}
-                    y1={paddingY}
-                    y2={chartHeight - paddingY}
+                    y1={paddingTop}
+                    y2={chartHeight - paddingBottom}
                     stroke="rgba(15, 23, 42, 0.16)"
                     strokeWidth={1}
                   />
                   {percentAxisTicks.map(tickValue => {
                     const y =
-                      paddingY + (plotHeight - (Math.min(tickValue, burnoutScaleMax) / burnoutScaleMax) * plotHeight);
+                      paddingTop + (plotHeight - (Math.min(tickValue, burnoutScaleMax) / burnoutScaleMax) * plotHeight);
                     return (
                       <g key={`axis-tick-${tickValue}`}>
                         <line
@@ -709,7 +706,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                     const percent = point.burnoutPercent ?? 0;
                     const boundedPercent = Math.max(0, Math.min(percent, burnoutScaleMax));
                     const x = getPointX(index);
-                    const y = paddingY + (plotHeight - (boundedPercent / burnoutScaleMax) * plotHeight);
+                    const y = paddingTop + (plotHeight - (boundedPercent / burnoutScaleMax) * plotHeight);
                     return (
                       <g key={`burnout-${point.monthKey}`}>
                         <circle cx={x} cy={y} r={4} fill="var(--project-long-term-burnout)" />
@@ -730,6 +727,17 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
             </p>
           )}
         </div>
+        <ul className="projectLongTerm__legend projectLongTerm__legend--below" aria-label="Legenda grafu">
+          {legendItems.map(item => (
+            <li key={item.key} className="projectLongTerm__legendItem">
+              <span
+                className={`projectLongTerm__legendSwatch projectLongTerm__legendSwatch--${item.key}`}
+                aria-hidden="true"
+              />
+              <span>{item.label}</span>
+            </li>
+          ))}
+        </ul>
         {!hasBudget ? (
           <p className="projectLongTerm__status" role="status">
             Rozpočet projektu není nastaven, průběh vyčerpání proto není k dispozici.

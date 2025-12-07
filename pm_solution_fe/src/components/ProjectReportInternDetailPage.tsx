@@ -232,7 +232,6 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
       <header className="projectReportInternDetail__header">
         <div className="projectReportInternDetail__headline">
           <h2>Detail stážisty</h2>
-          <p>Vyberte stážistu a získejte přehled o jeho otevřených issues na projektu.</p>
         </div>
 
         {loadingInterns ? (

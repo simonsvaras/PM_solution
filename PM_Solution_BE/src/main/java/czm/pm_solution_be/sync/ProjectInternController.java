@@ -26,30 +26,35 @@ public class ProjectInternController {
         this.internDao = internDao;
     }
 
-    public record InternGroupDto(long id, int code, String label) {}
+    public record InternGroupDto(long id, int code, String label) {
+    }
 
     public record InternAssignmentDto(long id,
-                                      String firstName,
-                                      String lastName,
-                                      String username,
-                                      long levelId,
-                                      String levelCode,
-                                      String levelLabel,
-                                      List<InternGroupDto> groups,
-                                      java.math.BigDecimal workloadHours,
-                                      boolean includeInReportedCost,
-                                      boolean assigned) {}
+            String firstName,
+            String lastName,
+            String username,
+            long levelId,
+            String levelCode,
+            String levelLabel,
+            List<InternGroupDto> groups,
+            java.math.BigDecimal workloadHours,
+            boolean includeInReportedCost,
+            boolean assigned) {
+    }
 
     public record UpdateInternAssignment(Long internId,
-                                         java.math.BigDecimal workloadHours,
-                                         Boolean includeInReportedCost) {}
+            java.math.BigDecimal workloadHours,
+            Boolean includeInReportedCost) {
+    }
 
-    public record UpdateInternsRequest(List<UpdateInternAssignment> interns) {}
+    public record UpdateInternsRequest(List<UpdateInternAssignment> interns) {
+    }
 
     @GetMapping
     public List<InternAssignmentDto> list(@PathVariable long projectId,
-                                          @RequestParam(value = "search", required = false) String search) {
-        List<InternAssignmentRow> rows = internDao.listInternsWithAssignment(projectId, search);
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(defaultValue = "false") boolean assigned) {
+        List<InternAssignmentRow> rows = internDao.listInternsWithAssignment(projectId, search, assigned);
         List<Long> internIds = rows.stream().map(InternAssignmentRow::id).toList();
         Map<Long, List<GroupRow>> groupMap = internDao.findGroupsForInternIds(internIds);
         return rows.stream().map(row -> new InternAssignmentDto(
@@ -65,8 +70,7 @@ public class ProjectInternController {
                         .toList(),
                 row.workloadHours(),
                 row.includeInReportedCost(),
-                row.assigned()
-        )).toList();
+                row.assigned())).toList();
     }
 
     @PutMapping
@@ -91,4 +95,3 @@ public class ProjectInternController {
         internDao.replaceProjectInterns(projectId, List.copyOf(unique.values()));
     }
 }
-

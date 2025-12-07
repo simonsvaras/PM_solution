@@ -1,5 +1,7 @@
 ﻿// Default to same-origin (nginx proxies /api -> backend in docker)
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+const DEFAULT_DEV_API_BASE = "http://localhost:8081";
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_API_BASE : "");
 
 export type SyncSummary = {
   fetched: number;
@@ -1455,9 +1457,13 @@ export async function getProjectIssues(projectId: number): Promise<ProjectIssue[
   return (data ?? []).map(mapProjectIssue);
 }
 
-export async function getProjectInterns(projectId: number, search?: string): Promise<ProjectInternAssignmentDTO[]> {
+export async function getProjectInterns(
+  projectId: number,
+  options?: { search?: string; assigned?: boolean },
+): Promise<ProjectInternAssignmentDTO[]> {
   const qs = new URLSearchParams();
-  if (search && search.trim()) qs.set('search', search.trim());
+  if (options?.search && options.search.trim()) qs.set('search', options.search.trim());
+  if (options?.assigned) qs.set('assigned', 'true');
   const url = `${API_BASE}/api/projects/${projectId}/interns${qs.toString() ? `?${qs.toString()}` : ''}`;
   const res = await fetch(url);
   if (!res.ok) throw await parseJson<ErrorResponse>(res);

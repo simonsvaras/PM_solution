@@ -993,6 +993,14 @@ function App() {
             <>
               <section className="panel">
                 <div className="panel__body panel__body--on-demand">
+                  <div className="on-demand-layout__notice">
+                    <p>
+                      Pro synchronizace pouze jednoho projektu přejděte do detailu projektu.
+                    </p>
+                    <a className="button button--secondary" href="/?module=projects&submodule=projects-overview">
+                      Otevřít Projects Overview
+                    </a>
+                  </div>
                   <div className="on-demand-layout">
                     <div className="on-demand-layout__filters">
                       <h2 className="on-demand-layout__title">Nastavení synchronizace</h2>

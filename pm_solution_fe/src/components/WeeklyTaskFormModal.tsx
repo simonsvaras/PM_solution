@@ -120,7 +120,7 @@ export default function WeeklyTaskFormModal({
   );
 
   const internsQuery = useQuery(
-    () => getProjectInterns(projectId),
+    () => getProjectInterns(projectId, { assigned: true }),
     [projectId],
     { enabled: isOpen && projectId > 0 },
   );

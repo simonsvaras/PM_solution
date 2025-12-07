@@ -41,7 +41,7 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
     setLoading(true);
     setError(null);
     setSaveError(null);
-    getProjectInterns(project.id, debouncedSearch)
+    getProjectInterns(project.id, debouncedSearch ? { search: debouncedSearch } : undefined)
       .then(result => {
         const normalised = result.map(item => ({
           ...item,

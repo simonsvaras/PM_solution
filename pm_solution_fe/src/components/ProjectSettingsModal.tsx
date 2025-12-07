@@ -420,10 +420,7 @@ export default function ProjectSettingsModal({
               projectName={project.name}
               isOpen={isOpen}
               onClose={onClose}
-              onSaved={() => {
-                onTeamUpdated();
-                onClose();
-              }}
+              onSaved={onTeamUpdated}
             />
           )}
           {activeTab === 'repositories' && (
@@ -473,7 +470,7 @@ function ProjectSettingsTeamSection({ projectId, projectName, isOpen, onClose, o
     setLoading(true);
     setError(null);
     setSaveError(null);
-    getProjectInterns(projectId, debouncedSearch)
+    getProjectInterns(projectId, debouncedSearch ? { search: debouncedSearch } : undefined)
       .then(result => {
         const normalised = result.map(item => ({
           ...item,
@@ -639,6 +636,7 @@ function ProjectSettingsTeamSection({ projectId, projectName, isOpen, onClose, o
       });
       await updateProjectInterns(projectId, payload);
       onSaved();
+      onClose();
     } catch (err) {
       setSaveError(err as ErrorResponse);
     } finally {

@@ -495,6 +495,27 @@
   gap: 12px;
 }
 
+.on-demand-layout__notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.on-demand-layout__notice p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.on-demand-layout__notice .button {
+  white-space: nowrap;
+}
+
 .on-demand-layout__field--reports-range {
   grid-column: 1 / -1;
 }
