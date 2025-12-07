@@ -52,7 +52,7 @@ export default function ProjectCard({ project, onEdit, onDelete, onManageRepos, 
         <button className="btn btn--danger" onClick={() => onDelete(project)}>Smazat</button>
         <button className="btn" onClick={() => onEdit(project)}>Editovat</button>
         <button className="btn btn--primary" onClick={() => onManageRepos(project)}>Správa repozitářů</button>
-        <button className="btn" onClick={() => onManageTeam(project)}>Správa tým</button>
+        <button className="btn" onClick={() => onManageTeam(project)}>Správa týmu</button>
       </div>
     </div>
   );

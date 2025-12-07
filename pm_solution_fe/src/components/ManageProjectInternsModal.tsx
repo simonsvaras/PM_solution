@@ -253,7 +253,7 @@ export default function ManageProjectInternsModal({ project, onClose, onSaved }:
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={project ? `Správa tým - ${project.name}` : 'Správa tým'}
+      title={project ? `Správa týmu - ${project.name}` : 'Správa tým'}
       className="modal--wide"
       bodyClassName="modal__body--repos"
       footer={footer}
