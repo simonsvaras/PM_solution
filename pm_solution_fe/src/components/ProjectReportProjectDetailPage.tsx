@@ -266,17 +266,32 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
     }, 0);
   }, [internContributions]);
 
+  const doneIssuesCount = useMemo(() => {
+    if (!detail) {
+      return 0;
+    }
+    return detail.issues.reduce((count, issue) => {
+      const statusValue = getLabelValue(issue.labels, 'status');
+      if (!statusValue) {
+        return count;
+      }
+      const normalized = statusValue.trim().toLowerCase();
+      return normalized === 'done' ? count + 1 : count;
+    }, 0);
+  }, [detail]);
+
   const progressInfo = useMemo(() => {
-    if (!selectedSummary || selectedSummary.totalIssues === 0) {
+    const totalIssues = selectedSummary?.totalIssues ?? detail?.issues?.length ?? 0;
+    if (totalIssues === 0) {
       return { value: '—', description: 'Žádné issues' };
     }
-    const ratio = selectedSummary.closedIssues / selectedSummary.totalIssues;
+    const ratio = doneIssuesCount / totalIssues;
     const percent = ratio * 100;
     return {
       value: `${percent.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} %`,
-      description: `${selectedSummary.closedIssues.toLocaleString('cs-CZ')} / ${selectedSummary.totalIssues.toLocaleString('cs-CZ')}`,
+      description: `${doneIssuesCount.toLocaleString('cs-CZ')} / ${totalIssues.toLocaleString('cs-CZ')}`,
     };
-  }, [selectedSummary]);
+  }, [selectedSummary, detail, doneIssuesCount]);
 
   const deadlineInfo = useMemo(() => {
     if (!selectedSummary) {
@@ -491,7 +506,7 @@ export default function ProjectReportProjectDetailPage({ project }: ProjectRepor
       ) : detail ? (
         <>
           <div className="projectReportProjectDetail__infoCards">
-            <InfoCard title="Progres práce" value={progressInfo.value} description={progressInfo.description} />
+            <InfoCard title="Progres práce (issue s label Done)" value={progressInfo.value} description={progressInfo.description} />
             <InfoCard title="Deadline" value={deadlineInfo.value} description={deadlineInfo.description} />
             <InfoCard title="Náklady" value={costInfo.value} description={costInfo.description} />
           </div>

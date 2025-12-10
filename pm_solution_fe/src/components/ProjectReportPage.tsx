@@ -508,7 +508,7 @@ export default function ProjectReportPage({
             {syncSummary && syncSummary.missingUsernames.length > 0 ? (
               <div className="projectReport__missing">
                 <p className="projectReport__missingTitle">
-                  Výkazy se nepodařilo uložit pro tyto uživatele (nenalezeni v systému):
+                  Výkazy se nezapočítaly pro tyto uživatele (nejsou registrováni v systému):
                 </p>
                 <ul className="projectReport__missingList">
                   {syncSummary.missingUsernames.map(username => (

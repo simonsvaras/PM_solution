@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -614,23 +615,105 @@ public class InternDao {
     }
 
     public void replaceProjectInterns(long projectId, List<ProjectInternAllocation> assignments) {
-        jdbc.update("DELETE FROM intern_project WHERE project_id = ?", projectId);
-        if (assignments == null || assignments.isEmpty()) {
-            return;
+        Map<Long, ProjectInternAllocation> existing = new HashMap<>();
+        for (ProjectInternAllocation allocation : listProjectInternAllocations(projectId)) {
+            existing.put(allocation.internId(), allocation);
         }
-        jdbc.batchUpdate(
-                "INSERT INTO intern_project (project_id, intern_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)",
-                assignments, assignments.size(),
-                (ps, assignment) -> {
-                    ps.setLong(1, projectId);
-                    ps.setLong(2, assignment.internId());
-                    if (assignment.workloadHours() == null) {
-                        ps.setNull(3, Types.NUMERIC);
-                    } else {
-                        ps.setBigDecimal(3, assignment.workloadHours());
-                    }
-                    ps.setBoolean(4, assignment.includeInReportedCost());
-                });
+        Map<Long, ProjectInternAllocation> desired = new LinkedHashMap<>();
+        if (assignments != null) {
+            for (ProjectInternAllocation allocation : assignments) {
+                desired.put(allocation.internId(), allocation);
+            }
+        }
+
+        List<Long> toDelete = new ArrayList<>();
+        for (Long internId : existing.keySet()) {
+            if (!desired.containsKey(internId)) {
+                toDelete.add(internId);
+            }
+        }
+
+        List<ProjectInternAllocation> toInsert = new ArrayList<>();
+        List<ProjectInternAllocation> toUpdate = new ArrayList<>();
+        for (ProjectInternAllocation allocation : desired.values()) {
+            ProjectInternAllocation current = existing.get(allocation.internId());
+            if (current == null) {
+                toInsert.add(allocation);
+            } else if (!workloadEquals(current.workloadHours(), allocation.workloadHours())
+                    || current.includeInReportedCost() != allocation.includeInReportedCost()) {
+                toUpdate.add(allocation);
+            }
+        }
+
+        if (!toDelete.isEmpty()) {
+            jdbc.batchUpdate(
+                    "DELETE FROM intern_project WHERE project_id = ? AND intern_id = ?",
+                    toDelete,
+                    toDelete.size(),
+                    (ps, internId) -> {
+                        ps.setLong(1, projectId);
+                        ps.setLong(2, internId);
+                    });
+        }
+
+        if (!toUpdate.isEmpty()) {
+            jdbc.batchUpdate(
+                    "UPDATE intern_project SET workload_hours = ?, include_in_reported_cost = ? WHERE project_id = ? AND intern_id = ?",
+                    toUpdate,
+                    toUpdate.size(),
+                    (ps, allocation) -> {
+                        if (allocation.workloadHours() == null) {
+                            ps.setNull(1, Types.NUMERIC);
+                        } else {
+                            ps.setBigDecimal(1, allocation.workloadHours());
+                        }
+                        ps.setBoolean(2, allocation.includeInReportedCost());
+                        ps.setLong(3, projectId);
+                        ps.setLong(4, allocation.internId());
+                    });
+        }
+
+        if (!toInsert.isEmpty()) {
+            jdbc.batchUpdate(
+                    "INSERT INTO intern_project (project_id, intern_id, workload_hours, include_in_reported_cost) VALUES (?, ?, ?, ?)",
+                    toInsert,
+                    toInsert.size(),
+                    (ps, allocation) -> {
+                        ps.setLong(1, projectId);
+                        ps.setLong(2, allocation.internId());
+                        if (allocation.workloadHours() == null) {
+                            ps.setNull(3, Types.NUMERIC);
+                        } else {
+                            ps.setBigDecimal(3, allocation.workloadHours());
+                        }
+                        ps.setBoolean(4, allocation.includeInReportedCost());
+                    });
+        }
+    }
+
+    public List<ProjectInternAllocation> listProjectInternAllocations(long projectId) {
+        String sql = """
+                SELECT intern_id,
+                       workload_hours,
+                       include_in_reported_cost
+                FROM intern_project
+                WHERE project_id = ?
+                """;
+        return jdbc.query(sql, (rs, rn) -> new ProjectInternAllocation(
+                rs.getLong("intern_id"),
+                rs.getBigDecimal("workload_hours"),
+                rs.getObject("include_in_reported_cost") == null || rs.getBoolean("include_in_reported_cost")),
+                projectId);
+    }
+
+    private static boolean workloadEquals(BigDecimal first, BigDecimal second) {
+        if (first == null && second == null) {
+            return true;
+        }
+        if (first == null || second == null) {
+            return false;
+        }
+        return first.compareTo(second) == 0;
     }
 
     /**

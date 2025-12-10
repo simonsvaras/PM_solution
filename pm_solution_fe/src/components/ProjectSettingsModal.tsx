@@ -385,7 +385,7 @@ export default function ProjectSettingsModal({
                   </div>
                   {budgetRangeError && <div className="errorText">{budgetRangeError}</div>}
                   <div className="field">
-                    <label htmlFor="project-settings-namespace">Namespace (volitelné)</label>
+                    <label htmlFor="project-settings-namespace">Namespace (Pro namapování milestones)</label>
                     <select
                       id="project-settings-namespace"
                       value={selectedNamespaceName ?? ''}

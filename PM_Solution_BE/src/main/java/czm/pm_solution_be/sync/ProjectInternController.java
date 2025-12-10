@@ -4,6 +4,7 @@ import czm.pm_solution_be.intern.InternDao;
 import czm.pm_solution_be.intern.InternDao.GroupRow;
 import czm.pm_solution_be.intern.InternDao.InternAssignmentRow;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -75,6 +76,7 @@ public class ProjectInternController {
 
     @PutMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
     public void update(@PathVariable long projectId, @RequestBody UpdateInternsRequest req) {
         if (req == null || req.interns() == null) {
             throw new IllegalArgumentException("interns je povinné pole.");
