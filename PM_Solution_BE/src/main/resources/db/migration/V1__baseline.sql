@@ -20,34 +20,34 @@ CREATE OR REPLACE FUNCTION "public"."compute_project_report_cost"("p_project_id"
     LANGUAGE "plpgsql"
     AS $$
 DECLARE
-    total NUMERIC(14, 2);
+total NUMERIC(14, 2);
 BEGIN
-    SELECT COALESCE(SUM(
-                       CASE
-                           WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN
-                               COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
-                           WHEN lvl.code = 'employee' THEN
-                               0
-                           ELSE
-                               COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
-                       END), 0)
-    INTO total
-    FROM project p
-    JOIN projects_to_repositorie ptr ON ptr.project_id = p.id
-    JOIN report r ON r.repository_id = ptr.repository_id
-    LEFT JOIN intern i ON i.username = r.username
-    LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = p.id
-    LEFT JOIN intern_level_history ilh ON ilh.intern_id = i.id
-        AND ilh.valid_from <= r.spent_at::date
+SELECT COALESCE(SUM(
+                        CASE
+                            WHEN ip.project_id IS NULL OR ip.include_in_reported_cost THEN
+                                COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
+                            WHEN lvl.code = 'employee' THEN
+                                0
+                            ELSE
+                                COALESCE(r.time_spent_hours * COALESCE(p.hourly_rate_czk, r.hourly_rate_czk), 0)
+                            END), 0)
+INTO total
+FROM project p
+         JOIN projects_to_repositorie ptr ON ptr.project_id = p.id
+         JOIN report r ON r.repository_id = ptr.repository_id
+         LEFT JOIN intern i ON i.username = r.username
+         LEFT JOIN intern_project ip ON ip.intern_id = i.id AND ip.project_id = p.id
+         LEFT JOIN intern_level_history ilh ON ilh.intern_id = i.id
+    AND ilh.valid_from <= r.spent_at::date
         AND (ilh.valid_to IS NULL OR ilh.valid_to >= r.spent_at::date)
     LEFT JOIN level lvl ON lvl.id = ilh.level_id
-    WHERE p.id = p_project_id
-      AND (p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
-      AND (p.budget_to IS NULL OR r.spent_at::date <= p.budget_to);
-    IF total IS NULL THEN
+WHERE p.id = p_project_id
+  AND (p.budget_from IS NULL OR r.spent_at::date >= p.budget_from)
+  AND (p.budget_to IS NULL OR r.spent_at::date <= p.budget_to);
+IF total IS NULL THEN
         total := 0;
-    END IF;
-    RETURN ROUND(total, 2);
+END IF;
+RETURN ROUND(total, 2);
 END;
 $$;
 ALTER FUNCTION "public"."compute_project_report_cost"("p_project_id" bigint) OWNER TO "postgres";
@@ -55,12 +55,12 @@ CREATE OR REPLACE FUNCTION "public"."refresh_project_report_cost"("p_project_id"
     LANGUAGE "plpgsql"
     AS $$
 DECLARE
-    total NUMERIC(14, 2);
+total NUMERIC(14, 2);
 BEGIN
     total := compute_project_report_cost(p_project_id);
-    UPDATE project
-    SET reported_cost = total
-    WHERE id = p_project_id;
+UPDATE project
+SET reported_cost = total
+WHERE id = p_project_id;
 END;
 $$;
 ALTER FUNCTION "public"."refresh_project_report_cost"("p_project_id" bigint) OWNER TO "postgres";
@@ -70,14 +70,14 @@ CREATE OR REPLACE FUNCTION "public"."trg_intern_project_refresh"() RETURNS "trig
 BEGIN
     IF TG_OP IN ('INSERT', 'UPDATE') THEN
         PERFORM refresh_project_report_cost(NEW.project_id);
-    END IF;
+END IF;
     IF TG_OP IN ('UPDATE', 'DELETE') THEN
         PERFORM refresh_project_report_cost(OLD.project_id);
-    END IF;
+END IF;
     IF TG_OP = 'DELETE' THEN
         RETURN OLD;
-    END IF;
-    RETURN NEW;
+END IF;
+RETURN NEW;
 END;
 $$;
 ALTER FUNCTION "public"."trg_intern_project_refresh"() OWNER TO "postgres";
@@ -86,7 +86,7 @@ CREATE OR REPLACE FUNCTION "public"."trg_project_budget_refresh"() RETURNS "trig
     AS $$
 BEGIN
     PERFORM refresh_project_report_cost(NEW.id);
-    RETURN NEW;
+RETURN NEW;
 END;
 $$;
 ALTER FUNCTION "public"."trg_project_budget_refresh"() OWNER TO "postgres";
@@ -96,17 +96,17 @@ CREATE OR REPLACE FUNCTION "public"."trg_project_repository_refresh"() RETURNS "
 BEGIN
     IF TG_OP = 'INSERT' THEN
         PERFORM refresh_project_report_cost(NEW.project_id);
-        RETURN NEW;
-    ELSIF TG_OP = 'DELETE' THEN
+RETURN NEW;
+ELSIF TG_OP = 'DELETE' THEN
         PERFORM refresh_project_report_cost(OLD.project_id);
-        RETURN OLD;
-    ELSE
+RETURN OLD;
+ELSE
         IF NEW.project_id IS DISTINCT FROM OLD.project_id THEN
             PERFORM refresh_project_report_cost(OLD.project_id);
-        END IF;
+END IF;
         PERFORM refresh_project_report_cost(NEW.project_id);
-        RETURN NEW;
-    END IF;
+RETURN NEW;
+END IF;
 END;
 $$;
 ALTER FUNCTION "public"."trg_project_repository_refresh"() OWNER TO "postgres";
@@ -114,52 +114,52 @@ CREATE OR REPLACE FUNCTION "public"."trg_report_refresh"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
 DECLARE
-    loop_project_id BIGINT;
+loop_project_id BIGINT;
 BEGIN
     IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') AND NEW.repository_id IS NOT NULL THEN
         FOR loop_project_id IN
-            SELECT DISTINCT ptr.project_id
-            FROM projects_to_repositorie ptr
-            WHERE ptr.repository_id = NEW.repository_id
-        LOOP
+SELECT DISTINCT ptr.project_id
+FROM projects_to_repositorie ptr
+WHERE ptr.repository_id = NEW.repository_id
+    LOOP
             PERFORM refresh_project_report_cost(loop_project_id);
-        END LOOP;
-    END IF;
+END LOOP;
+END IF;
     IF (TG_OP = 'UPDATE' AND (NEW.repository_id IS DISTINCT FROM OLD.repository_id))
        OR TG_OP = 'DELETE' THEN
         IF OLD.repository_id IS NOT NULL THEN
             FOR loop_project_id IN
-                SELECT DISTINCT ptr.project_id
-                FROM projects_to_repositorie ptr
-                WHERE ptr.repository_id = OLD.repository_id
-            LOOP
+SELECT DISTINCT ptr.project_id
+FROM projects_to_repositorie ptr
+WHERE ptr.repository_id = OLD.repository_id
+    LOOP
                 PERFORM refresh_project_report_cost(loop_project_id);
-            END LOOP;
-        END IF;
-    END IF;
+END LOOP;
+END IF;
+END IF;
     IF TG_OP = 'DELETE' THEN
         RETURN OLD;
-    END IF;
-    RETURN NEW;
+END IF;
+RETURN NEW;
 END;
 $$;
 ALTER FUNCTION "public"."trg_report_refresh"() OWNER TO "postgres";
 SET default_tablespace = '';
 SET default_table_access_method = "heap";
 CREATE TABLE IF NOT EXISTS "public"."capacity_status" (
-    "code" "text" NOT NULL,
-    "label" "text" NOT NULL,
-    "severity" smallint NOT NULL,
-    CONSTRAINT "capacity_status_severity_check" CHECK ((("severity" >= 0) AND ("severity" <= 100)))
-);
+                                                          "code" "text" NOT NULL,
+                                                          "label" "text" NOT NULL,
+                                                          "severity" smallint NOT NULL,
+                                                          CONSTRAINT "capacity_status_severity_check" CHECK ((("severity" >= 0) AND ("severity" <= 100)))
+    );
 ALTER TABLE "public"."capacity_status" OWNER TO "postgres";
 COMMENT ON TABLE "public"."capacity_status" IS 'Reference data for possible project capacity states reported by delivery teams.';
 COMMENT ON COLUMN "public"."capacity_status"."code" IS 'Stable identifier used by backend and frontend to reference the capacity status.';
 COMMENT ON COLUMN "public"."capacity_status"."label" IS 'Human readable label presented to users in the UI.';
 COMMENT ON COLUMN "public"."capacity_status"."severity" IS 'Ordering helper; 0 denotes no risk while 100 represents the most critical shortage.';
 CREATE TABLE IF NOT EXISTS "public"."flyway_schema_history" (
-    "installed_rank" integer NOT NULL,
-    "version" character varying(50),
+                                                                "installed_rank" integer NOT NULL,
+                                                                "version" character varying(50),
     "description" character varying(200) NOT NULL,
     "type" character varying(20) NOT NULL,
     "script" character varying(1000) NOT NULL,
@@ -168,12 +168,12 @@ CREATE TABLE IF NOT EXISTS "public"."flyway_schema_history" (
     "installed_on" timestamp without time zone DEFAULT "now"() NOT NULL,
     "execution_time" integer NOT NULL,
     "success" boolean NOT NULL
-);
+    );
 ALTER TABLE "public"."flyway_schema_history" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."group" (
-    "id" bigint NOT NULL,
-    "label" "text" NOT NULL,
-    "code" integer NOT NULL
+                                                "id" bigint NOT NULL,
+                                                "label" "text" NOT NULL,
+                                                "code" integer NOT NULL
 );
 ALTER TABLE "public"."group" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."group_id_seq"
@@ -185,17 +185,17 @@ CREATE SEQUENCE IF NOT EXISTS "public"."group_id_seq"
 ALTER SEQUENCE "public"."group_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."group_id_seq" OWNED BY "public"."group"."id";
 CREATE TABLE IF NOT EXISTS "public"."intern" (
-    "id" bigint NOT NULL,
-    "first_name" "text" NOT NULL,
-    "last_name" "text" NOT NULL,
-    "username" "text" NOT NULL,
-    "level_id" bigint NOT NULL,
-    "status_code" "text" DEFAULT 'SATUROVANO'::"text" NOT NULL
+                                                 "id" bigint NOT NULL,
+                                                 "first_name" "text" NOT NULL,
+                                                 "last_name" "text" NOT NULL,
+                                                 "username" "text" NOT NULL,
+                                                 "level_id" bigint NOT NULL,
+                                                 "status_code" "text" DEFAULT 'SATUROVANO'::"text" NOT NULL
 );
 ALTER TABLE "public"."intern" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."intern_group" (
-    "intern_id" bigint NOT NULL,
-    "group_id" bigint NOT NULL
+                                                       "intern_id" bigint NOT NULL,
+                                                       "group_id" bigint NOT NULL
 );
 ALTER TABLE "public"."intern_group" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."intern_id_seq"
@@ -207,13 +207,13 @@ CREATE SEQUENCE IF NOT EXISTS "public"."intern_id_seq"
 ALTER SEQUENCE "public"."intern_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."intern_id_seq" OWNED BY "public"."intern"."id";
 CREATE TABLE IF NOT EXISTS "public"."intern_level_history" (
-    "id" bigint NOT NULL,
-    "intern_id" bigint NOT NULL,
-    "level_id" bigint NOT NULL,
-    "valid_from" "date" NOT NULL,
-    "valid_to" "date",
-    CONSTRAINT "intern_level_history_check" CHECK ((("valid_to" IS NULL) OR ("valid_to" >= "valid_from")))
-);
+                                                               "id" bigint NOT NULL,
+                                                               "intern_id" bigint NOT NULL,
+                                                               "level_id" bigint NOT NULL,
+                                                               "valid_from" "date" NOT NULL,
+                                                               "valid_to" "date",
+                                                               CONSTRAINT "intern_level_history_check" CHECK ((("valid_to" IS NULL) OR ("valid_to" >= "valid_from")))
+    );
 ALTER TABLE "public"."intern_level_history" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."intern_level_history_id_seq"
     START WITH 1
@@ -224,26 +224,26 @@ CREATE SEQUENCE IF NOT EXISTS "public"."intern_level_history_id_seq"
 ALTER SEQUENCE "public"."intern_level_history_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."intern_level_history_id_seq" OWNED BY "public"."intern_level_history"."id";
 CREATE TABLE IF NOT EXISTS "public"."intern_project" (
-    "intern_id" bigint NOT NULL,
-    "project_id" bigint NOT NULL,
-    "workload_hours" numeric(6,2),
+                                                         "intern_id" bigint NOT NULL,
+                                                         "project_id" bigint NOT NULL,
+                                                         "workload_hours" numeric(6,2),
     "include_in_reported_cost" boolean DEFAULT true NOT NULL
-);
+    );
 ALTER TABLE "public"."intern_project" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."intern_status" (
-    "code" "text" NOT NULL,
-    "label" "text" NOT NULL,
-    "severity" integer NOT NULL
+                                                        "code" "text" NOT NULL,
+                                                        "label" "text" NOT NULL,
+                                                        "severity" integer NOT NULL
 );
 ALTER TABLE "public"."intern_status" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."intern_status_history" (
-    "id" bigint NOT NULL,
-    "intern_id" bigint NOT NULL,
-    "status_code" "text" NOT NULL,
-    "valid_from" "date" NOT NULL,
-    "valid_to" "date",
-    CONSTRAINT "intern_status_history_check" CHECK ((("valid_to" IS NULL) OR ("valid_to" >= "valid_from")))
-);
+                                                                "id" bigint NOT NULL,
+                                                                "intern_id" bigint NOT NULL,
+                                                                "status_code" "text" NOT NULL,
+                                                                "valid_from" "date" NOT NULL,
+                                                                "valid_to" "date",
+                                                                CONSTRAINT "intern_status_history_check" CHECK ((("valid_to" IS NULL) OR ("valid_to" >= "valid_from")))
+    );
 ALTER TABLE "public"."intern_status_history" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."intern_status_history_id_seq"
     START WITH 1
@@ -254,50 +254,50 @@ CREATE SEQUENCE IF NOT EXISTS "public"."intern_status_history_id_seq"
 ALTER SEQUENCE "public"."intern_status_history_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."intern_status_history_id_seq" OWNED BY "public"."intern_status_history"."id";
 CREATE TABLE IF NOT EXISTS "public"."report" (
-    "id" bigint NOT NULL,
-    "repository_id" bigint NOT NULL,
-    "iid" bigint,
-    "spent_at" timestamp with time zone NOT NULL,
-    "time_spent_seconds" integer NOT NULL,
-    "username" "text",
-    "time_spent_hours" numeric(12,4) NOT NULL,
+                                                 "id" bigint NOT NULL,
+                                                 "repository_id" bigint NOT NULL,
+                                                 "iid" bigint,
+                                                 "spent_at" timestamp with time zone NOT NULL,
+                                                 "time_spent_seconds" integer NOT NULL,
+                                                 "username" "text",
+                                                 "time_spent_hours" numeric(12,4) NOT NULL,
     "cost" numeric(12,2),
     "unregistered_username" "text",
     "username_fallback" "text" GENERATED ALWAYS AS (COALESCE("username", "unregistered_username")) STORED,
     "hourly_rate_czk" numeric(12,2),
     CONSTRAINT "chk_report_username_presence" CHECK ((("username" IS NOT NULL) OR ("unregistered_username" IS NOT NULL))),
     CONSTRAINT "report_time_spent_seconds_check" CHECK (("time_spent_seconds" <> 0))
-);
+    );
 ALTER TABLE "public"."report" OWNER TO "postgres";
 CREATE OR REPLACE VIEW "public"."intern_time_summary" AS
- SELECT "i"."id" AS "intern_id",
-    "i"."username" AS "intern_username",
-    COALESCE("sum"("r"."time_spent_seconds"), (0)::bigint) AS "seconds_spent_total",
-    COALESCE("sum"("r"."time_spent_hours"), (0)::numeric) AS "hours_spent_total"
-   FROM ("public"."intern" "i"
-     LEFT JOIN "public"."report" "r" ON (("r"."username" = "i"."username")))
-  GROUP BY "i"."id", "i"."username";
+SELECT "i"."id" AS "intern_id",
+       "i"."username" AS "intern_username",
+       COALESCE("sum"("r"."time_spent_seconds"), (0)::bigint) AS "seconds_spent_total",
+       COALESCE("sum"("r"."time_spent_hours"), (0)::numeric) AS "hours_spent_total"
+FROM ("public"."intern" "i"
+    LEFT JOIN "public"."report" "r" ON (("r"."username" = "i"."username")))
+GROUP BY "i"."id", "i"."username";
 ALTER VIEW "public"."intern_time_summary" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."issue" (
-    "id" bigint NOT NULL,
-    "repository_id" bigint,
-    "gitlab_issue_id" bigint,
-    "iid" bigint NOT NULL,
-    "title" "text" NOT NULL,
-    "state" "text" NOT NULL,
-    "assignee_id" bigint,
-    "assignee_username" "text",
-    "author_name" "text",
-    "labels" "text"[],
-    "due_date" "date",
-    "time_estimate_seconds" integer,
-    "total_time_spent_seconds" integer,
-    "updated_at" timestamp with time zone,
-    "milestone_title" "text",
-    "milestone_state" "text",
-    "created_at" timestamp with time zone,
-    "web_url" "text",
-    "human_time_estimate" "text"
+                                                "id" bigint NOT NULL,
+                                                "repository_id" bigint,
+                                                "gitlab_issue_id" bigint,
+                                                "iid" bigint NOT NULL,
+                                                "title" "text" NOT NULL,
+                                                "state" "text" NOT NULL,
+                                                "assignee_id" bigint,
+                                                "assignee_username" "text",
+                                                "author_name" "text",
+                                                "labels" "text"[],
+                                                "due_date" "date",
+                                                "time_estimate_seconds" integer,
+                                                "total_time_spent_seconds" integer,
+                                                "updated_at" timestamp with time zone,
+                                                "milestone_title" "text",
+                                                "milestone_state" "text",
+                                                "created_at" timestamp with time zone,
+                                                "web_url" "text",
+                                                "human_time_estimate" "text"
 );
 ALTER TABLE "public"."issue" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."issue_id_seq"
@@ -309,12 +309,12 @@ CREATE SEQUENCE IF NOT EXISTS "public"."issue_id_seq"
 ALTER SEQUENCE "public"."issue_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."issue_id_seq" OWNED BY "public"."issue"."id";
 CREATE TABLE IF NOT EXISTS "public"."level" (
-    "id" bigint NOT NULL,
-    "code" "text" NOT NULL,
-    "label" "text" NOT NULL,
-    "hourly_rate_czk" numeric(12,2) NOT NULL,
+                                                "id" bigint NOT NULL,
+                                                "code" "text" NOT NULL,
+                                                "label" "text" NOT NULL,
+                                                "hourly_rate_czk" numeric(12,2) NOT NULL,
     CONSTRAINT "level_hourly_rate_czk_check" CHECK (("hourly_rate_czk" >= (0)::numeric))
-);
+    );
 ALTER TABLE "public"."level" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."level_id_seq"
     START WITH 1
@@ -325,53 +325,53 @@ CREATE SEQUENCE IF NOT EXISTS "public"."level_id_seq"
 ALTER SEQUENCE "public"."level_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."level_id_seq" OWNED BY "public"."level"."id";
 CREATE TABLE IF NOT EXISTS "public"."milestone" (
-    "milestone_id" bigint NOT NULL,
-    "milestone_iid" bigint NOT NULL,
-    "title" "text" NOT NULL,
-    "state" "text" NOT NULL,
-    "due_date" "date",
-    "created_at" timestamp with time zone,
-    "updated_at" timestamp with time zone,
-    "project_id" bigint NOT NULL,
-    "description" "text"
+                                                    "milestone_id" bigint NOT NULL,
+                                                    "milestone_iid" bigint NOT NULL,
+                                                    "title" "text" NOT NULL,
+                                                    "state" "text" NOT NULL,
+                                                    "due_date" "date",
+                                                    "created_at" timestamp with time zone,
+                                                    "updated_at" timestamp with time zone,
+                                                    "project_id" bigint NOT NULL,
+                                                    "description" "text"
 );
 ALTER TABLE "public"."milestone" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."project" (
-    "id" bigint NOT NULL,
-    "name" "text" NOT NULL,
-    "namespace_id" bigint,
-    "budget" integer,
-    "budget_from" "date",
-    "budget_to" "date",
-    "reported_cost" numeric(14,2) DEFAULT 0 NOT NULL,
+                                                  "id" bigint NOT NULL,
+                                                  "name" "text" NOT NULL,
+                                                  "namespace_id" bigint,
+                                                  "budget" integer,
+                                                  "budget_from" "date",
+                                                  "budget_to" "date",
+                                                  "reported_cost" numeric(14,2) DEFAULT 0 NOT NULL,
     "namespace_name" "text",
     "hourly_rate_czk" numeric(12,2),
     "is_external" boolean DEFAULT false NOT NULL,
     CONSTRAINT "project_external_rate_check" CHECK (("is_external" OR ("hourly_rate_czk" IS NULL)))
-);
+    );
 ALTER TABLE "public"."project" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."projects_to_repositorie" (
-    "project_id" bigint NOT NULL,
-    "repository_id" bigint NOT NULL
+                                                                  "project_id" bigint NOT NULL,
+                                                                  "repository_id" bigint NOT NULL
 );
 ALTER TABLE "public"."projects_to_repositorie" OWNER TO "postgres";
 CREATE OR REPLACE VIEW "public"."milestone_report_cost" AS
- SELECT "m"."milestone_id",
-    "m"."project_id",
-    "round"(COALESCE("sum"(("r"."time_spent_hours" * COALESCE("p"."hourly_rate_czk", "r"."hourly_rate_czk"))), (0)::numeric), 2) AS "total_cost"
-   FROM (((("public"."milestone" "m"
-     JOIN "public"."project" "p" ON (("p"."id" = "m"."project_id")))
-     LEFT JOIN "public"."projects_to_repositorie" "ptr" ON (("ptr"."project_id" = "m"."project_id")))
-     LEFT JOIN "public"."issue" "iss" ON ((("iss"."repository_id" = "ptr"."repository_id") AND ("iss"."milestone_title" = "m"."title"))))
-     LEFT JOIN "public"."report" "r" ON ((("r"."repository_id" = "iss"."repository_id") AND ("r"."iid" = "iss"."iid") AND (("p"."budget_from" IS NULL) OR (("r"."spent_at")::"date" >= "p"."budget_from")) AND (("p"."budget_to" IS NULL) OR (("r"."spent_at")::"date" <= "p"."budget_to")))))
-  GROUP BY "m"."milestone_id", "m"."project_id";
+SELECT "m"."milestone_id",
+       "m"."project_id",
+       "round"(COALESCE("sum"(("r"."time_spent_hours" * COALESCE("p"."hourly_rate_czk", "r"."hourly_rate_czk"))), (0)::numeric), 2) AS "total_cost"
+FROM (((("public"."milestone" "m"
+    JOIN "public"."project" "p" ON (("p"."id" = "m"."project_id")))
+    LEFT JOIN "public"."projects_to_repositorie" "ptr" ON (("ptr"."project_id" = "m"."project_id")))
+    LEFT JOIN "public"."issue" "iss" ON ((("iss"."repository_id" = "ptr"."repository_id") AND ("iss"."milestone_title" = "m"."title"))))
+    LEFT JOIN "public"."report" "r" ON ((("r"."repository_id" = "iss"."repository_id") AND ("r"."iid" = "iss"."iid") AND (("p"."budget_from" IS NULL) OR (("r"."spent_at")::"date" >= "p"."budget_from")) AND (("p"."budget_to" IS NULL) OR (("r"."spent_at")::"date" <= "p"."budget_to")))))
+GROUP BY "m"."milestone_id", "m"."project_id";
 ALTER VIEW "public"."milestone_report_cost" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."project_capacity_report" (
-    "id" bigint NOT NULL,
-    "project_id" bigint NOT NULL,
-    "reported_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+                                                                  "id" bigint NOT NULL,
+                                                                  "project_id" bigint NOT NULL,
+                                                                  "reported_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "note" "text"
-);
+    );
 ALTER TABLE "public"."project_capacity_report" OWNER TO "postgres";
 COMMENT ON TABLE "public"."project_capacity_report" IS 'Historical records of capacity status updates per project.';
 COMMENT ON COLUMN "public"."project_capacity_report"."project_id" IS 'Project associated with the capacity report entry.';
@@ -386,8 +386,8 @@ CREATE SEQUENCE IF NOT EXISTS "public"."project_capacity_report_id_seq"
 ALTER SEQUENCE "public"."project_capacity_report_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."project_capacity_report_id_seq" OWNED BY "public"."project_capacity_report"."id";
 CREATE TABLE IF NOT EXISTS "public"."project_capacity_report_status" (
-    "report_id" bigint NOT NULL,
-    "status_code" "text" NOT NULL
+                                                                         "report_id" bigint NOT NULL,
+                                                                         "status_code" "text" NOT NULL
 );
 ALTER TABLE "public"."project_capacity_report_status" OWNER TO "postgres";
 COMMENT ON TABLE "public"."project_capacity_report_status" IS 'Join table linking project capacity reports with one or more capacity statuses.';
@@ -410,13 +410,13 @@ CREATE SEQUENCE IF NOT EXISTS "public"."report_id_seq"
 ALTER SEQUENCE "public"."report_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."report_id_seq" OWNED BY "public"."report"."id";
 CREATE TABLE IF NOT EXISTS "public"."repository" (
-    "id" bigint NOT NULL,
-    "gitlab_repo_id" bigint,
-    "name" "text" NOT NULL,
-    "name_with_namespace" "text" NOT NULL,
-    "namespace_id" bigint,
-    "namespace_name" "text",
-    "root_repo" boolean DEFAULT false NOT NULL
+                                                     "id" bigint NOT NULL,
+                                                     "gitlab_repo_id" bigint,
+                                                     "name" "text" NOT NULL,
+                                                     "name_with_namespace" "text" NOT NULL,
+                                                     "namespace_id" bigint,
+                                                     "namespace_name" "text",
+                                                     "root_repo" boolean DEFAULT false NOT NULL
 );
 ALTER TABLE "public"."repository" OWNER TO "postgres";
 CREATE SEQUENCE IF NOT EXISTS "public"."repository_id_seq"
@@ -428,9 +428,9 @@ CREATE SEQUENCE IF NOT EXISTS "public"."repository_id_seq"
 ALTER SEQUENCE "public"."repository_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."repository_id_seq" OWNED BY "public"."repository"."id";
 CREATE TABLE IF NOT EXISTS "public"."sync_cursor_repo" (
-    "repository_id" bigint NOT NULL,
-    "scope" "text" NOT NULL,
-    "last_run_at" timestamp with time zone NOT NULL
+                                                           "repository_id" bigint NOT NULL,
+                                                           "scope" "text" NOT NULL,
+                                                           "last_run_at" timestamp with time zone NOT NULL
 );
 ALTER TABLE "public"."sync_cursor_repo" OWNER TO "postgres";
 ALTER TABLE ONLY "public"."group" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."group_id_seq"'::"regclass");
