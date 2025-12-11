@@ -172,6 +172,7 @@ public class ReportSyncService {
             }
         }
 
+        syncDao.refreshMilestoneCostView();
         return summary;
     }
 

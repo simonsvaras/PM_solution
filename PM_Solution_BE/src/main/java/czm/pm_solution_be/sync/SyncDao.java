@@ -621,6 +621,10 @@ public class SyncDao {
         return new ReportInsertStats(inserted, duplicates, failed, List.copyOf(missingUsernames));
     }
 
+    public void refreshMilestoneCostView() {
+        jdbc.execute("REFRESH MATERIALIZED VIEW milestone_report_cost");
+    }
+
     /**
      * Removes every stored timelog entry. Used by the on-demand maintenance action.
      *
