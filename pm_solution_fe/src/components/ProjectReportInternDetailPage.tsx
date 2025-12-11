@@ -214,6 +214,40 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
     ? `Aktuálně přiřazené issues stážisty ${formatInternLabel(selectedIntern)}`
     : 'Vyberte stážistu pro zobrazení detailu.';
 
+  const issueAggregates = useMemo(
+    () =>
+      issues.reduce(
+        (acc, issue) => {
+          const status = (issue.status ?? issue.state ?? '').toLowerCase();
+          if (status === 'closed') {
+            acc.closed += 1;
+          }
+          acc.totalSeconds += Number.isFinite(issue.totalTimeSpentSeconds)
+            ? issue.totalTimeSpentSeconds
+            : 0;
+          return acc;
+        },
+        { closed: 0, totalSeconds: 0 },
+      ),
+    [issues],
+  );
+
+  const closedIssueCountValue = selectedInternUsername
+    ? issueAggregates.closed.toLocaleString('cs-CZ')
+    : '—';
+
+  const closedIssueDescription = selectedIntern
+    ? `Uzavřená issues stážisty ${formatInternLabel(selectedIntern)}`
+    : 'Vyberte stážistu pro zobrazení detailu.';
+
+  const totalTrackedHoursValue = selectedInternUsername
+    ? formatHoursFromSeconds(issueAggregates.totalSeconds)
+    : '—';
+
+  const totalTrackedDescription = selectedIntern
+    ? `Celkový součet vykázaných hodin stážisty ${formatInternLabel(selectedIntern)}`
+    : 'Vyberte stážistu pro zobrazení detailu.';
+
   function handleInternFilterChange(username: string | null) {
     setSelectedInternUsername(prev => {
       const next = username === prev ? null : username;
@@ -291,6 +325,16 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
       <div className="projectReportInternDetail__content">
         <div className="projectReportInternDetail__infoCards">
           <InfoCard title="Počet otevřených issues" value={issueCountValue} description={issueCountDescription} />
+          <InfoCard
+            title="Počet uzavřených issues"
+            value={closedIssueCountValue}
+            description={closedIssueDescription}
+          />
+          <InfoCard
+            title="Celkem vykázaných hodin"
+            value={totalTrackedHoursValue}
+            description={totalTrackedDescription}
+          />
         </div>
 
         {selectedInternUsername === null ? (

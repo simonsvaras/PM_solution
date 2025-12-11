@@ -860,6 +860,8 @@ export type ProjectReportInternDetailIssue = {
   issueWebUrl: string | null;
   humanTimeEstimate: string | null;
   labels: string[];
+  status: string | null;
+  state: string | null;
   dueDate: string | null;
   createdAt: string | null;
   ageDays: number | null;
@@ -1897,6 +1899,17 @@ export async function getProjectReportInternDetail(
   return {
     interns: data.interns.map(intern => ({ ...intern })),
     issues: data.issues.map(issue => {
+      const normalizedStatus = (() => {
+        if (typeof issue.status === 'string' && issue.status.trim().length > 0) {
+          return issue.status.trim();
+        }
+        const rawState = (issue as { state?: unknown }).state;
+        if (typeof rawState === 'string' && rawState.trim().length > 0) {
+          return rawState.trim();
+        }
+        return null;
+      })();
+
       const normalizedAgeDays =
         typeof issue.ageDays === 'number' && Number.isFinite(issue.ageDays)
           ? Math.max(0, Math.floor(issue.ageDays))
@@ -1910,6 +1923,8 @@ export async function getProjectReportInternDetail(
 
       return {
         ...issue,
+        status: normalizedStatus,
+        state: normalizedStatus,
         labels: normalizedLabels,
         issueWebUrl: normalizedWebUrl,
         humanTimeEstimate: normalizedHumanEstimate,
