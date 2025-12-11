@@ -1,29 +1,36 @@
-# Milestone náklady
+# Milestone naklady
 
-Tento dokument popisuje, jak backend počítá souhrnný náklad milníků a proč už není aplikován filtr podle `project.budget_from` / `project.budget_to`.
+Tento dokument vysvetluje, jak backend pocita souhrnny naklad milniku, proc byl odstranen filtr podle `project.budget_from` / `project.budget_to` a jak je reseno materializovani pohledu `milestone_report_cost`.
 
-## Souhrn změny
+## Souhrn zmeny
 
-- Milníkové náklady se nyní počítají ze všech reportů navázaných na issue přiřazené k milníku, bez ohledu na nastavené rozpočtové období projektu.
-- Změna je doručena migrací `V10__remove_budget_window_from_milestone_cost.sql`, která znovu vytvoří pohled `milestone_report_cost` bez podmínky na `r.spent_at`.
-- Čisté instalace získají stejné chování po spuštění celé sady migrací (V1 + … + V10), takže není potřeba ručně upravovat baseline.
+- Milnikove naklady se pocitaji ze vsech reportu navazanych na issue prirazene k milniku bez ohledu na rozsah rozpoctu projektu.
+- Migrace `V10__remove_budget_window_from_milestone_cost.sql` odstranila casove omezeni a re-definovala SQL dotaz pro `milestone_report_cost`.
+- Migrace `V11__materialize_milestone_cost_view.sql` znovu vytvari objekt jako materializovany view, aby bylo mozne pouzivat `REFRESH MATERIALIZED VIEW milestone_report_cost` beze zmeny aplikační logiky.
+- Ciste instalace ziskaji toto chovani pri spusteni cele sady migraci (V1 az V11), neni tedy nutne menit `V1__baseline.sql`.
 
-## Jak se částka počítá
+## Jak se castka pocita
 
-1. Pohled `milestone_report_cost` spojuje tabulky `milestone`, `project`, `projects_to_repositorie`, `issue` a `report`.
-2. Reporty se připojují pouze podle `repository_id` a `iid`; jedinou další podmínkou je shoda `issue.milestone_title` s názvem milníku.
-3. Hodiny (`report.time_spent_hours`) se násobí hodinovou sazbou. Pokud ji definuje samotný projekt (`project.hourly_rate_czk`), má přednost, jinak se použije sazba uložená v reportu (`report.hourly_rate_czk`).
-4. Součet se zaokrouhlí na dvě desetinná místa (`round(..., 2)`) a vrátí jako `total_cost`.
+1. Pohled spojuje tabulky `milestone`, `project`, `projects_to_repositorie`, `issue` a `report`.
+2. Reporty se pridruzuji pouze podle `repository_id` a `iid`, navic se hlida shoda `issue.milestone_title` s nazvem milniku.
+3. Hodiny (`report.time_spent_hours`) se nasobi hodinovou sazbou. Pokud ji definuje projekt (`project.hourly_rate_czk`), ma prednost, jinak se pouzije sazba z reportu (`report.hourly_rate_czk`).
+4. Soucet se zaokrouhli na dve desetinna mista pres `round(..., 2)` a ulozi se jako `total_cost`.
 
-Tyto agregace využívají všechny endpointy poskytující náklady milníků (`/milestones/costs`, `/milestones/{id}/detail` a další), takže změnu automaticky přeberou i UI komponenty.
+Vysledny agregat slouzi jako zdroj pro endpointy `/milestones/costs`, `/milestones/{id}/detail` i pro dalsi UI casti, ktere potrebuji zobrazit cenu milniku.
 
-## Důvody zrušení budget filtru
+## Materializovany pohled
 
-- Stakeholdeři chtějí vidět kompletní náklady milníku i v případě, že issue zasahuje mimo aktuálně nastavené období rozpočtu.
-- Vyloučení reportů mimo budget vedlo k podhodnocení milníků během delších realizací, což komplikovalo porovnávání se skutečným stavem.
-- Projektové rozpočty mohou nadále využívat `budget_from` / `budget_to` v jiných výpočtech (např. sumarizace projektu), ale pro milníky dává větší smysl transparentní model bez časového řezu.
+- Synchronizace reportu vola `REFRESH MATERIALIZED VIEW milestone_report_cost`, proto musi byt databazovy objekt materializovan.
+- `V11__materialize_milestone_cost_view.sql` nejdrive zrusi pripadny standardni view, vytvori materializovany view se stejnou definici (bez rozpoctovych filtru) a nastavi prava pro role `anon`, `authenticated` a `service_role`.
+- Po aplikaci migrace je vhodne provest prvni `REFRESH MATERIALIZED VIEW milestone_report_cost`, aby se napocitala data podle nove logiky.
 
-## Nasazení
+## Duvody zruseni budget filtru
 
-1. Při deployi spusťte migrace, aby se aplikovala změna `V10`.
-2. Pokud je `milestone_report_cost` materializovaný (synchronizační job ho po importu reportů refreshuje), doporučuje se refresh po nasazení, aby cache obsahovala data podle nové definice.
+- Stakeholderi potrebuji videt kompletni naklady milniku, i kdyz issue presahuje aktualne nastavene rozpoctove obdobi.
+- Vylouceni reportu mimo budget vedlo k podhodnoceni milniku pri delsi realizaci a ztizilo porovnavani s realnym stavem.
+- Rozpoctove intervaly zustavaji k dispozici pro jine vypocty (napr. sumarizace projektu), ale pro milniky dává smysl transparentni model bez casoveho rezu.
+
+## Nasazeni
+
+1. Spustte nove migrace (`V10`, `V11`), aby databaze pouzivala aktualni definici materializovaneho pohledu.
+2. Po deployi zavolejte `REFRESH MATERIALIZED VIEW milestone_report_cost` (napr. pres stavajici synchronizacni proces), aby cache odrazela zmenenou definici.

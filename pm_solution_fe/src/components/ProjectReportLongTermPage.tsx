@@ -34,14 +34,30 @@ type StatusMessage = {
   text: string;
 };
 
+type SelectedMilestoneTableRow = {
+  id: number;
+  title: string;
+  description: string;
+  cost: number;
+  dueDate: string | null;
+};
+
+type MilestoneTableSort = {
+  column: 'title' | 'cost';
+  direction: 'asc' | 'desc';
+};
+
+// Formats a Date instance to the YYYY-MM string used in API calls and chart ranges.
 function formatMonthKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+// Builds an ISO date string from individual parts when querying a specific year span.
 function formatYearDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+// Normalizes arbitrary strings into YYYY-MM keys while guarding against invalid input.
 function normalizeMonthKey(value: string): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -62,6 +78,7 @@ function normalizeMonthKey(value: string): string | null {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+// Converts the YYYY-MM key into a short Czech label for axis annotations.
 function formatMonthLabel(monthKey: string): string {
   const [yearStr, monthStr] = monthKey.split('-', 2);
   const year = Number.parseInt(yearStr, 10);
@@ -76,6 +93,7 @@ function formatMonthLabel(monthKey: string): string {
   });
 }
 
+// Human friendly formatting for hour totals shown in the chart.
 function formatHours(value: number): string {
   return value.toLocaleString('cs-CZ', {
     minimumFractionDigits: 1,
@@ -83,6 +101,7 @@ function formatHours(value: number): string {
   });
 }
 
+// Consistent currency formatting for cost figures across the UI.
 function formatCurrency(value: number): string {
   return value.toLocaleString('cs-CZ', {
     style: 'currency',
@@ -92,6 +111,7 @@ function formatCurrency(value: number): string {
   });
 }
 
+// Formats percentage values used in the burnout axis/tooltips.
 function formatPercent(value: number): string {
   return value.toLocaleString('cs-CZ', {
     minimumFractionDigits: 0,
@@ -125,6 +145,7 @@ function formatMilestoneDescription(description?: string | null): string {
   return trimmed.length > 0 ? trimmed : '—';
 }
 
+// Friendly fallback-heavy formatter for milestone deadlines.
 function formatMilestoneDueDate(value?: string | null): string {
   if (!value) {
     return '—';
@@ -140,6 +161,7 @@ function formatMilestoneDueDate(value?: string | null): string {
   });
 }
 
+// Normalises API cost payloads that may arrive as numbers or strings.
 function resolveMilestoneCost(value: number | string | null | undefined): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -174,6 +196,7 @@ function getMonthKeyFromMonthStart(value: string): string | null {
  * dependencies to keep the bundle size small.
  */
 export default function ProjectReportLongTermPage({ project }: ProjectReportLongTermPageProps) {
+  // Cache the sliding window of selectable years so the dropdown stays deterministic.
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const availableYears = useMemo(() => {
     const years: number[] = [];
@@ -183,6 +206,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return years;
   }, [currentYear]);
   const [selectedYear, setSelectedYear] = useState<number>(availableYears[0]);
+  // Pre-compute the ISO range parameters for the currently selected year.
   const fromValue = useMemo(() => formatYearDate(selectedYear, 1, 1), [selectedYear]);
   const toValue = useMemo(() => formatYearDate(selectedYear, 12, 31), [selectedYear]);
   const [loading, setLoading] = useState(false);
@@ -196,6 +220,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const [milestoneCostError, setMilestoneCostError] = useState<ErrorResponse | null>(null);
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<number[]>([]);
   const [milestoneMetadata, setMilestoneMetadata] = useState<Map<number, ProjectMilestoneSummary>>(new Map());
+  const [milestoneTableSort, setMilestoneTableSort] = useState<MilestoneTableSort>({
+    column: 'title',
+    direction: 'asc',
+  });
   const chartTitleId = useId();
   const chartDescId = `${chartTitleId}-desc`;
   const milestoneChartTitleId = useId();
@@ -218,6 +246,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     setSelectedMilestoneIds([]);
     setMilestoneCostError(null);
     setMilestoneMetadata(new Map());
+    setMilestoneTableSort({ column: 'title', direction: 'asc' });
   }, [project.id, availableYears]);
 
   // Fetch the long-term project report for the currently selected year.
@@ -319,6 +348,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     };
   }, [projectId]);
 
+  // Load supplementary metadata (title, due date) to enrich the milestone table.
   useEffect(() => {
     let ignore = false;
     getProjectActiveMilestones(projectId, true)
@@ -346,6 +376,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     );
   }, [selectedYear]);
 
+  // Read a usable numeric budget from the optional metadata payload.
   const resolvedBudget = useMemo(() => {
     const metaBudget = reportMeta?.budget;
     if (typeof metaBudget === 'number' && Number.isFinite(metaBudget) && metaBudget > 0) {
@@ -354,6 +385,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return null;
   }, [reportMeta?.budget]);
 
+  // Merge the backend months with the generated month range to fill gaps and compute cumulative metrics.
   const chartPoints = useMemo<ChartPoint[]>(() => {
     if (monthRange.length === 0) {
       return [];
@@ -393,6 +425,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     });
   }, [monthRange, reportMonths, resolvedBudget]);
 
+  // Budget-aware helpers that drive whether the burnout visuals are rendered.
   const hasBudget = typeof resolvedBudget === 'number' && Number.isFinite(resolvedBudget) && resolvedBudget > 0;
   const burnoutPercentTotal = hasBudget && resolvedBudget
     ? Math.min((totalCost / resolvedBudget) * 100, 999)
@@ -404,12 +437,14 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   );
   const hasChartData = (hasHoursData || hasBurnoutData) && chartPoints.length > 0;
 
+  // Surface loading/error states for the primary annual report request.
   const statusMessage: StatusMessage | null = error
     ? { tone: 'error', text: error.error?.message ?? 'Nepodařilo se načíst dlouhodobý report.' }
     : loading
     ? { tone: 'muted', text: 'Načítám data…' }
     : null;
 
+  // Derived dimensions for the main annual chart.
   const chartHeight = 360;
   const paddingX = 56;
   const paddingTop = 80;
@@ -428,6 +463,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return paddingX + barWidth / 2 + (usableWidth * index) / (chartPoints.length - 1);
   };
 
+  // Resolve axis scales from the current dataset so labels stay proportional.
   const maxHours = chartPoints.reduce((max, point) => Math.max(max, point.hours), 0);
   const hoursScaleMax = maxHours > 0 ? maxHours * 1.1 : 1;
   const maxBurnout = chartPoints.reduce((max, point) => {
@@ -440,6 +476,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     ? Math.max(100, Math.ceil(maxBurnout / 10) * 10 || 100)
     : 0;
 
+  // Build evenly spaced labels for the burnout axis so the grid scales with the data.
   const percentAxisTicks = useMemo(() => {
     if (!hasBudget || burnoutScaleMax <= 0) {
       return [] as number[];
@@ -462,6 +499,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         .join(' ')
     : '';
 
+  // Toggle legend entries based on the presence of a project budget.
   const legendItems = useMemo(
     () =>
       hasBudget
@@ -485,15 +523,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return milestoneCosts.filter(item => allowed.has(item.milestoneId));
   }, [milestoneCosts, selectedMilestoneIds]);
 
-  const selectedMilestoneTableRows = useMemo(() => {
+  // Flatten the selected milestone summaries into lightweight rows for the comparison table.
+  const selectedMilestoneTableRows = useMemo<SelectedMilestoneTableRow[]>(() => {
     if (selectedMilestoneSummaries.length === 0) {
-      return [] as {
-        id: number;
-        title: string;
-        description: string;
-        cost: number;
-        dueDate: string | null;
-      }[];
+      return [];
     }
     return selectedMilestoneSummaries.map(summary => {
       const metadata = milestoneMetadata.get(summary.milestoneId);
@@ -507,6 +540,45 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     });
   }, [selectedMilestoneSummaries, milestoneMetadata]);
 
+  // Apply the current table sort configuration without mutating the memorised rows.
+  const sortedMilestoneTableRows = useMemo(() => {
+    if (selectedMilestoneTableRows.length <= 1) {
+      return selectedMilestoneTableRows;
+    }
+    const sorted = [...selectedMilestoneTableRows];
+    const direction = milestoneTableSort.direction === 'asc' ? 1 : -1;
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      if (milestoneTableSort.column === 'title') {
+        comparison = a.title.localeCompare(b.title, 'cs');
+      } else {
+        comparison = a.cost - b.cost;
+      }
+      if (comparison === 0) {
+        comparison = a.id - b.id;
+      }
+      return comparison * direction;
+    });
+    return sorted;
+  }, [selectedMilestoneTableRows, milestoneTableSort]);
+
+  // Aggregate the currently visible milestone costs for the footer summary.
+  const selectedMilestoneCostTotal = useMemo(
+    () => selectedMilestoneTableRows.reduce((sum, row) => sum + row.cost, 0),
+    [selectedMilestoneTableRows],
+  );
+
+  // Handles both toggling direction and switching the active sort column.
+  const handleMilestoneTableSort = useCallback((column: 'title' | 'cost') => {
+    setMilestoneTableSort(prev => {
+      if (prev.column === column) {
+        return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { column, direction: column === 'title' ? 'asc' : 'desc' };
+    });
+  }, []);
+
+  // Update the year picker and trigger the useEffect data refresh cycle.
   const handleYearChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const parsed = Number(event.target.value);
     if (Number.isFinite(parsed)) {
@@ -525,6 +597,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   // empty state versus the SVG rendering.
   const hasMilestoneCostData = selectedMilestoneSummaries.some(item => resolveMilestoneCost(item.totalCost) > 0);
 
+  // Layout presets for the milestone comparison chart.
   const milestoneChartHeight = 320;
   const milestonePaddingX = 56;
   const milestonePaddingY = 48;
@@ -542,6 +615,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
       ? Math.min(80, (milestoneStep || milestoneNominalWidth) * 0.6)
       : Math.min(80, milestoneNominalWidth * 0.6);
 
+  // Status banner tied to the milestone cost dataset.
   const milestoneStatusMessage: StatusMessage | null = milestoneCostError
     ? { tone: 'error', text: milestoneCostError.error?.message ?? 'Nepodařilo se načíst náklady milníků.' }
     : loadingMilestoneCosts
@@ -561,9 +635,11 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     : '';
 
   const milestoneStatusId = milestoneStatusMessage ? `${milestoneChecklistId}-status` : undefined;
+  // Maintain accessible descriptions for the milestone checklist container.
   const milestoneSelectDescribedBy = [milestoneSelectHintId, milestoneStatusId]
     .filter(Boolean)
     .join(' ') || undefined;
+  // Derived flags that keep the milestone UI responsive to async states.
   const milestoneChecklistDisabled = loadingMilestoneCosts || milestoneCosts.length === 0;
   const milestoneSelectionEmpty = !loadingMilestoneCosts && milestoneCosts.length > 0 && selectedMilestoneIds.length === 0;
   const milestoneChartHasData = selectedMilestoneSummaries.length > 0 && hasMilestoneCostData;
@@ -598,10 +674,12 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     [milestoneCosts],
   );
 
+  // Quickly reset the selection to an empty state.
   const handleClearMilestoneSelection = useCallback(() => {
     setSelectedMilestoneIds([]);
   }, []);
 
+  // Helper for the "select all" bulk action in the comparison section.
   const handleSelectAllMilestones = useCallback(() => {
     if (milestoneCosts.length === 0) {
       return;
@@ -609,8 +687,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     setSelectedMilestoneIds(milestoneCosts.map(item => item.milestoneId));
   }, [milestoneCosts]);
 
+  // Enables a friendly empty state whenever the year has data but nothing chartable.
   const emptyState = !loading && !error && !hasChartData && chartPoints.length > 0;
 
+  // Compose CSS modifier classes for the top-level status banner.
   const statusClassName = statusMessage
     ? [
         'projectLongTerm__status',
@@ -621,6 +701,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         .join(' ')
     : '';
 
+  // Render the full long-term report layout including filters, charts, and milestone comparison.
   return (
     <div className="projectLongTerm" data-testid="project-long-term-page">
       <section className="projectLongTerm__controls" aria-label="Filtry dlouhodobého reportu">
@@ -914,14 +995,66 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                   <table className="projectLongTerm__milestoneTable">
                     <thead>
                       <tr>
-                        <th scope="col">Milestone Title</th>
+                        <th
+                          scope="col"
+                          aria-sort={
+                            milestoneTableSort.column === 'title'
+                              ? milestoneTableSort.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="projectLongTerm__milestoneSortButton"
+                            onClick={() => handleMilestoneTableSort('title')}
+                            title="Seřadit podle názvu"
+                          >
+                            Milestone Title
+                            {milestoneTableSort.column === 'title' ? (
+                              <span
+                                className="projectLongTerm__milestoneSortIcon"
+                                aria-hidden="true"
+                              >
+                                {milestoneTableSort.direction === 'asc' ? 'A-Z' : 'Z-A'}
+                              </span>
+                            ) : null}
+                          </button>
+                        </th>
                         <th scope="col">Popis</th>
-                        <th scope="col">Celkové náklady</th>
+                        <th
+                          scope="col"
+                          aria-sort={
+                            milestoneTableSort.column === 'cost'
+                              ? milestoneTableSort.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="projectLongTerm__milestoneSortButton"
+                            onClick={() => handleMilestoneTableSort('cost')}
+                            title="Seřadit podle nákladů"
+                          >
+                            Celkové náklady
+                            {milestoneTableSort.column === 'cost' ? (
+                              <span
+                                className="projectLongTerm__milestoneSortIcon"
+                                aria-hidden="true"
+                              >
+                                {milestoneTableSort.direction === 'asc' ? '0-9' : '9-0'}
+                              </span>
+                            ) : null}
+                          </button>
+                        </th>
                         <th scope="col">Deadline</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedMilestoneTableRows.map(row => (
+                      {sortedMilestoneTableRows.map(row => (
                         <tr key={row.id} className="projectLongTerm__milestoneTableRow">
                           <td>{row.title}</td>
                           <td>{row.description}</td>
@@ -930,6 +1063,17 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td className="projectLongTerm__milestoneTableTotalLabel" colSpan={2}>
+                          Náklady celkem
+                        </td>
+                        <td className="projectLongTerm__milestoneTableCost">
+                          {formatCurrency(selectedMilestoneCostTotal)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
