@@ -848,6 +848,10 @@ public class SyncDao {
                                             OffsetDateTime createdAt,
                                             long totalTimeSpentSeconds) {}
 
+    public record ProjectInternIssueStats(long totalIssues,
+                                          long closedIssues,
+                                          long totalTimeSpentSeconds) {}
+
     public record ActiveMilestoneRow(long milestoneId,
                                      long milestoneIid,
                                      String title,
@@ -1330,6 +1334,40 @@ public class SyncDao {
                     createdAt,
                     Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds")).map(Number::longValue).orElse(0L)
             );
+        }, internUsername, projectId, internUsername);
+    }
+
+    public Optional<ProjectInternIssueStats> findProjectInternIssueStats(long projectId, String internUsername) {
+        if (internUsername == null || internUsername.isBlank()) {
+            return Optional.empty();
+        }
+
+        String sql = """
+                SELECT COUNT(*) AS total_issues,
+                       COUNT(*) FILTER (WHERE iss.state = 'closed') AS closed_issues,
+                       COALESCE(SUM(r.time_spent_seconds), 0) AS total_time_spent_seconds
+                FROM projects_to_repositorie ptr
+                JOIN issue iss ON iss.repository_id = ptr.repository_id
+                LEFT JOIN report r
+                       ON r.repository_id = iss.repository_id
+                      AND r.iid = iss.iid
+                      AND r.username = ?
+                WHERE ptr.project_id = ?
+                  AND iss.assignee_username = ?
+                """;
+
+        return jdbc.query(sql, rs -> {
+            if (!rs.next()) {
+                return Optional.empty();
+            }
+
+            long totalIssues = Optional.ofNullable((Number) rs.getObject("total_issues")).map(Number::longValue).orElse(0L);
+            long closedIssues = Optional.ofNullable((Number) rs.getObject("closed_issues")).map(Number::longValue).orElse(0L);
+            long totalTimeSpentSeconds = Optional.ofNullable((Number) rs.getObject("total_time_spent_seconds"))
+                    .map(Number::longValue)
+                    .orElse(0L);
+
+            return Optional.of(new ProjectInternIssueStats(totalIssues, closedIssues, totalTimeSpentSeconds));
         }, internUsername, projectId, internUsername);
     }
 

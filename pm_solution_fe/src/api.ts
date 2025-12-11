@@ -868,9 +868,16 @@ export type ProjectReportInternDetailIssue = {
   totalTimeSpentSeconds: number;
 };
 
+export type ProjectReportInternIssueStats = {
+  totalIssues: number;
+  closedIssues: number;
+  totalTimeSpentSeconds: number;
+};
+
 export type ProjectReportInternDetailResponse = {
   interns: ProjectReportDetailIntern[];
   issues: ProjectReportInternDetailIssue[];
+  stats: ProjectReportInternIssueStats | null;
 };
 
 export type ProjectReportDetailParams = {
@@ -1896,6 +1903,23 @@ export async function getProjectReportInternDetail(
   );
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<ProjectReportInternDetailResponse>(res);
+  const normalizedStats = (() => {
+    const stats = data.stats;
+    if (!stats) {
+      return null;
+    }
+    const totalIssues = Number.isFinite(stats.totalIssues) ? Number(stats.totalIssues) : 0;
+    const closedIssues = Number.isFinite(stats.closedIssues) ? Number(stats.closedIssues) : 0;
+    const totalTimeSpentSeconds = Number.isFinite(stats.totalTimeSpentSeconds)
+      ? Number(stats.totalTimeSpentSeconds)
+      : 0;
+
+    return {
+      totalIssues,
+      closedIssues,
+      totalTimeSpentSeconds,
+    } satisfies ProjectReportInternIssueStats;
+  })();
   return {
     interns: data.interns.map(intern => ({ ...intern })),
     issues: data.issues.map(issue => {
@@ -1937,6 +1961,7 @@ export async function getProjectReportInternDetail(
         issueTitle: issue.issueTitle.trim() ? issue.issueTitle.trim() : 'Bez názvu',
       };
     }),
+    stats: normalizedStats,
   };
 }
 

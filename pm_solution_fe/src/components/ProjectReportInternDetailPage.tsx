@@ -9,6 +9,7 @@ import {
   type ProjectOverviewDTO,
   type ProjectReportDetailIntern,
   type ProjectReportInternDetailIssue,
+  type ProjectReportInternIssueStats,
 } from '../api';
 
 function formatHoursFromSeconds(seconds: number): string {
@@ -103,6 +104,7 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
   const [interns, setInterns] = useState<ProjectReportDetailIntern[]>([]);
   const [selectedInternUsername, setSelectedInternUsername] = useState<string | null>(null);
   const [issues, setIssues] = useState<ProjectReportInternDetailIssue[]>([]);
+  const [issueStats, setIssueStats] = useState<ProjectReportInternIssueStats | null>(null);
   const [loadingInterns, setLoadingInterns] = useState(false);
   const [loadingIssues, setLoadingIssues] = useState(false);
   const [internsError, setInternsError] = useState<ErrorResponse | null>(null);
@@ -165,6 +167,7 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
   useEffect(() => {
     if (!selectedInternUsername) {
       setIssues([]);
+      setIssueStats(null);
       setIssuesError(null);
       setLoadingIssues(false);
       return;
@@ -173,6 +176,7 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
     let ignore = false;
     setLoadingIssues(true);
     setIssuesError(null);
+    setIssueStats(null);
 
     getProjectReportInternDetail(project.id, selectedInternUsername)
       .then(data => {
@@ -181,6 +185,7 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
         }
         setInterns(data.interns);
         setIssues(data.issues);
+        setIssueStats(data.stats);
       })
       .catch(err => {
         if (ignore) {
@@ -215,25 +220,19 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
     : 'Vyberte stážistu pro zobrazení detailu.';
 
   const issueAggregates = useMemo(
-    () =>
-      issues.reduce(
-        (acc, issue) => {
-          const status = (issue.status ?? issue.state ?? '').toLowerCase();
-          if (status === 'closed') {
-            acc.closed += 1;
-          }
-          acc.totalSeconds += Number.isFinite(issue.totalTimeSpentSeconds)
-            ? issue.totalTimeSpentSeconds
-            : 0;
-          return acc;
-        },
-        { closed: 0, totalSeconds: 0 },
-      ),
-    [issues],
+    () => ({
+      closed: issueStats?.closedIssues ?? 0,
+      totalSeconds: issueStats?.totalTimeSpentSeconds ?? 0,
+    }),
+    [issueStats],
   );
 
+  const hasStats = issueStats !== null;
+
   const closedIssueCountValue = selectedInternUsername
-    ? issueAggregates.closed.toLocaleString('cs-CZ')
+    ? hasStats
+      ? issueAggregates.closed.toLocaleString('cs-CZ')
+      : '—'
     : '—';
 
   const closedIssueDescription = selectedIntern
@@ -241,7 +240,9 @@ export default function ProjectReportInternDetailPage({ project }: ProjectReport
     : 'Vyberte stážistu pro zobrazení detailu.';
 
   const totalTrackedHoursValue = selectedInternUsername
-    ? formatHoursFromSeconds(issueAggregates.totalSeconds)
+    ? hasStats
+      ? formatHoursFromSeconds(issueAggregates.totalSeconds)
+      : '—'
     : '—';
 
   const totalTrackedDescription = selectedIntern

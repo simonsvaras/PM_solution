@@ -57,7 +57,13 @@ public class ProjectReportDetailController {
                                   Integer ageDays,
                                   long totalTimeSpentSeconds) {}
 
-    public record ProjectReportInternDetailResponse(List<InternSummary> interns, List<InternOpenIssue> issues) {}
+    public record ProjectReportInternIssueStats(long totalIssues,
+                                                long closedIssues,
+                                                long totalTimeSpentSeconds) {}
+
+    public record ProjectReportInternDetailResponse(List<InternSummary> interns,
+                                                    List<InternOpenIssue> issues,
+                                                    ProjectReportInternIssueStats stats) {}
 
     public record ProjectLongTermReportMeta(Integer budget,
                                             LocalDate budgetFrom,
@@ -146,6 +152,7 @@ public class ProjectReportDetailController {
         }
 
         List<InternOpenIssue> issues = List.of();
+        ProjectReportInternIssueStats stats = null;
         if (normalizedInternUsername != null) {
             List<SyncDao.ProjectInternOpenIssueRow> rows =
                     dao.listProjectInternOpenIssues(projectId, normalizedInternUsername);
@@ -164,6 +171,13 @@ public class ProjectReportDetailController {
                             calculateIssueAgeDays(row.createdAt()),
                             row.totalTimeSpentSeconds()))
                     .toList();
+
+            stats = dao.findProjectInternIssueStats(projectId, normalizedInternUsername)
+                    .map(row -> new ProjectReportInternIssueStats(
+                            row.totalIssues(),
+                            row.closedIssues(),
+                            row.totalTimeSpentSeconds()))
+                    .orElse(new ProjectReportInternIssueStats(0, 0, 0));
         }
 
         List<InternSummary> interns = new ArrayList<>(internMap.values());
@@ -171,7 +185,7 @@ public class ProjectReportDetailController {
                 .thenComparing(InternSummary::firstName)
                 .thenComparing(InternSummary::username));
 
-        return new ProjectReportInternDetailResponse(interns, issues);
+        return new ProjectReportInternDetailResponse(interns, issues, stats);
     }
 
     @GetMapping("/{projectId}/reports/long-term")
