@@ -860,15 +860,24 @@ export type ProjectReportInternDetailIssue = {
   issueWebUrl: string | null;
   humanTimeEstimate: string | null;
   labels: string[];
+  status: string | null;
+  state: string | null;
   dueDate: string | null;
   createdAt: string | null;
   ageDays: number | null;
   totalTimeSpentSeconds: number;
 };
 
+export type ProjectReportInternIssueStats = {
+  totalIssues: number;
+  closedIssues: number;
+  totalTimeSpentSeconds: number;
+};
+
 export type ProjectReportInternDetailResponse = {
   interns: ProjectReportDetailIntern[];
   issues: ProjectReportInternDetailIssue[];
+  stats: ProjectReportInternIssueStats | null;
 };
 
 export type ProjectReportDetailParams = {
@@ -1894,9 +1903,37 @@ export async function getProjectReportInternDetail(
   );
   if (!res.ok) throw await parseJson<ErrorResponse>(res);
   const data = await parseJson<ProjectReportInternDetailResponse>(res);
+  const normalizedStats = (() => {
+    const stats = data.stats;
+    if (!stats) {
+      return null;
+    }
+    const totalIssues = Number.isFinite(stats.totalIssues) ? Number(stats.totalIssues) : 0;
+    const closedIssues = Number.isFinite(stats.closedIssues) ? Number(stats.closedIssues) : 0;
+    const totalTimeSpentSeconds = Number.isFinite(stats.totalTimeSpentSeconds)
+      ? Number(stats.totalTimeSpentSeconds)
+      : 0;
+
+    return {
+      totalIssues,
+      closedIssues,
+      totalTimeSpentSeconds,
+    } satisfies ProjectReportInternIssueStats;
+  })();
   return {
     interns: data.interns.map(intern => ({ ...intern })),
     issues: data.issues.map(issue => {
+      const normalizedStatus = (() => {
+        if (typeof issue.status === 'string' && issue.status.trim().length > 0) {
+          return issue.status.trim();
+        }
+        const rawState = (issue as { state?: unknown }).state;
+        if (typeof rawState === 'string' && rawState.trim().length > 0) {
+          return rawState.trim();
+        }
+        return null;
+      })();
+
       const normalizedAgeDays =
         typeof issue.ageDays === 'number' && Number.isFinite(issue.ageDays)
           ? Math.max(0, Math.floor(issue.ageDays))
@@ -1910,6 +1947,8 @@ export async function getProjectReportInternDetail(
 
       return {
         ...issue,
+        status: normalizedStatus,
+        state: normalizedStatus,
         labels: normalizedLabels,
         issueWebUrl: normalizedWebUrl,
         humanTimeEstimate: normalizedHumanEstimate,
@@ -1922,6 +1961,7 @@ export async function getProjectReportInternDetail(
         issueTitle: issue.issueTitle.trim() ? issue.issueTitle.trim() : 'Bez názvu',
       };
     }),
+    stats: normalizedStats,
   };
 }
 
