@@ -7,9 +7,14 @@ import type {
   ProjectLongTermReportMonth,
   ProjectLongTermReportResponse,
   ProjectMilestoneCostSummary,
+  ProjectMilestoneSummary,
   ProjectOverviewDTO,
 } from '../api';
-import { getProjectLongTermReport, getProjectMilestoneCostSummary } from '../api';
+import {
+  getProjectActiveMilestones,
+  getProjectLongTermReport,
+  getProjectMilestoneCostSummary,
+} from '../api';
 
 type ProjectReportLongTermPageProps = {
   project: ProjectOverviewDTO;
@@ -103,9 +108,49 @@ function isNonNull<T>(value: T | null | undefined): value is T {
  * so that users can quickly orient themselves even when titles are missing.
  */
 function formatMilestoneOptionLabel(milestone: ProjectMilestoneCostSummary): string {
-  const trimmedTitle = milestone.title?.trim();
-  const title = trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : 'Bez názvu';
+  const title = resolveMilestoneTitle(milestone.title);
   return `#${milestone.milestoneIid} — ${title}`;
+}
+
+function resolveMilestoneTitle(title?: string | null): string {
+  const trimmedTitle = title?.trim();
+  return trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : 'Bez názvu';
+}
+
+function formatMilestoneDescription(description?: string | null): string {
+  if (typeof description !== 'string') {
+    return '—';
+  }
+  const trimmed = description.trim();
+  return trimmed.length > 0 ? trimmed : '—';
+}
+
+function formatMilestoneDueDate(value?: string | null): string {
+  if (!value) {
+    return '—';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString('cs-CZ', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+function resolveMilestoneCost(value: number | string | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
 }
 
 /**
@@ -150,6 +195,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const [loadingMilestoneCosts, setLoadingMilestoneCosts] = useState(false);
   const [milestoneCostError, setMilestoneCostError] = useState<ErrorResponse | null>(null);
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<number[]>([]);
+  const [milestoneMetadata, setMilestoneMetadata] = useState<Map<number, ProjectMilestoneSummary>>(new Map());
   const chartTitleId = useId();
   const chartDescId = `${chartTitleId}-desc`;
   const milestoneChartTitleId = useId();
@@ -171,6 +217,7 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     setMilestoneCosts([]);
     setSelectedMilestoneIds([]);
     setMilestoneCostError(null);
+    setMilestoneMetadata(new Map());
   }, [project.id, availableYears]);
 
   // Fetch the long-term project report for the currently selected year.
@@ -184,44 +231,44 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
 
     let ignore = false;
     getProjectLongTermReport(projectId, { from: fromValue, to: toValue })
-      .then((response: ProjectLongTermReportResponse) => {
-        if (ignore) {
-          return;
-        }
-        setReportMeta(response.meta ?? null);
-        setReportMonths(Array.isArray(response.months) ? response.months : []);
-        setTotalHours(typeof response.totalHours === 'number' ? response.totalHours : 0);
-        setTotalCost(typeof response.totalCost === 'number' ? response.totalCost : 0);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (ignore) {
-          return;
-        }
-        const fallbackError: ErrorResponse = {
-          error: {
-            code: 'unknown',
-            message: 'Nepoda?ilo se na??st dlouhodob? report.',
-            httpStatus: 0,
-          },
-        };
-        if (err && typeof err === 'object' && 'error' in err) {
-          setError(err as ErrorResponse);
-        } else {
-          setError(fallbackError);
-        }
-        setReportMonths([]);
-        setReportMeta(null);
-        setTotalHours(0);
-        setTotalCost(0);
-        setLoading(false);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [projectId, fromValue, toValue]);
-
+      .then((response: ProjectLongTermReportResponse) => {
+        if (ignore) {
+          return;
+        }
+        setReportMeta(response.meta ?? null);
+        setReportMonths(Array.isArray(response.months) ? response.months : []);
+        setTotalHours(typeof response.totalHours === 'number' ? response.totalHours : 0);
+        setTotalCost(typeof response.totalCost === 'number' ? response.totalCost : 0);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (ignore) {
+          return;
+        }
+        const fallbackError: ErrorResponse = {
+          error: {
+            code: 'unknown',
+            message: 'Nepoda?ilo se na??st dlouhodob? report.',
+            httpStatus: 0,
+          },
+        };
+        if (err && typeof err === 'object' && 'error' in err) {
+          setError(err as ErrorResponse);
+        } else {
+          setError(fallbackError);
+        }
+        setReportMonths([]);
+        setReportMeta(null);
+        setTotalHours(0);
+        setTotalCost(0);
+        setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [projectId, fromValue, toValue]);
+
   // Keep the milestone cost dataset in sync with the project selection and preserve any previously
   // selected milestone IDs when they are still present in the refreshed payload.
   useEffect(() => {
@@ -266,6 +313,27 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         setMilestoneCosts([]);
         setSelectedMilestoneIds([]);
         setLoadingMilestoneCosts(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    let ignore = false;
+    getProjectActiveMilestones(projectId, true)
+      .then(response => {
+        if (ignore) {
+          return;
+        }
+        const map = new Map<number, ProjectMilestoneSummary>();
+        response.forEach(item => map.set(item.milestoneId, item));
+        setMilestoneMetadata(map);
+      })
+      .catch(() => {
+        if (!ignore) {
+          setMilestoneMetadata(new Map());
+        }
       });
     return () => {
       ignore = true;
@@ -417,6 +485,28 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
     return milestoneCosts.filter(item => allowed.has(item.milestoneId));
   }, [milestoneCosts, selectedMilestoneIds]);
 
+  const selectedMilestoneTableRows = useMemo(() => {
+    if (selectedMilestoneSummaries.length === 0) {
+      return [] as {
+        id: number;
+        title: string;
+        description: string;
+        cost: number;
+        dueDate: string | null;
+      }[];
+    }
+    return selectedMilestoneSummaries.map(summary => {
+      const metadata = milestoneMetadata.get(summary.milestoneId);
+      return {
+        id: summary.milestoneId,
+        title: resolveMilestoneTitle(metadata?.title ?? summary.title),
+        description: formatMilestoneDescription(metadata?.description),
+        cost: Math.max(0, resolveMilestoneCost(summary.totalCost)),
+        dueDate: metadata?.dueDate ?? summary.dueDate ?? null,
+      };
+    });
+  }, [selectedMilestoneSummaries, milestoneMetadata]);
+
   const handleYearChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const parsed = Number(event.target.value);
     if (Number.isFinite(parsed)) {
@@ -426,17 +516,14 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
 
   // Calculate the maximum cost to scale the comparison bars even when the API returns numeric
   // strings (e.g. from JSON serialisation of decimals).
-  const maxMilestoneCost = selectedMilestoneSummaries.reduce((max, item) => {
-    const costValue = typeof item.totalCost === 'number' ? item.totalCost : Number(item.totalCost ?? 0);
-    return Math.max(max, Number.isFinite(costValue) ? costValue : 0);
-  }, 0);
+  const maxMilestoneCost = selectedMilestoneSummaries.reduce(
+    (max, item) => Math.max(max, Math.max(0, resolveMilestoneCost(item.totalCost))),
+    0,
+  );
 
   // Determine whether any of the selected milestones contain a meaningful cost so we can toggle the
   // empty state versus the SVG rendering.
-  const hasMilestoneCostData = selectedMilestoneSummaries.some(item => {
-    const costValue = typeof item.totalCost === 'number' ? item.totalCost : Number(item.totalCost ?? 0);
-    return Number.isFinite(costValue) && costValue > 0;
-  });
+  const hasMilestoneCostData = selectedMilestoneSummaries.some(item => resolveMilestoneCost(item.totalCost) > 0);
 
   const milestoneChartHeight = 320;
   const milestonePaddingX = 56;
@@ -514,6 +601,13 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
   const handleClearMilestoneSelection = useCallback(() => {
     setSelectedMilestoneIds([]);
   }, []);
+
+  const handleSelectAllMilestones = useCallback(() => {
+    if (milestoneCosts.length === 0) {
+      return;
+    }
+    setSelectedMilestoneIds(milestoneCosts.map(item => item.milestoneId));
+  }, [milestoneCosts]);
 
   const emptyState = !loading && !error && !hasChartData && chartPoints.length > 0;
 
@@ -751,51 +845,94 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
         </header>
         <div className="projectLongTerm__comparisonControls">
           <div className="projectLongTerm__milestoneSelectGroup">
-            <p id={milestoneSelectLabelId} className="projectLongTerm__milestoneSelectLabel">
-              Vyberte milníky
-            </p>
-            <div
-              id={milestoneChecklistId}
-              className="projectLongTerm__milestoneChecklist"
-              role="group"
-              aria-labelledby={milestoneSelectLabelId}
-              aria-describedby={milestoneSelectDescribedBy}
-              aria-disabled={milestoneChecklistDisabled}
-              data-disabled={milestoneChecklistDisabled ? 'true' : undefined}
-            >
-              {milestoneCosts.map(milestone => {
-                const optionLabel = formatMilestoneOptionLabel(milestone);
-                const checked = selectedMilestoneIds.includes(milestone.milestoneId);
-                return (
-                  <label
-                    key={milestone.milestoneId}
-                    className="projectLongTerm__milestoneOption"
-                    title={optionLabel}
-                  >
-                    <input
-                      type="checkbox"
-                      value={milestone.milestoneId}
-                      checked={checked}
-                      onChange={() => handleMilestoneToggle(milestone.milestoneId)}
-                      disabled={milestoneChecklistDisabled}
-                    />
-                    <span>{optionLabel}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <p id={milestoneSelectHintId} className="projectLongTerm__milestoneSelectHint">
-              Zaškrtněte milníky, které chcete porovnat.
-            </p>
-            <div className="projectLongTerm__milestoneActions">
-              <button
-                type="button"
-                className="projectLongTerm__milestoneClearButton"
-                onClick={handleClearMilestoneSelection}
-                disabled={selectedMilestoneIds.length === 0 || milestoneChecklistDisabled}
+            <div className="projectLongTerm__milestoneSelectColumn">
+              <p id={milestoneSelectLabelId} className="projectLongTerm__milestoneSelectLabel">
+                Vyberte milníky
+              </p>
+              <div
+                id={milestoneChecklistId}
+                className="projectLongTerm__milestoneChecklist"
+                role="group"
+                aria-labelledby={milestoneSelectLabelId}
+                aria-describedby={milestoneSelectDescribedBy}
+                aria-disabled={milestoneChecklistDisabled}
+                data-disabled={milestoneChecklistDisabled ? 'true' : undefined}
               >
-                Zrušit výběr
-              </button>
+                {milestoneCosts.map(milestone => {
+                  const optionLabel = formatMilestoneOptionLabel(milestone);
+                  const checked = selectedMilestoneIds.includes(milestone.milestoneId);
+                  return (
+                    <label
+                      key={milestone.milestoneId}
+                      className="projectLongTerm__milestoneOption"
+                      title={optionLabel}
+                    >
+                      <input
+                        type="checkbox"
+                        value={milestone.milestoneId}
+                        checked={checked}
+                        onChange={() => handleMilestoneToggle(milestone.milestoneId)}
+                        disabled={milestoneChecklistDisabled}
+                      />
+                      <span>{optionLabel}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p id={milestoneSelectHintId} className="projectLongTerm__milestoneSelectHint">
+                Zaškrtněte milníky, které chcete porovnat.
+              </p>
+              <div className="projectLongTerm__milestoneActions">
+                <button
+                  type="button"
+                  className="projectLongTerm__milestoneActionButton"
+                  onClick={handleClearMilestoneSelection}
+                  disabled={selectedMilestoneIds.length === 0 || milestoneChecklistDisabled}
+                >
+                  Zrušit výběr
+                </button>
+                <button
+                  type="button"
+                  className="projectLongTerm__milestoneActionButton"
+                  onClick={handleSelectAllMilestones}
+                  disabled={milestoneCosts.length === 0 || milestoneChecklistDisabled}
+                >
+                  Vybrat vše
+                </button>
+              </div>
+            </div>
+            <div
+              className="projectLongTerm__selectedMilestoneTableWrapper"
+              data-empty={selectedMilestoneTableRows.length === 0 ? 'true' : undefined}
+            >
+              {selectedMilestoneTableRows.length === 0 ? (
+                <p className="projectLongTerm__selectedMilestoneTablePlaceholder">
+                  Vyberte alespoň jeden milník pro zobrazení detailů.
+                </p>
+              ) : (
+                <div className="projectLongTerm__selectedMilestoneTableScroller">
+                  <table className="projectLongTerm__milestoneTable">
+                    <thead>
+                      <tr>
+                        <th scope="col">Milestone Title</th>
+                        <th scope="col">Popis</th>
+                        <th scope="col">Celkové náklady</th>
+                        <th scope="col">Deadline</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedMilestoneTableRows.map(row => (
+                        <tr key={row.id} className="projectLongTerm__milestoneTableRow">
+                          <td>{row.title}</td>
+                          <td>{row.description}</td>
+                          <td className="projectLongTerm__milestoneTableCost">{formatCurrency(row.cost)}</td>
+                          <td>{formatMilestoneDueDate(row.dueDate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
           {milestoneStatusMessage ? (
@@ -850,10 +987,8 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                 );
               })}
               {selectedMilestoneSummaries.map((milestone, index) => {
-                const costValue =
-                  typeof milestone.totalCost === 'number' ? milestone.totalCost : Number(milestone.totalCost ?? 0);
-                const boundedCost = Math.max(0, Number.isFinite(costValue) ? costValue : 0);
-                const heightRatio = maxMilestoneCost > 0 ? boundedCost / maxMilestoneCost : 0;
+                const costValue = Math.max(0, resolveMilestoneCost(milestone.totalCost));
+                const heightRatio = maxMilestoneCost > 0 ? costValue / maxMilestoneCost : 0;
                 const barHeight = heightRatio * milestonePlotHeight;
                 const xCenter = getMilestoneX(index);
                 const y = milestonePaddingY + (milestonePlotHeight - barHeight);
@@ -871,10 +1006,10 @@ export default function ProjectReportLongTermPage({ project }: ProjectReportLong
                       ry={8}
                       fill="var(--color-accent-strong)"
                     >
-                      <title>{`${optionLabel}: ${formatCurrency(boundedCost)}`}</title>
+                      <title>{`${optionLabel}: ${formatCurrency(costValue)}`}</title>
                     </rect>
                     <text x={xCenter} y={labelY} textAnchor="middle" className="projectLongTerm__chartValue">
-                      {formatCurrency(boundedCost)}
+                      {formatCurrency(costValue)}
                     </text>
                     <text
                       x={xCenter}

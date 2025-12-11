@@ -122,10 +122,17 @@
 }
 
 .projectLongTerm__milestoneSelectGroup {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(320px, 1fr);
+  gap: 16px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.projectLongTerm__milestoneSelectColumn {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: min(100%, 360px);
 }
 
 .projectLongTerm__milestoneSelectLabel {
@@ -181,10 +188,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 4px;
 }
 
-.projectLongTerm__milestoneClearButton {
-  margin-top: 4px;
+.projectLongTerm__milestoneActionButton {
   border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-primary);
@@ -196,13 +203,73 @@
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-.projectLongTerm__milestoneClearButton:hover:not(:disabled) {
+.projectLongTerm__milestoneActionButton:hover:not(:disabled) {
   background: rgba(15, 23, 42, 0.05);
 }
 
-.projectLongTerm__milestoneClearButton:disabled {
+.projectLongTerm__milestoneActionButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.projectLongTerm__selectedMilestoneTableWrapper {
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.02);
+  padding: 12px;
+  min-height: 196px;
+  display: flex;
+  flex-direction: column;
+}
+
+.projectLongTerm__selectedMilestoneTableWrapper[data-empty='true'] {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.projectLongTerm__selectedMilestoneTablePlaceholder {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.projectLongTerm__selectedMilestoneTableScroller {
+  overflow-x: auto;
+}
+
+.projectLongTerm__milestoneTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.projectLongTerm__milestoneTable th,
+.projectLongTerm__milestoneTable td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.projectLongTerm__milestoneTable th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.projectLongTerm__milestoneTable td {
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  vertical-align: top;
+}
+
+.projectLongTerm__milestoneTableRow:last-child td {
+  border-bottom: none;
+}
+
+.projectLongTerm__milestoneTableCost {
+  white-space: nowrap;
+  font-weight: 600;
 }
 
 .projectLongTerm__chartHeader {
@@ -315,5 +382,9 @@
   .projectLongTerm__chartHeader {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .projectLongTerm__milestoneSelectGroup {
+    grid-template-columns: 1fr;
   }
 }
