@@ -119,6 +119,37 @@
   gap: 8px;
 }
 
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-header__actionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  color: var(--color-accent-strong);
+  border-color: rgba(30, 58, 138, 0.2);
+  border-radius: 14px;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+  padding: 0.6em 1.4em;
+}
+
+.page-header__actionButton:hover:not(:disabled),
+.page-header__actionButton:focus-visible:not(:disabled) {
+  background: #eef2ff;
+  border-color: rgba(30, 58, 138, 0.45);
+  color: var(--color-accent-strong);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.12);
+}
+
+.page-header__actionIcon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .page-header__eyebrowRow {
   display: flex;
   align-items: center;

@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import './App.css';
 import Navbar, { type Module } from './components/Navbar';
 import ProjectsPage from './components/ProjectsPage';
@@ -83,6 +84,12 @@ const modules: Module[] = [
   },
 ];
 
+const hiddenNavbarSubmodules = new Set(['interns-admin', 'projects-admin']);
+const navbarModules: Module[] = modules.map(module => ({
+  ...module,
+  submodules: module.submodules.filter(submodule => !hiddenNavbarSubmodules.has(submodule.key)),
+}));
+
 const HelpIcon = ({ text }: { text: string }) => (
   <span
     className="on-demand-helpIcon"
@@ -103,6 +110,23 @@ const HelpIcon = ({ text }: { text: string }) => (
   >
     !
   </span>
+);
+
+const SettingsIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M11.25 1.5h1.5l.47 2.82a7.039 7.039 0 0 1 2.05.947l2.58-1.49 1.06 1.06-1.49 2.58c.395.64.708 1.332.927 2.06L21.75 11.25v1.5l-2.902.673a7.051 7.051 0 0 1-.947 2.05l1.49 2.58-1.06 1.06-2.58-1.49c-.64.395-1.332.708-2.06.927l-.673 2.902h-1.5l-.673-2.902a7.051 7.051 0 0 1-2.05-.947l-2.58 1.49-1.06-1.06 1.49-2.58a7.039 7.039 0 0 1-.927-2.06L2.25 12.75v-1.5l2.902-.673c.219-.728.532-1.42.927-2.06l-1.49-2.58 1.06-1.06 2.58 1.49a7.051 7.051 0 0 1 2.05-.947z" />
+    <circle cx="12" cy="12" r="2.5" />
+  </svg>
 );
 
 type ReportDetailView =
@@ -661,6 +685,38 @@ function App() {
   ) : null;
   const shouldRenderEyebrowRow = headerEyebrowContent !== null || headerEyebrowActions !== null;
 
+  const showInternsManagementAction = isInternsOverview && !isInternDetailRoute;
+  const showProjectsManagementAction = isProjectsOverview;
+  const headerActionButtons: ReactNode[] = [];
+  if (showInternsManagementAction) {
+    headerActionButtons.push(
+      <button
+        key="interns-admin"
+        type="button"
+        className="page-header__actionButton"
+        onClick={() => handleNavigation('interns', 'interns-admin')}
+      >
+        <SettingsIcon className="page-header__actionIcon" />
+        Správa stážistů
+      </button>,
+    );
+  }
+  if (showProjectsManagementAction) {
+    headerActionButtons.push(
+      <button
+        key="projects-admin"
+        type="button"
+        className="page-header__actionButton"
+        onClick={() => handleNavigation('projects', 'projects-admin')}
+      >
+        <SettingsIcon className="page-header__actionIcon" />
+        Správa projektů
+      </button>,
+    );
+  }
+  const headerActions =
+    headerActionButtons.length > 0 ? <div className="page-header__actions">{headerActionButtons}</div> : null;
+
   function handleNavigation(moduleKey: string, submoduleKey?: string) {
     const moduleDef = modules.find(module => module.key === moduleKey) ?? modules[0];
     const fallbackSubmoduleKey = moduleDef.submodules[0]?.key ?? modules[0].submodules[0].key;
@@ -964,7 +1020,7 @@ function App() {
   return (
     <div className="app-shell">
       <Navbar
-        modules={modules}
+        modules={navbarModules}
         activeModuleKey={activeModuleKey}
         activeSubmoduleKey={activeSubmoduleKey}
         onSelect={handleNavigation}
@@ -981,6 +1037,7 @@ function App() {
                   </div>
                 ) : null}
                 <h1>{headerTitle}</h1>
+                {headerActions}
               </div>
               {detailNavigation}
             </div>
